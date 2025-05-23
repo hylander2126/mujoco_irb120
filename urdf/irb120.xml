@@ -1,0 +1,48 @@
+<mujoco model="irb120">
+  <compiler angle="radian"/>
+
+  <asset>
+    <mesh name="base_link" content_type="model/stl" file="base_link.stl"/>
+    <mesh name="link_1" content_type="model/stl" file="link_1.stl"/>
+    <mesh name="link_2" content_type="model/stl" file="link_2.stl"/>
+    <mesh name="link_3" content_type="model/stl" file="link_3.stl"/>
+    <mesh name="link_4" content_type="model/stl" file="link_4.stl"/>
+    <mesh name="link_5" content_type="model/stl" file="link_5.stl"/>
+    <mesh name="link_6" content_type="model/stl" file="link_6.stl"/>
+  </asset>
+
+  <worldbody>
+    <geom type="mesh" rgba="0.737255 0.34902 0.160784 1" mesh="base_link"/>
+    <body name="link_1">
+      <inertial pos="9.77e-05 -0.00012 0.23841" quat="0.682254 0.00390398 0.000308424 0.731105" mass="3.067" diaginertia="0.0144051 0.0142167 0.0104531"/>
+      <joint name="joint_1" pos="0 0 0" axis="0 0 1" range="-2.87979 2.87979" damping="50" frictionloss="1"/>
+      <geom type="mesh" rgba="0.737255 0.34902 0.160784 1" mesh="link_1"/>
+      <body name="link_2" pos="0 0 0.29">
+        <inertial pos="0.00078 -0.00212 0.10124" quat="0.999869 -0.0161472 -0.000833282 0.000226582" mass="3.909" diaginertia="0.0603112 0.0415853 0.0259384"/>
+        <joint name="joint_2" pos="0 0 0" axis="0 1 0" range="-1.91986 1.91986" damping="50" frictionloss="1"/>
+        <geom type="mesh" rgba="0.737255 0.34902 0.160784 1" mesh="link_2"/>
+        <body name="link_3" pos="0 0 0.27">
+          <inertial pos="0.02281 0.00106 0.05791" quat="0.432899 0.550817 0.583108 0.411319" mass="2.944" diaginertia="0.0167239 0.0131155 0.00792802"/>
+          <joint name="joint_3" pos="0 0 0" axis="0 1 0" range="-1.91986 1.22173" damping="10" frictionloss="1"/>
+          <geom type="mesh" rgba="0.737255 0.34902 0.160784 1" mesh="link_3"/>
+          <body name="link_4" pos="0 0 0.07">
+            <inertial pos="0.2247 0.00015 0.00041" quat="-0.00259586 0.70465 0.010211 0.709476" mass="1.328" diaginertia="0.00525375 0.0040137 0.00284611"/>
+            <joint name="joint_4" pos="0 0 0" axis="1 0 0" range="-2.79253 2.79253" damping="5" frictionloss="1"/>
+            <geom type="mesh" rgba="0.737255 0.34902 0.160784 1" mesh="link_4"/>
+            <body name="link_5" pos="0.302 0 0">
+              <inertial pos="-0.00109 3.68e-05 6.22e-05" quat="0.500352 0.501305 0.499724 0.498615" mass="0.546" diaginertia="0.00089283 0.00081547 0.000404884"/>
+              <joint name="joint_5" pos="0 0 0" axis="0 1 0" range="-2.0944 2.0944" damping="2" frictionloss="1"/>
+              <geom type="mesh" rgba="0.737255 0.34902 0.160784 1" mesh="link_5"/>
+              <body name="link_6" pos="0.072 0 0">
+                <inertial pos="0.059632 -9.827e-05 -7.63038e-07" quat="0.499733 0.499729 0.500267 0.500271" mass="0.237" diaginertia="0.00254416 0.00254416 0.0011"/>
+                <joint name="joint_6" pos="0 0 0" axis="1 0 0" range="-6.98132 6.98132" damping="1" frictionloss="1"/>
+                <geom type="mesh" rgba="0.188235 0.196078 0.203922 1" mesh="link_6"/>
+                <geom size="0.01 0.1" pos="0.151 0 0" quat="0.707107 0 0.707107 0" type="cylinder" rgba="0 0 1 1"/>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

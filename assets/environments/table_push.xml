@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco>
+	<compiler angle="radian" coordinate="local" meshdir="../stls/" texturedir="../textures"></compiler>
+	<option timestep="0.002">
+		<flag warmstart="enable"></flag>
+	</option>
+
+	<include file="../shared.xml"></include>
+
+	<actuator>
+        <!-- Control all 6 revolute joints -->
+		<velocity joint="joint_1" name="joint_1" kv="1"/>
+        <velocity joint="joint_2" name="joint_2" kv="1"/>
+        <velocity joint="joint_3" name="joint_3" kv="1"/>
+        <velocity joint="joint_4" name="joint_4" kv="1"/>
+        <velocity joint="joint_5" name="joint_5" kv="1"/>
+        <velocity joint="joint_6" name="joint_6" kv="1"/>
+    </actuator>
+
+	<!-- <actuator>
+		<motor joint="joint_1" name="joint_1" gear="1"/>
+		<motor joint="joint_2" name="joint_2" gear="1"/>
+		<motor joint="joint_3" name="joint_3" gear="1"/>
+		<motor joint="joint_4" name="joint_4" gear="1"/>
+		<motor joint="joint_5" name="joint_5" gear="1"/>
+		<motor joint="joint_6" name="joint_6" gear="1"/>
+	</actuator> -->
+
+	<worldbody>
+		<geom name="floor" size="5 5 5" type="plane" material="grid_mat"/>
+		<!-- <camera name="closeup" pos="0 -100 .07" xyaxes="1 0 0 0 1 2"/> -->
+		<include file="../robot/robot.xml"></include>
+		
+		<!-- Table Surface -->
+		<body pos="1.25 0 0.08" name="table0">
+			<geom size="0.5 0.35 0.02" type="box" mass="2000" material="table_mat"></geom>
+		</body>
+		<!-- Table Base -->
+		<body pos="1.25 0 0.03" name="table1">
+			<geom size="0.15 0.25 0.03" type="box" mass="2000" material="table_mat"></geom>
+		</body>
+		<!-- Rectangular payload -->
+		<include file="../objects/rectangle.xml"></include>
+
+		<light directional="true" ambient="0.2 0.2 0.2" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" castshadow="false" pos="0 0 4" dir="0 0 -1" name="light0"></light>
+	</worldbody>
+</mujoco>

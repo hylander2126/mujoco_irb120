@@ -1,0 +1,69 @@
+<mujoco>
+    <!-- Static marker body for visualization (not part of robot kinematics) -->
+    <!-- <body mocap="true" name="Abb-Robot" pos="0 0 0"> -->
+        <!-- Central marker cube -->
+        <!-- <geom type="box" pos="0 0 0" size="0.005 0.005 0.005" rgba="0 0.5 0 0.7" contype="0" conaffinity="0"/> -->
+        <!-- Reference axes for visualization -->
+        <!-- <geom type="box" pos="0 0 0" size="1 0.005 0.005" rgba="0 0.5 0 0.1" contype="0" conaffinity="0"/> -->
+        <!-- <geom type="box" pos="0 0 0" size="0.005 1 0.001" rgba="0 0.5 0 0.1" contype="0" conaffinity="0"/> -->
+        <!-- <geom type="box" pos="0 0 0" size="0.005 0.005 1" rgba="0 0.5 0 0.1" contype="0" conaffinity="0"/> -->
+    <!-- </body> -->
+
+    <!-- Root body of the robot arm with prismatic joints (XYZ slide) -->
+    <body name="base_link" pos="0.5 0 0">
+        <!-- Sliding joints for Cartesian motion -->
+        <!-- <joint name="robot0:slide0" type="slide" axis="1 0 0" damping="1e+11" armature="0.0001"/>
+        <joint name="robot0:slide1" type="slide" axis="0 1 0" damping="1e+11" armature="0.0001"/>
+        <joint name="robot0:slide2" type="slide" axis="0 0 1" damping="1e+11" armature="0.0001"/> -->
+
+        <!-- Base inertial properties and geometry -->
+        <inertial pos="-0.0036 0 0.0014" quat="0.7605 -0.0133 -0.0061 0.6491" mass="70.1294" diaginertia="1.2869 1.2236 0.9868"/>
+        <geom type="mesh" mesh="base_link" name="robot0:base_link" rgba="1 0.43 0 1" contype="0" conaffinity="0"/>
+        
+        <!-- Begin kinematic chain -->
+        <body name="link_1" pos="0 0 0" gravcomp="1">
+            <joint name="joint_1" type="hinge" axis="0 0 1" range="-2.87979 2.87979" limited="true" damping="1" frictionloss="0.01"/>
+            <inertial pos="0.0006 -0.0004 0.2263" quat="0.8016 -0.0156 -0.0077 0.5977" mass="3.6488" diaginertia="0.0159 0.0157 0.0125"/>
+            <geom type="mesh" mesh="link_1" name="robot0:link_1" rgba="1 0.43 0 1" contype="0" conaffinity="0"/>
+
+            <body name="link_2" pos="0 0 0.29" gravcomp="1"> <!-- 0 0 0.29 -->
+                <joint name="joint_2" type="hinge" axis="0 1 0" range="-1.91986 1.91986" limited="true" damping="1" frictionloss="0.01"/>
+                <inertial pos="0.0005 -0.0047 0.1061" quat="0.999978 0.00659 0.00036 -0.00049" mass="6.1585" diaginertia="0.072 0.054 0.027"/>
+                <geom type="mesh" mesh="link_2" name="robot0:link_2" rgba="1 0.43 0 1" contype="0" conaffinity="0"/>
+
+                <body name="link_3" pos="0 0 0.27" gravcomp="1"> <!-- 0 0 0.27 -->
+                    <joint name="joint_3" type="hinge" axis="0 1 0" range="-1.22173 1.91986" limited="true" damping="1" frictionloss="0.01"/>
+                    <inertial pos="0.0349 0.0006 0.0609" quat="0.5408 0.4564 0.4341 0.5574" mass="2.7659" diaginertia="0.0161 0.0135 0.0062"/>
+                    <geom type="mesh" mesh="link_3" name="robot0:link_3" rgba="1 0.43 0 1" contype="0" conaffinity="0"/>
+
+                    <body name="link_4" pos="0 0 0.07" gravcomp="1"> <!-- 0 0 0.07 -->
+                        <joint name="joint_4" type="hinge" axis="1 0 0" range="-2.79252 2.79252" limited="true" damping="1" frictionloss="0.01"/>
+                        <inertial pos="0.2331 0.0001 0.0016" quat="-0.005 0.716 -0.014 0.698" mass="1.5279" diaginertia="0.0053 0.0039 0.0028"/>
+                        <geom type="mesh" mesh="link_4" name="robot0:link_4" rgba="1 0.43 0 1" contype="0" conaffinity="0"/>
+
+                        <body name="link_5" pos="0.302 0 0" gravcomp="1"> <!-- 0.302 0 0 -->
+                            <joint name="joint_5" type="hinge" axis="0 1 0" range="-2.0944 2.0944" limited="true" damping="1" frictionloss="0.01"/>
+                            <inertial pos="0.0067 0.0002 0.00004" quat="0.4995 0.4994 0.5002 0.5009" mass="0.4420" diaginertia="0.00068 0.00063 0.00028"/>
+                            <geom type="mesh" mesh="link_5" name="robot0:link_5" rgba="1 0.43 0 1" contype="0" conaffinity="0"/>
+
+                            <body name="link_6" pos="0.072 0 0" gravcomp="1"> <!-- 0.072 0 0 -->
+                                <joint name="joint_6" type="hinge" axis="1 0 0" range="-3.142 3.142" limited="true" damping="1" frictionloss="0.01"/> <!---range +-6.98132 -->
+                                <inertial pos="-0.0065 0.0002 0" quat="0.7063 0.7079 -0.0015 -0.0016" mass="0.0139" diaginertia="2.66e-6 1.52e-6 1.48e-6"/>
+                                <geom type="mesh" mesh="link_6" name="robot0:link_6" rgba="0 0 0 1" contype="0" conaffinity="0"/>
+                                
+                                <!-- Pusher link -->
+                                <body name="pusher_link" pos="0 0 0" euler="0 1.5708 0" gravcomp="1">
+                                    <!-- <joint name="pusher_joint" type="slide" axis="1 0 0" damping="1e+11" armature="0.0001"/> -->
+                                    <inertial pos="-0.09 -0.0001 -0.0017" quat="0 0.7071 0 0.7071" mass="0.02" diaginertia="0.0024 0.0019 0.0013"/>
+                                    <geom type="mesh" mesh="pusher_link" name="robot0:pusher_link" material="robot0:gripper_mat"/>
+                                    <!-- Pusher contact site -->
+                                    <site name="ee_site" type="sphere" pos="0.0 0.0 0.0" size="0.01" rgba="1 0 0 1"/>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </body>
+</mujoco>
