@@ -1,5 +1,6 @@
 <mujoco>
-    <compiler angle="radian" meshdir="../stls/" />
+    <!-- <compiler angle="radian" />  -->
+    <!-- meshdir="../stls/" /> -->
     <size njmax="500" nconmax="100" />
     <asset>
         <texture type="skybox" builtin="gradient" rgb1="0.44 0.85 0.56" rgb2="0.46 0.87 0.58" width="32" height="32"></texture>
@@ -23,7 +24,18 @@
         <mesh name="link_5" file="link_5.stl" />
         <mesh name="link_6" file="link_6.stl" />
         <mesh name="pusher_link" file="pusher_link.stl" scale="0.001 0.001 0.001"/>
-        <!-- <mesh file="gripper_link.stl" name="robot0:gripper_link"></mesh> -->
+
+        <mesh name="flashlight" file="flashlight.stl" scale="1.2 1.2 1.2"/>
+        <mesh name="flash_contact0" file="flash_contact0.stl"/>
+        <mesh name="flash_contact1" file="flash_contact1.stl"/>
+
+        <mesh name="stanfordbunny" file="stanfordbunny.stl" scale="1.5 1.5 1.5"/>
+        <mesh name="bunny_contact0" file="bunny_contact0.stl"/>
+        <mesh name="bunny_contact1" file="bunny_contact1.stl"/>
+        <mesh name="bunny_contact2" file="bunny_contact2.stl"/>
+        <mesh name="bunny_contact3" file="bunny_contact3.stl"/>
+        <mesh name="bunny_contact4" file="bunny_contact4.stl"/>
+        <mesh name="bunny_contact5" file="bunny_contact5.stl"/>
     </asset>
     
     <!-- <equality>
