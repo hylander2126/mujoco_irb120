@@ -1,0 +1,8 @@
+<mujoco>
+    <body name="payload" pos="1 0 0.2">
+        <joint name="payload:joint" type="free" damping="0.01"></joint>
+        <geom name="payload" type="mesh" mesh="flashlight" pos="0 0 0" material="block_mat" mass="0.1"/>
+        <site name="payload_site" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
+        <site name="frame_site" pos="0.04 0.04 -0.1" size="0.02 0.02 0.02" type="box" rgba="1 0 0 0"></site>
+    </body>
+</mujoco>

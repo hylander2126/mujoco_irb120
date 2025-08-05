@@ -1,0 +1,2277 @@
+MuJoCo version 3.3.2
+model name     irb120
+
+MEMORY
+  total         189.1 KB
+  meshes         53.7 KB
+
+SIZES
+  nq                  6
+  nv                  6
+  nbody               7
+  nbvh                1398
+  nbvhstatic          1398
+  njnt                6
+  ngeom               8
+  nmesh               7
+  nmeshvert           363
+  nmeshnormal         363
+  nmeshface           698
+  nmeshgraph          5291
+  nmeshpoly           647
+  nmeshpolyvert       1992
+  nmeshpolymap        1992
+  nnames              163
+  npaths              80
+  nnames_map          56
+  nM                  21
+  nB                  42
+  nC                  21
+  nD                  36
+  ntree               1
+  njmax               -1
+  nconmax             -1
+  narena              13631488
+  nbuffer             195856
+
+OPTION
+  timestep            0.002   
+  apirate             1e+02   
+  impratio            1       
+  tolerance           1e-08   
+  ls_tolerance        0.01    
+  noslip_tolerance    1e-06   
+  ccd_tolerance       1e-06   
+  density             0       
+  viscosity           0       
+  o_margin            0       
+  integrator          0
+  cone                0
+  jacobian            2
+  solver              2
+  iterations          100
+  ls_iterations       50
+  noslip_iterations   0
+  ccd_iterations      50
+  disableflags        0
+  enableflags         0
+  disableactuator     0
+  sdf_initpoints      40
+  sdf_iterations      10
+  gravity             0         0        -9.8      
+  wind                0         0         0        
+  magnetic            0        -0.5       0        
+  o_solref            0.02      1        
+  o_solimp            0.9       0.95      0.001     0.5       2        
+  o_friction          1         1         0.005     0.0001    0.0001   
+
+totalmass             12      
+
+STATISTIC
+  meaninertia         0.21    
+  meanmass            2       
+  meansize            0.2     
+  extent              0.93    
+  center              0.18     0.00025  0.33    
+
+qpos0                 0         0         0         0         0         0        
+
+qpos_spring           0         0         0         0         0         0        
+
+
+BODY 0:
+  name                  world
+  body_parentid         0 
+  body_rootid           0 
+  body_weldid           0 
+  body_mocapid          -1 
+  body_jntnum           0 
+  body_jntadr           -1 
+  body_dofnum           0 
+  body_dofadr           -1 
+  body_treeid           -1 
+  body_geomnum          1 
+  body_geomadr          0 
+  body_simple           1 
+  body_sameframe        1 
+  body_pos              0         0         0        
+  body_quat             1         0         0         0        
+  body_ipos             0         0         0        
+  body_iquat            1         0         0         0        
+  body_mass             0        
+  body_subtreemass      12       
+  body_inertia          0         0         0        
+  body_invweight0       0         0        
+  body_gravcomp         0        
+  body_margin           0        
+  body_plugin           -1 
+  body_contype          1 
+  body_conaffinity      1 
+  body_bvhadr           0 
+  body_bvhnum           1 
+
+BODY 1:
+  name                  link_1
+  body_parentid         0 
+  body_rootid           1 
+  body_weldid           1 
+  body_mocapid          -1 
+  body_jntnum           1 
+  body_jntadr           0 
+  body_dofnum           1 
+  body_dofadr           0 
+  body_treeid           0 
+  body_geomnum          1 
+  body_geomadr          1 
+  body_simple           0 
+  body_sameframe        0 
+  body_pos              0         0         0        
+  body_quat             1         0         0         0        
+  body_ipos             9.8e-05  -0.00012   0.24     
+  body_iquat            0.68      0.0039    0.00031   0.73     
+  body_mass             3.1      
+  body_subtreemass      12       
+  body_inertia          0.014     0.014     0.01     
+  body_invweight0       3.6e-08   1.5      
+  body_gravcomp         0        
+  body_margin           0        
+  body_plugin           -1 
+  body_contype          1 
+  body_conaffinity      1 
+  body_bvhadr           1 
+  body_bvhnum           1 
+
+BODY 2:
+  name                  link_2
+  body_parentid         1 
+  body_rootid           1 
+  body_weldid           2 
+  body_mocapid          -1 
+  body_jntnum           1 
+  body_jntadr           1 
+  body_dofnum           1 
+  body_dofadr           1 
+  body_treeid           0 
+  body_geomnum          1 
+  body_geomadr          2 
+  body_simple           0 
+  body_sameframe        0 
+  body_pos              0         0         0.29     
+  body_quat             1         0         0         0        
+  body_ipos             0.00078  -0.0021    0.1      
+  body_iquat            1        -0.016    -0.00083   0.00023  
+  body_mass             3.9      
+  body_subtreemass      9        
+  body_inertia          0.06      0.042     0.026    
+  body_invweight0       0.0084    2.3      
+  body_gravcomp         0        
+  body_margin           0        
+  body_plugin           -1 
+  body_contype          1 
+  body_conaffinity      1 
+  body_bvhadr           2 
+  body_bvhnum           1 
+
+BODY 3:
+  name                  link_3
+  body_parentid         2 
+  body_rootid           1 
+  body_weldid           3 
+  body_mocapid          -1 
+  body_jntnum           1 
+  body_jntadr           2 
+  body_dofnum           1 
+  body_dofadr           2 
+  body_treeid           0 
+  body_geomnum          1 
+  body_geomadr          3 
+  body_simple           0 
+  body_sameframe        0 
+  body_pos              0         0         0.27     
+  body_quat             1         0         0         0        
+  body_ipos             0.023     0.0011    0.058    
+  body_iquat            0.43      0.55      0.58      0.41     
+  body_mass             2.9      
+  body_subtreemass      5.1      
+  body_inertia          0.017     0.013     0.0079   
+  body_invweight0       0.056     3.7      
+  body_gravcomp         0        
+  body_margin           0        
+  body_plugin           -1 
+  body_contype          1 
+  body_conaffinity      1 
+  body_bvhadr           3 
+  body_bvhnum           1 
+
+BODY 4:
+  name                  link_4
+  body_parentid         3 
+  body_rootid           1 
+  body_weldid           4 
+  body_mocapid          -1 
+  body_jntnum           1 
+  body_jntadr           3 
+  body_dofnum           1 
+  body_dofadr           3 
+  body_treeid           0 
+  body_geomnum          1 
+  body_geomadr          4 
+  body_simple           0 
+  body_sameframe        0 
+  body_pos              0         0         0.07     
+  body_quat             1         0         0         0        
+  body_ipos             0.22      0.00015   0.00041  
+  body_iquat           -0.0026    0.7       0.01      0.71     
+  body_mass             1.3      
+  body_subtreemass      2.1      
+  body_inertia          0.0053    0.004     0.0028   
+  body_invweight0       0.24      1.1e+02  
+  body_gravcomp         0        
+  body_margin           0        
+  body_plugin           -1 
+  body_contype          1 
+  body_conaffinity      1 
+  body_bvhadr           4 
+  body_bvhnum           1 
+
+BODY 5:
+  name                  link_5
+  body_parentid         4 
+  body_rootid           1 
+  body_weldid           5 
+  body_mocapid          -1 
+  body_jntnum           1 
+  body_jntadr           4 
+  body_dofnum           1 
+  body_dofadr           4 
+  body_treeid           0 
+  body_geomnum          1 
+  body_geomadr          5 
+  body_simple           0 
+  body_sameframe        0 
+  body_pos              0.3       0         0        
+  body_quat             1         0         0         0        
+  body_ipos            -0.0011    3.7e-05   6.2e-05  
+  body_iquat            0.5       0.5       0.5       0.5      
+  body_mass             0.55     
+  body_subtreemass      0.78     
+  body_inertia          0.00089   0.00082   0.0004   
+  body_invweight0       0.39      1.5e+02  
+  body_gravcomp         0        
+  body_margin           0        
+  body_plugin           -1 
+  body_contype          1 
+  body_conaffinity      1 
+  body_bvhadr           5 
+  body_bvhnum           1 
+
+BODY 6:
+  name                  link_6
+  body_parentid         5 
+  body_rootid           1 
+  body_weldid           6 
+  body_mocapid          -1 
+  body_jntnum           1 
+  body_jntadr           5 
+  body_dofnum           1 
+  body_dofadr           5 
+  body_treeid           0 
+  body_geomnum          2 
+  body_geomadr          6 
+  body_simple           0 
+  body_sameframe        0 
+  body_pos              0.072     0         0        
+  body_quat             1         0         0         0        
+  body_ipos             0.06     -9.8e-05  -7.6e-07  
+  body_iquat            0.5       0.5       0.5       0.5      
+  body_mass             0.24     
+  body_subtreemass      0.24     
+  body_inertia          0.0025    0.0025    0.0011   
+  body_invweight0       1.1       3.5e+02  
+  body_gravcomp         0        
+  body_margin           0        
+  body_plugin           -1 
+  body_contype          1 
+  body_conaffinity      1 
+  body_bvhadr           6 
+  body_bvhnum           3 
+
+
+JOINT 0:
+  name                  joint_1
+  jnt_type              3 
+  jnt_qposadr           0 
+  jnt_dofadr            0 
+  jnt_bodyid            1 
+  jnt_group             0 
+  jnt_limited           1 
+  jnt_actfrclimited     0 
+  jnt_actgravcomp       0 
+  jnt_solref            0.02      1        
+  jnt_solimp            0.9       0.95      0.001     0.5       2        
+  jnt_pos               0         0         0        
+  jnt_axis              0         0         1        
+  jnt_stiffness         0        
+  jnt_range            -2.9       2.9      
+  jnt_actfrcrange       0         0        
+  jnt_margin            0        
+
+JOINT 1:
+  name                  joint_2
+  jnt_type              3 
+  jnt_qposadr           1 
+  jnt_dofadr            1 
+  jnt_bodyid            2 
+  jnt_group             0 
+  jnt_limited           1 
+  jnt_actfrclimited     0 
+  jnt_actgravcomp       0 
+  jnt_solref            0.02      1        
+  jnt_solimp            0.9       0.95      0.001     0.5       2        
+  jnt_pos               0         0         0        
+  jnt_axis              0         1         0        
+  jnt_stiffness         0        
+  jnt_range            -1.9       1.9      
+  jnt_actfrcrange       0         0        
+  jnt_margin            0        
+
+JOINT 2:
+  name                  joint_3
+  jnt_type              3 
+  jnt_qposadr           2 
+  jnt_dofadr            2 
+  jnt_bodyid            3 
+  jnt_group             0 
+  jnt_limited           1 
+  jnt_actfrclimited     0 
+  jnt_actgravcomp       0 
+  jnt_solref            0.02      1        
+  jnt_solimp            0.9       0.95      0.001     0.5       2        
+  jnt_pos               0         0         0        
+  jnt_axis              0         1         0        
+  jnt_stiffness         0        
+  jnt_range            -1.9       1.2      
+  jnt_actfrcrange       0         0        
+  jnt_margin            0        
+
+JOINT 3:
+  name                  joint_4
+  jnt_type              3 
+  jnt_qposadr           3 
+  jnt_dofadr            3 
+  jnt_bodyid            4 
+  jnt_group             0 
+  jnt_limited           1 
+  jnt_actfrclimited     0 
+  jnt_actgravcomp       0 
+  jnt_solref            0.02      1        
+  jnt_solimp            0.9       0.95      0.001     0.5       2        
+  jnt_pos               0         0         0        
+  jnt_axis              1         0         0        
+  jnt_stiffness         0        
+  jnt_range            -2.8       2.8      
+  jnt_actfrcrange       0         0        
+  jnt_margin            0        
+
+JOINT 4:
+  name                  joint_5
+  jnt_type              3 
+  jnt_qposadr           4 
+  jnt_dofadr            4 
+  jnt_bodyid            5 
+  jnt_group             0 
+  jnt_limited           1 
+  jnt_actfrclimited     0 
+  jnt_actgravcomp       0 
+  jnt_solref            0.02      1        
+  jnt_solimp            0.9       0.95      0.001     0.5       2        
+  jnt_pos               0         0         0        
+  jnt_axis              0         1         0        
+  jnt_stiffness         0        
+  jnt_range            -2.1       2.1      
+  jnt_actfrcrange       0         0        
+  jnt_margin            0        
+
+JOINT 5:
+  name                  joint_6
+  jnt_type              3 
+  jnt_qposadr           5 
+  jnt_dofadr            5 
+  jnt_bodyid            6 
+  jnt_group             0 
+  jnt_limited           1 
+  jnt_actfrclimited     0 
+  jnt_actgravcomp       0 
+  jnt_solref            0.02      1        
+  jnt_solimp            0.9       0.95      0.001     0.5       2        
+  jnt_pos               0         0         0        
+  jnt_axis              1         0         0        
+  jnt_stiffness         0        
+  jnt_range            -7         7        
+  jnt_actfrcrange       0         0        
+  jnt_margin            0        
+
+
+DOF 0:
+  dof_bodyid            1 
+  dof_jntid             0 
+  dof_parentid          -1 
+  dof_treeid            0 
+  dof_Madr              0 
+  dof_simplenum         0 
+  dof_solref            0.02      1        
+  dof_solimp            0.9       0.95      0.001     0.5       2        
+  dof_frictionloss      1        
+  dof_armature          0        
+  dof_damping           50       
+  dof_invweight0        4.5      
+  dof_M0                0.22     
+
+DOF 1:
+  dof_bodyid            2 
+  dof_jntid             1 
+  dof_parentid          0 
+  dof_treeid            0 
+  dof_Madr              1 
+  dof_simplenum         0 
+  dof_solref            0.02      1        
+  dof_solimp            0.9       0.95      0.001     0.5       2        
+  dof_frictionloss      1        
+  dof_armature          0        
+  dof_damping           50       
+  dof_invweight0        2.5      
+  dof_M0                0.83     
+
+DOF 2:
+  dof_bodyid            3 
+  dof_jntid             2 
+  dof_parentid          1 
+  dof_treeid            0 
+  dof_Madr              3 
+  dof_simplenum         0 
+  dof_solref            0.02      1        
+  dof_solimp            0.9       0.95      0.001     0.5       2        
+  dof_frictionloss      1        
+  dof_armature          0        
+  dof_damping           10       
+  dof_invweight0        11       
+  dof_M0                0.21     
+
+DOF 3:
+  dof_bodyid            4 
+  dof_jntid             3 
+  dof_parentid          2 
+  dof_treeid            0 
+  dof_Madr              6 
+  dof_simplenum         0 
+  dof_solref            0.02      1        
+  dof_solimp            0.9       0.95      0.001     0.5       2        
+  dof_frictionloss      1        
+  dof_armature          0        
+  dof_damping           5        
+  dof_invweight0        3.1e+02  
+  dof_M0                0.0044   
+
+DOF 4:
+  dof_bodyid            5 
+  dof_jntid             4 
+  dof_parentid          3 
+  dof_treeid            0 
+  dof_Madr              10 
+  dof_simplenum         0 
+  dof_solref            0.02      1        
+  dof_solimp            0.9       0.95      0.001     0.5       2        
+  dof_frictionloss      1        
+  dof_armature          0        
+  dof_damping           2        
+  dof_invweight0        1.6e+02  
+  dof_M0                0.0075   
+
+DOF 5:
+  dof_bodyid            6 
+  dof_jntid             5 
+  dof_parentid          4 
+  dof_treeid            0 
+  dof_Madr              15 
+  dof_simplenum         0 
+  dof_solref            0.02      1        
+  dof_solimp            0.9       0.95      0.001     0.5       2        
+  dof_frictionloss      1        
+  dof_armature          0        
+  dof_damping           1        
+  dof_invweight0        1.2e+03  
+  dof_M0                0.0011   
+
+
+GEOM 0:
+  name                  
+  geom_type             7 
+  geom_contype          1 
+  geom_conaffinity      1 
+  geom_condim           3 
+  geom_bodyid           0 
+  geom_dataid           0 
+  geom_matid            -1 
+  geom_group            0 
+  geom_priority         0 
+  geom_plugin           -1 
+  geom_sameframe        0 
+  geom_solmix           1        
+  geom_solref           0.02      1        
+  geom_solimp           0.9       0.95      0.001     0.5       2        
+  geom_size             0.09      0.097     0.17     
+  geom_aabb             0.0014   -0.00023  -0.015     0.089     0.097     0.16     
+  geom_rbound           0.22     
+  geom_pos             -0.047     5.7e-05   0.079    
+  geom_quat             0.019     0.7       0.015     0.72     
+  geom_friction         1         0.005     0.0001   
+  geom_margin           0        
+  geom_gap              0        
+  geom_fluid            0         0         0         0         0         0         0         0         0         0         0         0        
+  geom_rgba             0.74      0.35      0.16      1        
+
+GEOM 1:
+  name                  
+  geom_type             7 
+  geom_contype          1 
+  geom_conaffinity      1 
+  geom_condim           3 
+  geom_bodyid           1 
+  geom_dataid           1 
+  geom_matid            -1 
+  geom_group            0 
+  geom_priority         0 
+  geom_plugin           -1 
+  geom_sameframe        0 
+  geom_solmix           1        
+  geom_solref           0.02      1        
+  geom_solimp           0.9       0.95      0.001     0.5       2        
+  geom_size             0.13      0.12      0.13     
+  geom_aabb            -0.012     0.0077    0.0088    0.11      0.11      0.12     
+  geom_rbound           0.22     
+  geom_pos              0.00099  -0.00069   0.24     
+  geom_quat             0.99     -0.063    -0.095     0.037    
+  geom_friction         1         0.005     0.0001   
+  geom_margin           0        
+  geom_gap              0        
+  geom_fluid            0         0         0         0         0         0         0         0         0         0         0         0        
+  geom_rgba             0.74      0.35      0.16      1        
+
+GEOM 2:
+  name                  
+  geom_type             7 
+  geom_contype          1 
+  geom_conaffinity      1 
+  geom_condim           3 
+  geom_bodyid           2 
+  geom_dataid           2 
+  geom_matid            -1 
+  geom_group            0 
+  geom_priority         0 
+  geom_plugin           -1 
+  geom_sameframe        0 
+  geom_solmix           1        
+  geom_solref           0.02      1        
+  geom_solimp           0.9       0.95      0.001     0.5       2        
+  geom_size             0.078     0.12      0.23     
+  geom_aabb             0.00024  -0.00026   0.02      0.078     0.12      0.21     
+  geom_rbound           0.27     
+  geom_pos             -0.00014   0.00025   0.1      
+  geom_quat             1        -0.0024    0.00015   0.0029   
+  geom_friction         1         0.005     0.0001   
+  geom_margin           0        
+  geom_gap              0        
+  geom_fluid            0         0         0         0         0         0         0         0         0         0         0         0        
+  geom_rgba             0.74      0.35      0.16      1        
+
+GEOM 3:
+  name                  
+  geom_type             7 
+  geom_contype          1 
+  geom_conaffinity      1 
+  geom_condim           3 
+  geom_bodyid           3 
+  geom_dataid           3 
+  geom_matid            -1 
+  geom_group            0 
+  geom_priority         0 
+  geom_plugin           -1 
+  geom_sameframe        0 
+  geom_solmix           1        
+  geom_solref           0.02      1        
+  geom_solimp           0.9       0.95      0.001     0.5       2        
+  geom_size             0.061     0.1       0.14     
+  geom_aabb            -0.00029   0.00028   0.0094    0.061     0.1       0.13     
+  geom_rbound           0.18     
+  geom_pos              0.028     0.0009    0.054    
+  geom_quat             0.54      0.46      0.44      0.55     
+  geom_friction         1         0.005     0.0001   
+  geom_margin           0        
+  geom_gap              0        
+  geom_fluid            0         0         0         0         0         0         0         0         0         0         0         0        
+  geom_rgba             0.74      0.35      0.16      1        
+
+GEOM 4:
+  name                  
+  geom_type             7 
+  geom_contype          1 
+  geom_conaffinity      1 
+  geom_condim           3 
+  geom_bodyid           4 
+  geom_dataid           4 
+  geom_matid            -1 
+  geom_group            0 
+  geom_priority         0 
+  geom_plugin           -1 
+  geom_sameframe        0 
+  geom_solmix           1        
+  geom_solref           0.02      1        
+  geom_solimp           0.9       0.95      0.001     0.5       2        
+  geom_size             0.06      0.068     0.11     
+  geom_aabb             0.0039    0.0012    0.0054    0.056     0.067     0.1      
+  geom_rbound           0.14     
+  geom_pos              0.24      0.00027   0.0016   
+  geom_quat            -0.0069    0.72     -0.014     0.7      
+  geom_friction         1         0.005     0.0001   
+  geom_margin           0        
+  geom_gap              0        
+  geom_fluid            0         0         0         0         0         0         0         0         0         0         0         0        
+  geom_rgba             0.74      0.35      0.16      1        
+
+GEOM 5:
+  name                  
+  geom_type             7 
+  geom_contype          1 
+  geom_conaffinity      1 
+  geom_condim           3 
+  geom_bodyid           5 
+  geom_dataid           5 
+  geom_matid            -1 
+  geom_group            0 
+  geom_priority         0 
+  geom_plugin           -1 
+  geom_sameframe        0 
+  geom_solmix           1        
+  geom_solref           0.02      1        
+  geom_solimp           0.9       0.95      0.001     0.5       2        
+  geom_size             0.038     0.044     0.072    
+  geom_aabb            -0.00038   6e-05    -0.0015    0.038     0.044     0.07     
+  geom_rbound           0.092    
+  geom_pos              0.0018    1.1e-05  -3.3e-05  
+  geom_quat             0.5       0.5       0.5       0.5      
+  geom_friction         1         0.005     0.0001   
+  geom_margin           0        
+  geom_gap              0        
+  geom_fluid            0         0         0         0         0         0         0         0         0         0         0         0        
+  geom_rgba             0.74      0.35      0.16      1        
+
+GEOM 6:
+  name                  
+  geom_type             7 
+  geom_contype          1 
+  geom_conaffinity      1 
+  geom_condim           3 
+  geom_bodyid           6 
+  geom_dataid           6 
+  geom_matid            -1 
+  geom_group            0 
+  geom_priority         0 
+  geom_plugin           -1 
+  geom_sameframe        0 
+  geom_solmix           1        
+  geom_solref           0.02      1        
+  geom_solimp           0.9       0.95      0.001     0.5       2        
+  geom_size             0.0068    0.021     0.021    
+  geom_aabb             7.3e-07  -5.2e-05   5.5e-05   0.0068    0.021     0.021    
+  geom_rbound           0.031    
+  geom_pos             -0.0065   -3.2e-06   1.9e-06  
+  geom_quat             1        -0.073     0         0        
+  geom_friction         1         0.005     0.0001   
+  geom_margin           0        
+  geom_gap              0        
+  geom_fluid            0         0         0         0         0         0         0         0         0         0         0         0        
+  geom_rgba             0.19      0.2       0.2       1        
+
+GEOM 7:
+  name                  
+  geom_type             5 
+  geom_contype          1 
+  geom_conaffinity      1 
+  geom_condim           3 
+  geom_bodyid           6 
+  geom_dataid           -1 
+  geom_matid            -1 
+  geom_group            0 
+  geom_priority         0 
+  geom_plugin           -1 
+  geom_sameframe        0 
+  geom_solmix           1        
+  geom_solref           0.02      1        
+  geom_solimp           0.9       0.95      0.001     0.5       2        
+  geom_size             0.01      0.1       0        
+  geom_aabb             0         0         0         0.01      0.01      0.1      
+  geom_rbound           0.1      
+  geom_pos              0.15      0         3.4e-17  
+  geom_quat             0.71      0         0.71      0        
+  geom_friction         1         0.005     0.0001   
+  geom_margin           0        
+  geom_gap              0        
+  geom_fluid            0         0         0         0         0         0         0         0         0         0         0         0        
+  geom_rgba             0         0         1         1        
+
+
+MESH 0:
+  name                  base_link
+  mesh_vertadr          0 
+  mesh_vertnum          52 
+  mesh_normaladr        0 
+  mesh_normalnum        52 
+  mesh_texcoordadr      -1 
+  mesh_texcoordnum      0 
+  mesh_faceadr          0 
+  mesh_facenum          100 
+  mesh_bvhadr           9 
+  mesh_bvhnum           199 
+  mesh_graphadr         0 
+  mesh_scale            1         1         1        
+  mesh_pos             -0.047     5.7e-05   0.079    
+  mesh_quat             0.019     0.7       0.015     0.72     
+  mesh_pathadr          0 
+  mesh_polynum          80 
+  mesh_polyadr          0 
+  qhull face            100
+  qhull vert            52
+
+MESH 1:
+  name                  link_1
+  mesh_vertadr          52 
+  mesh_vertnum          52 
+  mesh_normaladr        52 
+  mesh_normalnum        52 
+  mesh_texcoordadr      -1 
+  mesh_texcoordnum      0 
+  mesh_faceadr          100 
+  mesh_facenum          100 
+  mesh_bvhadr           208 
+  mesh_bvhnum           199 
+  mesh_graphadr         758 
+  mesh_scale            1         1         1        
+  mesh_pos              0.00099  -0.00069   0.24     
+  mesh_quat             0.99     -0.063    -0.095     0.037    
+  mesh_pathadr          14 
+  mesh_polynum          98 
+  mesh_polyadr          80 
+  qhull face            100
+  qhull vert            52
+
+MESH 2:
+  name                  link_2
+  mesh_vertadr          104 
+  mesh_vertnum          51 
+  mesh_normaladr        104 
+  mesh_normalnum        51 
+  mesh_texcoordadr      -1 
+  mesh_texcoordnum      0 
+  mesh_faceadr          200 
+  mesh_facenum          98 
+  mesh_bvhadr           407 
+  mesh_bvhnum           195 
+  mesh_graphadr         1516 
+  mesh_scale            1         1         1        
+  mesh_pos             -0.00014   0.00025   0.1      
+  mesh_quat             1        -0.0024    0.00015   0.0029   
+  mesh_pathadr          25 
+  mesh_polynum          95 
+  mesh_polyadr          178 
+  qhull face            98
+  qhull vert            51
+
+MESH 3:
+  name                  link_3
+  mesh_vertadr          155 
+  mesh_vertnum          52 
+  mesh_normaladr        155 
+  mesh_normalnum        52 
+  mesh_texcoordadr      -1 
+  mesh_texcoordnum      0 
+  mesh_faceadr          298 
+  mesh_facenum          100 
+  mesh_bvhadr           602 
+  mesh_bvhnum           199 
+  mesh_graphadr         2259 
+  mesh_scale            1         1         1        
+  mesh_pos              0.028     0.0009    0.054    
+  mesh_quat             0.54      0.46      0.44      0.55     
+  mesh_pathadr          36 
+  mesh_polynum          100 
+  mesh_polyadr          273 
+  qhull face            100
+  qhull vert            52
+
+MESH 4:
+  name                  link_4
+  mesh_vertadr          207 
+  mesh_vertnum          52 
+  mesh_normaladr        207 
+  mesh_normalnum        52 
+  mesh_texcoordadr      -1 
+  mesh_texcoordnum      0 
+  mesh_faceadr          398 
+  mesh_facenum          100 
+  mesh_bvhadr           801 
+  mesh_bvhnum           199 
+  mesh_graphadr         3017 
+  mesh_scale            1         1         1        
+  mesh_pos              0.24      0.00027   0.0016   
+  mesh_quat            -0.0069    0.72     -0.014     0.7      
+  mesh_pathadr          47 
+  mesh_polynum          100 
+  mesh_polyadr          373 
+  qhull face            100
+  qhull vert            52
+
+MESH 5:
+  name                  link_5
+  mesh_vertadr          259 
+  mesh_vertnum          52 
+  mesh_normaladr        259 
+  mesh_normalnum        52 
+  mesh_texcoordadr      -1 
+  mesh_texcoordnum      0 
+  mesh_faceadr          498 
+  mesh_facenum          100 
+  mesh_bvhadr           1000 
+  mesh_bvhnum           199 
+  mesh_graphadr         3775 
+  mesh_scale            1         1         1        
+  mesh_pos              0.0018    1.1e-05  -3.3e-05  
+  mesh_quat             0.5       0.5       0.5       0.5      
+  mesh_pathadr          58 
+  mesh_polynum          98 
+  mesh_polyadr          473 
+  qhull face            100
+  qhull vert            52
+
+MESH 6:
+  name                  link_6
+  mesh_vertadr          311 
+  mesh_vertnum          52 
+  mesh_normaladr        311 
+  mesh_normalnum        52 
+  mesh_texcoordadr      -1 
+  mesh_texcoordnum      0 
+  mesh_faceadr          598 
+  mesh_facenum          100 
+  mesh_bvhadr           1199 
+  mesh_bvhnum           199 
+  mesh_graphadr         4533 
+  mesh_scale            1         1         1        
+  mesh_pos             -0.0065   -3.2e-06   1.9e-06  
+  mesh_quat             1        -0.073     0         0        
+  mesh_pathadr          69 
+  mesh_polynum          76 
+  mesh_polyadr          571 
+  qhull face            100
+  qhull vert            52
+
+BVH:
+  id      depth   nodeid  child[0]  child[1]
+  0       0        0      -1        -1
+  1       0        1      -1        -1
+  2       0        2      -1        -1
+  3       0        3      -1        -1
+  4       0        4      -1        -1
+  5       0        5      -1        -1
+  6       0        6       1         2
+  7       1        6      -1        -1
+  8       1        7      -1        -1
+  9       0       -1       1         100
+  10      1       -1       2         51
+  11      2       -1       3         26
+  12      3       -1       4         15
+  13      4       -1       5         10
+  14      5       -1       6         7
+  15      6        91     -1        -1
+  16      6       -1       8         9
+  17      7        92     -1        -1
+  18      7        87     -1        -1
+  19      5       -1       11        12
+  20      6        46     -1        -1
+  21      6       -1       13        14
+  22      7        83     -1        -1
+  23      7        88     -1        -1
+  24      4       -1       16        21
+  25      5       -1       17        18
+  26      6        90     -1        -1
+  27      6       -1       19        20
+  28      7        38     -1        -1
+  29      7        13     -1        -1
+  30      5       -1       22        23
+  31      6        89     -1        -1
+  32      6       -1       24        25
+  33      7        12     -1        -1
+  34      7        42     -1        -1
+  35      3       -1       27        38
+  36      4       -1       28        33
+  37      5       -1       29        30
+  38      6        2      -1        -1
+  39      6       -1       31        32
+  40      7        1      -1        -1
+  41      7        36     -1        -1
+  42      5       -1       34        35
+  43      6        37     -1        -1
+  44      6       -1       36        37
+  45      7        34     -1        -1
+  46      7        10     -1        -1
+  47      4       -1       39        44
+  48      5       -1       40        41
+  49      6        39     -1        -1
+  50      6       -1       42        43
+  51      7        40     -1        -1
+  52      7        35     -1        -1
+  53      5       -1       45        48
+  54      6       -1       46        47
+  55      7        11     -1        -1
+  56      7        0      -1        -1
+  57      6       -1       49        50
+  58      7        16     -1        -1
+  59      7        15     -1        -1
+  60      2       -1       52        75
+  61      3       -1       53        64
+  62      4       -1       54        59
+  63      5       -1       55        56
+  64      6        3      -1        -1
+  65      6       -1       57        58
+  66      7        41     -1        -1
+  67      7        30     -1        -1
+  68      5       -1       60        61
+  69      6        4      -1        -1
+  70      6       -1       62        63
+  71      7        32     -1        -1
+  72      7        45     -1        -1
+  73      4       -1       65        70
+  74      5       -1       66        67
+  75      6        44     -1        -1
+  76      6       -1       68        69
+  77      7        43     -1        -1
+  78      7        33     -1        -1
+  79      5       -1       71        72
+  80      6        86     -1        -1
+  81      6       -1       73        74
+  82      7        84     -1        -1
+  83      7        99     -1        -1
+  84      3       -1       76        87
+  85      4       -1       77        82
+  86      5       -1       78        79
+  87      6        85     -1        -1
+  88      6       -1       80        81
+  89      7        24     -1        -1
+  90      7        17     -1        -1
+  91      5       -1       83        84
+  92      6        25     -1        -1
+  93      6       -1       85        86
+  94      7        7      -1        -1
+  95      7        9      -1        -1
+  96      4       -1       88        93
+  97      5       -1       89        90
+  98      6        71     -1        -1
+  99      6       -1       91        92
+  100     7        78     -1        -1
+  101     7        76     -1        -1
+  102     5       -1       94        97
+  103     6       -1       95        96
+  104     7        53     -1        -1
+  105     7        52     -1        -1
+  106     6       -1       98        99
+  107     7        57     -1        -1
+  108     7        58     -1        -1
+  109     1       -1       101       150
+  110     2       -1       102       125
+  111     3       -1       103       114
+  112     4       -1       104       109
+  113     5       -1       105       106
+  114     6        23     -1        -1
+  115     6       -1       107       108
+  116     7        61     -1        -1
+  117     7        67     -1        -1
+  118     5       -1       110       111
+  119     6        63     -1        -1
+  120     6       -1       112       113
+  121     7        62     -1        -1
+  122     7        80     -1        -1
+  123     4       -1       115       120
+  124     5       -1       116       117
+  125     6        98     -1        -1
+  126     6       -1       118       119
+  127     7        8      -1        -1
+  128     7        79     -1        -1
+  129     5       -1       121       122
+  130     6        96     -1        -1
+  131     6       -1       123       124
+  132     7        97     -1        -1
+  133     7        93     -1        -1
+  134     3       -1       126       137
+  135     4       -1       127       132
+  136     5       -1       128       129
+  137     6        18     -1        -1
+  138     6       -1       130       131
+  139     7        19     -1        -1
+  140     7        47     -1        -1
+  141     5       -1       133       134
+  142     6        94     -1        -1
+  143     6       -1       135       136
+  144     7        48     -1        -1
+  145     7        68     -1        -1
+  146     4       -1       138       143
+  147     5       -1       139       140
+  148     6        69     -1        -1
+  149     6       -1       141       142
+  150     7        65     -1        -1
+  151     7        64     -1        -1
+  152     5       -1       144       147
+  153     6       -1       145       146
+  154     7        14     -1        -1
+  155     7        82     -1        -1
+  156     6       -1       148       149
+  157     7        72     -1        -1
+  158     7        95     -1        -1
+  159     2       -1       151       174
+  160     3       -1       152       163
+  161     4       -1       153       158
+  162     5       -1       154       155
+  163     6        31     -1        -1
+  164     6       -1       156       157
+  165     7        21     -1        -1
+  166     7        66     -1        -1
+  167     5       -1       159       160
+  168     6        50     -1        -1
+  169     6       -1       161       162
+  170     7        51     -1        -1
+  171     7        49     -1        -1
+  172     4       -1       164       169
+  173     5       -1       165       166
+  174     6        81     -1        -1
+  175     6       -1       167       168
+  176     7        73     -1        -1
+  177     7        74     -1        -1
+  178     5       -1       170       171
+  179     6        77     -1        -1
+  180     6       -1       172       173
+  181     7        27     -1        -1
+  182     7        75     -1        -1
+  183     3       -1       175       186
+  184     4       -1       176       181
+  185     5       -1       177       178
+  186     6        22     -1        -1
+  187     6       -1       179       180
+  188     7        60     -1        -1
+  189     7        20     -1        -1
+  190     5       -1       182       183
+  191     6        5      -1        -1
+  192     6       -1       184       185
+  193     7        55     -1        -1
+  194     7        59     -1        -1
+  195     4       -1       187       192
+  196     5       -1       188       189
+  197     6        6      -1        -1
+  198     6       -1       190       191
+  199     7        54     -1        -1
+  200     7        56     -1        -1
+  201     5       -1       193       196
+  202     6       -1       194       195
+  203     7        26     -1        -1
+  204     7        70     -1        -1
+  205     6       -1       197       198
+  206     7        29     -1        -1
+  207     7        28     -1        -1
+  208     0       -1       1         100
+  209     1       -1       2         51
+  210     2       -1       3         26
+  211     3       -1       4         15
+  212     4       -1       5         10
+  213     5       -1       6         7
+  214     6        46     -1        -1
+  215     6       -1       8         9
+  216     7        8      -1        -1
+  217     7        76     -1        -1
+  218     5       -1       11        12
+  219     6        6      -1        -1
+  220     6       -1       13        14
+  221     7        7      -1        -1
+  222     7        44     -1        -1
+  223     4       -1       16        21
+  224     5       -1       17        18
+  225     6        99     -1        -1
+  226     6       -1       19        20
+  227     7        98     -1        -1
+  228     7        19     -1        -1
+  229     5       -1       22        23
+  230     6        20     -1        -1
+  231     6       -1       24        25
+  232     7        96     -1        -1
+  233     7        45     -1        -1
+  234     3       -1       27        38
+  235     4       -1       28        33
+  236     5       -1       29        30
+  237     6        97     -1        -1
+  238     6       -1       31        32
+  239     7        66     -1        -1
+  240     7        61     -1        -1
+  241     5       -1       34        35
+  242     6        64     -1        -1
+  243     6       -1       36        37
+  244     7        65     -1        -1
+  245     7        60     -1        -1
+  246     4       -1       39        44
+  247     5       -1       40        41
+  248     6        18     -1        -1
+  249     6       -1       42        43
+  250     7        63     -1        -1
+  251     7        62     -1        -1
+  252     5       -1       45        48
+  253     6       -1       46        47
+  254     7        59     -1        -1
+  255     7        38     -1        -1
+  256     6       -1       49        50
+  257     7        9      -1        -1
+  258     7        81     -1        -1
+  259     2       -1       52        75
+  260     3       -1       53        64
+  261     4       -1       54        59
+  262     5       -1       55        56
+  263     6        95     -1        -1
+  264     6       -1       57        58
+  265     7        1      -1        -1
+  266     7        42     -1        -1
+  267     5       -1       60        61
+  268     6        22     -1        -1
+  269     6       -1       62        63
+  270     7        21     -1        -1
+  271     7        4      -1        -1
+  272     4       -1       65        70
+  273     5       -1       66        67
+  274     6        77     -1        -1
+  275     6       -1       68        69
+  276     7        23     -1        -1
+  277     7        26     -1        -1
+  278     5       -1       71        72
+  279     6        27     -1        -1
+  280     6       -1       73        74
+  281     7        39     -1        -1
+  282     7        2      -1        -1
+  283     3       -1       76        87
+  284     4       -1       77        82
+  285     5       -1       78        79
+  286     6        78     -1        -1
+  287     6       -1       80        81
+  288     7        43     -1        -1
+  289     7        79     -1        -1
+  290     5       -1       83        84
+  291     6        3      -1        -1
+  292     6       -1       85        86
+  293     7        29     -1        -1
+  294     7        36     -1        -1
+  295     4       -1       88        93
+  296     5       -1       89        90
+  297     6        40     -1        -1
+  298     6       -1       91        92
+  299     7        41     -1        -1
+  300     7        85     -1        -1
+  301     5       -1       94        97
+  302     6       -1       95        96
+  303     7        83     -1        -1
+  304     7        30     -1        -1
+  305     6       -1       98        99
+  306     7        80     -1        -1
+  307     7        33     -1        -1
+  308     1       -1       101       150
+  309     2       -1       102       125
+  310     3       -1       103       114
+  311     4       -1       104       109
+  312     5       -1       105       106
+  313     6        94     -1        -1
+  314     6       -1       107       108
+  315     7        75     -1        -1
+  316     7        11     -1        -1
+  317     5       -1       110       111
+  318     6        16     -1        -1
+  319     6       -1       112       113
+  320     7        17     -1        -1
+  321     7        0      -1        -1
+  322     4       -1       115       120
+  323     5       -1       116       117
+  324     6        24     -1        -1
+  325     6       -1       118       119
+  326     7        74     -1        -1
+  327     7        90     -1        -1
+  328     5       -1       121       122
+  329     6        69     -1        -1
+  330     6       -1       123       124
+  331     7        92     -1        -1
+  332     7        73     -1        -1
+  333     3       -1       126       137
+  334     4       -1       127       132
+  335     5       -1       128       129
+  336     6        68     -1        -1
+  337     6       -1       130       131
+  338     7        67     -1        -1
+  339     7        82     -1        -1
+  340     5       -1       133       134
+  341     6        10     -1        -1
+  342     6       -1       135       136
+  343     7        14     -1        -1
+  344     7        49     -1        -1
+  345     4       -1       138       143
+  346     5       -1       139       140
+  347     6        70     -1        -1
+  348     6       -1       141       142
+  349     7        12     -1        -1
+  350     7        89     -1        -1
+  351     5       -1       144       147
+  352     6       -1       145       146
+  353     7        87     -1        -1
+  354     7        71     -1        -1
+  355     6       -1       148       149
+  356     7        31     -1        -1
+  357     7        88     -1        -1
+  358     2       -1       151       174
+  359     3       -1       152       163
+  360     4       -1       153       158
+  361     5       -1       154       155
+  362     6        28     -1        -1
+  363     6       -1       156       157
+  364     7        93     -1        -1
+  365     7        72     -1        -1
+  366     5       -1       159       160
+  367     6        25     -1        -1
+  368     6       -1       161       162
+  369     7        56     -1        -1
+  370     7        57     -1        -1
+  371     4       -1       164       169
+  372     5       -1       165       166
+  373     6        53     -1        -1
+  374     6       -1       167       168
+  375     7        37     -1        -1
+  376     7        58     -1        -1
+  377     5       -1       170       171
+  378     6        91     -1        -1
+  379     6       -1       172       173
+  380     7        52     -1        -1
+  381     7        55     -1        -1
+  382     3       -1       175       186
+  383     4       -1       176       181
+  384     5       -1       177       178
+  385     6        35     -1        -1
+  386     6       -1       179       180
+  387     7        84     -1        -1
+  388     7        50     -1        -1
+  389     5       -1       182       183
+  390     6        5      -1        -1
+  391     6       -1       184       185
+  392     7        48     -1        -1
+  393     7        51     -1        -1
+  394     4       -1       187       192
+  395     5       -1       188       189
+  396     6        34     -1        -1
+  397     6       -1       190       191
+  398     7        54     -1        -1
+  399     7        32     -1        -1
+  400     5       -1       193       196
+  401     6       -1       194       195
+  402     7        86     -1        -1
+  403     7        47     -1        -1
+  404     6       -1       197       198
+  405     7        15     -1        -1
+  406     7        13     -1        -1
+  407     0       -1       1         98
+  408     1       -1       2         49
+  409     2       -1       3         26
+  410     3       -1       4         15
+  411     4       -1       5         10
+  412     5       -1       6         7
+  413     6        2      -1        -1
+  414     6       -1       8         9
+  415     7        48     -1        -1
+  416     7        67     -1        -1
+  417     5       -1       11        12
+  418     6        10     -1        -1
+  419     6       -1       13        14
+  420     7        65     -1        -1
+  421     7        80     -1        -1
+  422     4       -1       16        21
+  423     5       -1       17        18
+  424     6        90     -1        -1
+  425     6       -1       19        20
+  426     7        47     -1        -1
+  427     7        68     -1        -1
+  428     5       -1       22        23
+  429     6        64     -1        -1
+  430     6       -1       24        25
+  431     7        25     -1        -1
+  432     7        33     -1        -1
+  433     3       -1       27        38
+  434     4       -1       28        33
+  435     5       -1       29        30
+  436     6        0      -1        -1
+  437     6       -1       31        32
+  438     7        34     -1        -1
+  439     7        91     -1        -1
+  440     5       -1       34        35
+  441     6        32     -1        -1
+  442     6       -1       36        37
+  443     7        1      -1        -1
+  444     7        3      -1        -1
+  445     4       -1       39        44
+  446     5       -1       40        41
+  447     6        29     -1        -1
+  448     6       -1       42        43
+  449     7        83     -1        -1
+  450     7        82     -1        -1
+  451     5       -1       45        46
+  452     6        93     -1        -1
+  453     6       -1       47        48
+  454     7        86     -1        -1
+  455     7        85     -1        -1
+  456     2       -1       50        73
+  457     3       -1       51        62
+  458     4       -1       52        57
+  459     5       -1       53        54
+  460     6        27     -1        -1
+  461     6       -1       55        56
+  462     7        9      -1        -1
+  463     7        8      -1        -1
+  464     5       -1       58        59
+  465     6        14     -1        -1
+  466     6       -1       60        61
+  467     7        66     -1        -1
+  468     7        23     -1        -1
+  469     4       -1       63        68
+  470     5       -1       64        65
+  471     6        24     -1        -1
+  472     6       -1       66        67
+  473     7        57     -1        -1
+  474     7        88     -1        -1
+  475     5       -1       69        70
+  476     6        54     -1        -1
+  477     6       -1       71        72
+  478     7        84     -1        -1
+  479     7        55     -1        -1
+  480     3       -1       74        85
+  481     4       -1       75        80
+  482     5       -1       76        77
+  483     6        26     -1        -1
+  484     6       -1       78        79
+  485     7        45     -1        -1
+  486     7        46     -1        -1
+  487     5       -1       81        82
+  488     6        92     -1        -1
+  489     6       -1       83        84
+  490     7        89     -1        -1
+  491     7        87     -1        -1
+  492     4       -1       86        91
+  493     5       -1       87        88
+  494     6        30     -1        -1
+  495     6       -1       89        90
+  496     7        70     -1        -1
+  497     7        28     -1        -1
+  498     5       -1       92        95
+  499     6       -1       93        94
+  500     7        21     -1        -1
+  501     7        36     -1        -1
+  502     6       -1       96        97
+  503     7        79     -1        -1
+  504     7        81     -1        -1
+  505     1       -1       99        146
+  506     2       -1       100       123
+  507     3       -1       101       112
+  508     4       -1       102       107
+  509     5       -1       103       104
+  510     6        61     -1        -1
+  511     6       -1       105       106
+  512     7        96     -1        -1
+  513     7        97     -1        -1
+  514     5       -1       108       109
+  515     6        94     -1        -1
+  516     6       -1       110       111
+  517     7        95     -1        -1
+  518     7        37     -1        -1
+  519     4       -1       113       118
+  520     5       -1       114       115
+  521     6        63     -1        -1
+  522     6       -1       116       117
+  523     7        76     -1        -1
+  524     7        31     -1        -1
+  525     5       -1       119       120
+  526     6        71     -1        -1
+  527     6       -1       121       122
+  528     7        69     -1        -1
+  529     7        5      -1        -1
+  530     3       -1       124       135
+  531     4       -1       125       130
+  532     5       -1       126       127
+  533     6        22     -1        -1
+  534     6       -1       128       129
+  535     7        7      -1        -1
+  536     7        53     -1        -1
+  537     5       -1       131       132
+  538     6        20     -1        -1
+  539     6       -1       133       134
+  540     7        56     -1        -1
+  541     7        43     -1        -1
+  542     4       -1       136       141
+  543     5       -1       137       138
+  544     6        11     -1        -1
+  545     6       -1       139       140
+  546     7        52     -1        -1
+  547     7        44     -1        -1
+  548     5       -1       142       143
+  549     6        6      -1        -1
+  550     6       -1       144       145
+  551     7        60     -1        -1
+  552     7        13     -1        -1
+  553     2       -1       147       170
+  554     3       -1       148       159
+  555     4       -1       149       154
+  556     5       -1       150       151
+  557     6        59     -1        -1
+  558     6       -1       152       153
+  559     7        58     -1        -1
+  560     7        12     -1        -1
+  561     5       -1       155       156
+  562     6        38     -1        -1
+  563     6       -1       157       158
+  564     7        39     -1        -1
+  565     7        51     -1        -1
+  566     4       -1       160       165
+  567     5       -1       161       162
+  568     6        77     -1        -1
+  569     6       -1       163       164
+  570     7        18     -1        -1
+  571     7        17     -1        -1
+  572     5       -1       166       167
+  573     6        16     -1        -1
+  574     6       -1       168       169
+  575     7        19     -1        -1
+  576     7        73     -1        -1
+  577     3       -1       171       182
+  578     4       -1       172       177
+  579     5       -1       173       174
+  580     6        49     -1        -1
+  581     6       -1       175       176
+  582     7        62     -1        -1
+  583     7        35     -1        -1
+  584     5       -1       178       179
+  585     6        75     -1        -1
+  586     6       -1       180       181
+  587     7        78     -1        -1
+  588     7        41     -1        -1
+  589     4       -1       183       188
+  590     5       -1       184       185
+  591     6        40     -1        -1
+  592     6       -1       186       187
+  593     7        42     -1        -1
+  594     7        15     -1        -1
+  595     5       -1       189       192
+  596     6       -1       190       191
+  597     7        74     -1        -1
+  598     7        72     -1        -1
+  599     6       -1       193       194
+  600     7        4      -1        -1
+  601     7        50     -1        -1
+  602     0       -1       1         100
+  603     1       -1       2         51
+  604     2       -1       3         26
+  605     3       -1       4         15
+  606     4       -1       5         10
+  607     5       -1       6         7
+  608     6        32     -1        -1
+  609     6       -1       8         9
+  610     7        66     -1        -1
+  611     7        67     -1        -1
+  612     5       -1       11        12
+  613     6        31     -1        -1
+  614     6       -1       13        14
+  615     7        33     -1        -1
+  616     7        89     -1        -1
+  617     4       -1       16        21
+  618     5       -1       17        18
+  619     6        35     -1        -1
+  620     6       -1       19        20
+  621     7        34     -1        -1
+  622     7        30     -1        -1
+  623     5       -1       22        23
+  624     6        6      -1        -1
+  625     6       -1       24        25
+  626     7        36     -1        -1
+  627     7        7      -1        -1
+  628     3       -1       27        38
+  629     4       -1       28        33
+  630     5       -1       29        30
+  631     6        69     -1        -1
+  632     6       -1       31        32
+  633     7        37     -1        -1
+  634     7        20     -1        -1
+  635     5       -1       34        35
+  636     6        5      -1        -1
+  637     6       -1       36        37
+  638     7        23     -1        -1
+  639     7        22     -1        -1
+  640     4       -1       39        44
+  641     5       -1       40        41
+  642     6        68     -1        -1
+  643     6       -1       42        43
+  644     7        15     -1        -1
+  645     7        24     -1        -1
+  646     5       -1       45        48
+  647     6       -1       46        47
+  648     7        21     -1        -1
+  649     7        16     -1        -1
+  650     6       -1       49        50
+  651     7        26     -1        -1
+  652     7        25     -1        -1
+  653     2       -1       52        75
+  654     3       -1       53        64
+  655     4       -1       54        59
+  656     5       -1       55        56
+  657     6        4      -1        -1
+  658     6       -1       57        58
+  659     7        94     -1        -1
+  660     7        72     -1        -1
+  661     5       -1       60        61
+  662     6        90     -1        -1
+  663     6       -1       62        63
+  664     7        99     -1        -1
+  665     7        88     -1        -1
+  666     4       -1       65        70
+  667     5       -1       66        67
+  668     6        19     -1        -1
+  669     6       -1       68        69
+  670     7        98     -1        -1
+  671     7        10     -1        -1
+  672     5       -1       71        72
+  673     6        27     -1        -1
+  674     6       -1       73        74
+  675     7        28     -1        -1
+  676     7        65     -1        -1
+  677     3       -1       76        87
+  678     4       -1       77        82
+  679     5       -1       78        79
+  680     6        74     -1        -1
+  681     6       -1       80        81
+  682     7        91     -1        -1
+  683     7        95     -1        -1
+  684     5       -1       83        84
+  685     6        29     -1        -1
+  686     6       -1       85        86
+  687     7        87     -1        -1
+  688     7        58     -1        -1
+  689     4       -1       88        93
+  690     5       -1       89        90
+  691     6        73     -1        -1
+  692     6       -1       91        92
+  693     7        41     -1        -1
+  694     7        3      -1        -1
+  695     5       -1       94        97
+  696     6       -1       95        96
+  697     7        42     -1        -1
+  698     7        2      -1        -1
+  699     6       -1       98        99
+  700     7        59     -1        -1
+  701     7        55     -1        -1
+  702     1       -1       101       150
+  703     2       -1       102       125
+  704     3       -1       103       114
+  705     4       -1       104       109
+  706     5       -1       105       106
+  707     6        8      -1        -1
+  708     6       -1       107       108
+  709     7        52     -1        -1
+  710     7        14     -1        -1
+  711     5       -1       110       111
+  712     6        53     -1        -1
+  713     6       -1       112       113
+  714     7        54     -1        -1
+  715     7        51     -1        -1
+  716     4       -1       115       120
+  717     5       -1       116       117
+  718     6        1      -1        -1
+  719     6       -1       118       119
+  720     7        13     -1        -1
+  721     7        86     -1        -1
+  722     5       -1       121       122
+  723     6        83     -1        -1
+  724     6       -1       123       124
+  725     7        85     -1        -1
+  726     7        82     -1        -1
+  727     3       -1       126       137
+  728     4       -1       127       132
+  729     5       -1       128       129
+  730     6        75     -1        -1
+  731     6       -1       130       131
+  732     7        80     -1        -1
+  733     7        81     -1        -1
+  734     5       -1       133       134
+  735     6        92     -1        -1
+  736     6       -1       135       136
+  737     7        93     -1        -1
+  738     7        43     -1        -1
+  739     4       -1       138       143
+  740     5       -1       139       140
+  741     6        84     -1        -1
+  742     6       -1       141       142
+  743     7        46     -1        -1
+  744     7        38     -1        -1
+  745     5       -1       144       147
+  746     6       -1       145       146
+  747     7        12     -1        -1
+  748     7        44     -1        -1
+  749     6       -1       148       149
+  750     7        57     -1        -1
+  751     7        56     -1        -1
+  752     2       -1       151       174
+  753     3       -1       152       163
+  754     4       -1       153       158
+  755     5       -1       154       155
+  756     6        96     -1        -1
+  757     6       -1       156       157
+  758     7        97     -1        -1
+  759     7        0      -1        -1
+  760     5       -1       159       160
+  761     6        70     -1        -1
+  762     6       -1       161       162
+  763     7        40     -1        -1
+  764     7        39     -1        -1
+  765     4       -1       164       169
+  766     5       -1       165       166
+  767     6        47     -1        -1
+  768     6       -1       167       168
+  769     7        76     -1        -1
+  770     7        78     -1        -1
+  771     5       -1       170       171
+  772     6        71     -1        -1
+  773     6       -1       172       173
+  774     7        79     -1        -1
+  775     7        77     -1        -1
+  776     3       -1       175       186
+  777     4       -1       176       181
+  778     5       -1       177       178
+  779     6        63     -1        -1
+  780     6       -1       179       180
+  781     7        45     -1        -1
+  782     7        62     -1        -1
+  783     5       -1       182       183
+  784     6        9      -1        -1
+  785     6       -1       184       185
+  786     7        61     -1        -1
+  787     7        60     -1        -1
+  788     4       -1       187       192
+  789     5       -1       188       189
+  790     6        64     -1        -1
+  791     6       -1       190       191
+  792     7        18     -1        -1
+  793     7        17     -1        -1
+  794     5       -1       193       196
+  795     6       -1       194       195
+  796     7        11     -1        -1
+  797     7        48     -1        -1
+  798     6       -1       197       198
+  799     7        50     -1        -1
+  800     7        49     -1        -1
+  801     0       -1       1         100
+  802     1       -1       2         51
+  803     2       -1       3         26
+  804     3       -1       4         15
+  805     4       -1       5         10
+  806     5       -1       6         7
+  807     6        47     -1        -1
+  808     6       -1       8         9
+  809     7        34     -1        -1
+  810     7        64     -1        -1
+  811     5       -1       11        12
+  812     6        37     -1        -1
+  813     6       -1       13        14
+  814     7        63     -1        -1
+  815     7        87     -1        -1
+  816     4       -1       16        21
+  817     5       -1       17        18
+  818     6        15     -1        -1
+  819     6       -1       19        20
+  820     7        46     -1        -1
+  821     7        61     -1        -1
+  822     5       -1       22        23
+  823     6        16     -1        -1
+  824     6       -1       24        25
+  825     7        18     -1        -1
+  826     7        17     -1        -1
+  827     3       -1       27        38
+  828     4       -1       28        33
+  829     5       -1       29        30
+  830     6        62     -1        -1
+  831     6       -1       31        32
+  832     7        55     -1        -1
+  833     7        82     -1        -1
+  834     5       -1       34        35
+  835     6        80     -1        -1
+  836     6       -1       36        37
+  837     7        56     -1        -1
+  838     7        79     -1        -1
+  839     4       -1       39        44
+  840     5       -1       40        41
+  841     6        28     -1        -1
+  842     6       -1       42        43
+  843     7        53     -1        -1
+  844     7        52     -1        -1
+  845     5       -1       45        48
+  846     6       -1       46        47
+  847     7        2      -1        -1
+  848     7        81     -1        -1
+  849     6       -1       49        50
+  850     7        9      -1        -1
+  851     7        0      -1        -1
+  852     2       -1       52        75
+  853     3       -1       53        64
+  854     4       -1       54        59
+  855     5       -1       55        56
+  856     6        99     -1        -1
+  857     6       -1       57        58
+  858     7        45     -1        -1
+  859     7        72     -1        -1
+  860     5       -1       60        61
+  861     6        14     -1        -1
+  862     6       -1       62        63
+  863     7        96     -1        -1
+  864     7        88     -1        -1
+  865     4       -1       65        70
+  866     5       -1       66        67
+  867     6        36     -1        -1
+  868     6       -1       68        69
+  869     7        8      -1        -1
+  870     7        23     -1        -1
+  871     5       -1       71        72
+  872     6        54     -1        -1
+  873     6       -1       73        74
+  874     7        24     -1        -1
+  875     7        7      -1        -1
+  876     3       -1       76        87
+  877     4       -1       77        82
+  878     5       -1       78        79
+  879     6        49     -1        -1
+  880     6       -1       80        81
+  881     7        35     -1        -1
+  882     7        1      -1        -1
+  883     5       -1       83        84
+  884     6        21     -1        -1
+  885     6       -1       85        86
+  886     7        78     -1        -1
+  887     7        77     -1        -1
+  888     4       -1       88        93
+  889     5       -1       89        90
+  890     6        19     -1        -1
+  891     6       -1       91        92
+  892     7        12     -1        -1
+  893     7        25     -1        -1
+  894     5       -1       94        97
+  895     6       -1       95        96
+  896     7        75     -1        -1
+  897     7        69     -1        -1
+  898     6       -1       98        99
+  899     7        48     -1        -1
+  900     7        91     -1        -1
+  901     1       -1       101       150
+  902     2       -1       102       125
+  903     3       -1       103       114
+  904     4       -1       104       109
+  905     5       -1       105       106
+  906     6        13     -1        -1
+  907     6       -1       107       108
+  908     7        93     -1        -1
+  909     7        98     -1        -1
+  910     5       -1       110       111
+  911     6        94     -1        -1
+  912     6       -1       112       113
+  913     7        41     -1        -1
+  914     7        85     -1        -1
+  915     4       -1       115       120
+  916     5       -1       116       117
+  917     6        71     -1        -1
+  918     6       -1       118       119
+  919     7        86     -1        -1
+  920     7        50     -1        -1
+  921     5       -1       121       122
+  922     6        95     -1        -1
+  923     6       -1       123       124
+  924     7        97     -1        -1
+  925     7        27     -1        -1
+  926     3       -1       126       137
+  927     4       -1       127       132
+  928     5       -1       128       129
+  929     6        29     -1        -1
+  930     6       -1       130       131
+  931     7        74     -1        -1
+  932     7        73     -1        -1
+  933     5       -1       133       134
+  934     6        3      -1        -1
+  935     6       -1       135       136
+  936     7        66     -1        -1
+  937     7        20     -1        -1
+  938     4       -1       138       143
+  939     5       -1       139       140
+  940     6        22     -1        -1
+  941     6       -1       141       142
+  942     7        76     -1        -1
+  943     7        26     -1        -1
+  944     5       -1       144       147
+  945     6       -1       145       146
+  946     7        44     -1        -1
+  947     7        92     -1        -1
+  948     6       -1       148       149
+  949     7        6      -1        -1
+  950     7        58     -1        -1
+  951     2       -1       151       174
+  952     3       -1       152       163
+  953     4       -1       153       158
+  954     5       -1       154       155
+  955     6        30     -1        -1
+  956     6       -1       156       157
+  957     7        31     -1        -1
+  958     7        5      -1        -1
+  959     5       -1       159       160
+  960     6        10     -1        -1
+  961     6       -1       161       162
+  962     7        11     -1        -1
+  963     7        43     -1        -1
+  964     4       -1       164       169
+  965     5       -1       165       166
+  966     6        65     -1        -1
+  967     6       -1       167       168
+  968     7        33     -1        -1
+  969     7        4      -1        -1
+  970     5       -1       170       171
+  971     6        70     -1        -1
+  972     6       -1       172       173
+  973     7        57     -1        -1
+  974     7        67     -1        -1
+  975     3       -1       175       186
+  976     4       -1       176       181
+  977     5       -1       177       178
+  978     6        38     -1        -1
+  979     6       -1       179       180
+  980     7        32     -1        -1
+  981     7        51     -1        -1
+  982     5       -1       182       183
+  983     6        42     -1        -1
+  984     6       -1       184       185
+  985     7        68     -1        -1
+  986     7        59     -1        -1
+  987     4       -1       187       192
+  988     5       -1       188       189
+  989     6        60     -1        -1
+  990     6       -1       190       191
+  991     7        89     -1        -1
+  992     7        90     -1        -1
+  993     5       -1       193       196
+  994     6       -1       194       195
+  995     7        84     -1        -1
+  996     7        83     -1        -1
+  997     6       -1       197       198
+  998     7        40     -1        -1
+  999     7        39     -1        -1
+  1000    0       -1       1         100
+  1001    1       -1       2         51
+  1002    2       -1       3         26
+  1003    3       -1       4         15
+  1004    4       -1       5         10
+  1005    5       -1       6         7
+  1006    6        2      -1        -1
+  1007    6       -1       8         9
+  1008    7        0      -1        -1
+  1009    7        29     -1        -1
+  1010    5       -1       11        12
+  1011    6        3      -1        -1
+  1012    6       -1       13        14
+  1013    7        53     -1        -1
+  1014    7        55     -1        -1
+  1015    4       -1       16        21
+  1016    5       -1       17        18
+  1017    6        27     -1        -1
+  1018    6       -1       19        20
+  1019    7        83     -1        -1
+  1020    7        81     -1        -1
+  1021    5       -1       22        23
+  1022    6        28     -1        -1
+  1023    6       -1       24        25
+  1024    7        12     -1        -1
+  1025    7        45     -1        -1
+  1026    3       -1       27        38
+  1027    4       -1       28        33
+  1028    5       -1       29        30
+  1029    6        15     -1        -1
+  1030    6       -1       31        32
+  1031    7        14     -1        -1
+  1032    7        82     -1        -1
+  1033    5       -1       34        35
+  1034    6        80     -1        -1
+  1035    6       -1       36        37
+  1036    7        88     -1        -1
+  1037    7        89     -1        -1
+  1038    4       -1       39        44
+  1039    5       -1       40        41
+  1040    6        54     -1        -1
+  1041    6       -1       42        43
+  1042    7        26     -1        -1
+  1043    7        74     -1        -1
+  1044    5       -1       45        48
+  1045    6       -1       46        47
+  1046    7        25     -1        -1
+  1047    7        92     -1        -1
+  1048    6       -1       49        50
+  1049    7        90     -1        -1
+  1050    7        91     -1        -1
+  1051    2       -1       52        75
+  1052    3       -1       53        64
+  1053    4       -1       54        59
+  1054    5       -1       55        56
+  1055    6        43     -1        -1
+  1056    6       -1       57        58
+  1057    7        77     -1        -1
+  1058    7        20     -1        -1
+  1059    5       -1       60        61
+  1060    6        24     -1        -1
+  1061    6       -1       62        63
+  1062    7        75     -1        -1
+  1063    7        13     -1        -1
+  1064    4       -1       65        70
+  1065    5       -1       66        67
+  1066    6        22     -1        -1
+  1067    6       -1       68        69
+  1068    7        65     -1        -1
+  1069    7        76     -1        -1
+  1070    5       -1       71        72
+  1071    6        44     -1        -1
+  1072    6       -1       73        74
+  1073    7        47     -1        -1
+  1074    7        78     -1        -1
+  1075    3       -1       76        87
+  1076    4       -1       77        82
+  1077    5       -1       78        79
+  1078    6        71     -1        -1
+  1079    6       -1       80        81
+  1080    7        51     -1        -1
+  1081    7        79     -1        -1
+  1082    5       -1       83        84
+  1083    6        49     -1        -1
+  1084    6       -1       85        86
+  1085    7        8      -1        -1
+  1086    7        11     -1        -1
+  1087    4       -1       88        93
+  1088    5       -1       89        90
+  1089    6        50     -1        -1
+  1090    6       -1       91        92
+  1091    7        21     -1        -1
+  1092    7        57     -1        -1
+  1093    5       -1       94        97
+  1094    6       -1       95        96
+  1095    7        46     -1        -1
+  1096    7        58     -1        -1
+  1097    6       -1       98        99
+  1098    7        56     -1        -1
+  1099    7        99     -1        -1
+  1100    1       -1       101       150
+  1101    2       -1       102       125
+  1102    3       -1       103       114
+  1103    4       -1       104       109
+  1104    5       -1       105       106
+  1105    6        64     -1        -1
+  1106    6       -1       107       108
+  1107    7        23     -1        -1
+  1108    7        98     -1        -1
+  1109    5       -1       110       111
+  1110    6        93     -1        -1
+  1111    6       -1       112       113
+  1112    7        73     -1        -1
+  1113    7        72     -1        -1
+  1114    4       -1       115       120
+  1115    5       -1       116       117
+  1116    6        48     -1        -1
+  1117    6       -1       118       119
+  1118    7        97     -1        -1
+  1119    7        94     -1        -1
+  1120    5       -1       121       122
+  1121    6        61     -1        -1
+  1122    6       -1       123       124
+  1123    7        63     -1        -1
+  1124    7        67     -1        -1
+  1125    3       -1       126       137
+  1126    4       -1       127       132
+  1127    5       -1       128       129
+  1128    6        36     -1        -1
+  1129    6       -1       130       131
+  1130    7        33     -1        -1
+  1131    7        96     -1        -1
+  1132    5       -1       133       134
+  1133    6        37     -1        -1
+  1134    6       -1       135       136
+  1135    7        86     -1        -1
+  1136    7        85     -1        -1
+  1137    4       -1       138       143
+  1138    5       -1       139       140
+  1139    6        34     -1        -1
+  1140    6       -1       141       142
+  1141    7        59     -1        -1
+  1142    7        5      -1        -1
+  1143    5       -1       144       147
+  1144    6       -1       145       146
+  1145    7        60     -1        -1
+  1146    7        4      -1        -1
+  1147    6       -1       148       149
+  1148    7        66     -1        -1
+  1149    7        18     -1        -1
+  1150    2       -1       151       174
+  1151    3       -1       152       163
+  1152    4       -1       153       158
+  1153    5       -1       154       155
+  1154    6        87     -1        -1
+  1155    6       -1       156       157
+  1156    7        52     -1        -1
+  1157    7        35     -1        -1
+  1158    5       -1       159       160
+  1159    6        32     -1        -1
+  1160    6       -1       161       162
+  1161    7        1      -1        -1
+  1162    7        31     -1        -1
+  1163    4       -1       164       169
+  1164    5       -1       165       166
+  1165    6        95     -1        -1
+  1166    6       -1       167       168
+  1167    7        84     -1        -1
+  1168    7        38     -1        -1
+  1169    5       -1       170       171
+  1170    6        10     -1        -1
+  1171    6       -1       172       173
+  1172    7        42     -1        -1
+  1173    7        41     -1        -1
+  1174    3       -1       175       186
+  1175    4       -1       176       181
+  1176    5       -1       177       178
+  1177    6        62     -1        -1
+  1178    6       -1       179       180
+  1179    7        30     -1        -1
+  1180    7        39     -1        -1
+  1181    5       -1       182       183
+  1182    6        9      -1        -1
+  1183    6       -1       184       185
+  1184    7        16     -1        -1
+  1185    7        7      -1        -1
+  1186    4       -1       187       192
+  1187    5       -1       188       189
+  1188    6        40     -1        -1
+  1189    6       -1       190       191
+  1190    7        69     -1        -1
+  1191    7        68     -1        -1
+  1192    5       -1       193       196
+  1193    6       -1       194       195
+  1194    7        70     -1        -1
+  1195    7        17     -1        -1
+  1196    6       -1       197       198
+  1197    7        19     -1        -1
+  1198    7        6      -1        -1
+  1199    0       -1       1         100
+  1200    1       -1       2         51
+  1201    2       -1       3         26
+  1202    3       -1       4         15
+  1203    4       -1       5         10
+  1204    5       -1       6         7
+  1205    6        58     -1        -1
+  1206    6       -1       8         9
+  1207    7        59     -1        -1
+  1208    7        56     -1        -1
+  1209    5       -1       11        12
+  1210    6        33     -1        -1
+  1211    6       -1       13        14
+  1212    7        20     -1        -1
+  1213    7        16     -1        -1
+  1214    4       -1       16        21
+  1215    5       -1       17        18
+  1216    6        70     -1        -1
+  1217    6       -1       19        20
+  1218    7        71     -1        -1
+  1219    7        55     -1        -1
+  1220    5       -1       22        23
+  1221    6        18     -1        -1
+  1222    6       -1       24        25
+  1223    7        69     -1        -1
+  1224    7        68     -1        -1
+  1225    3       -1       27        38
+  1226    4       -1       28        33
+  1227    5       -1       29        30
+  1228    6        88     -1        -1
+  1229    6       -1       31        32
+  1230    7        89     -1        -1
+  1231    7        90     -1        -1
+  1232    5       -1       34        35
+  1233    6        52     -1        -1
+  1234    6       -1       36        37
+  1235    7        84     -1        -1
+  1236    7        86     -1        -1
+  1237    4       -1       39        44
+  1238    5       -1       40        41
+  1239    6        46     -1        -1
+  1240    6       -1       42        43
+  1241    7        83     -1        -1
+  1242    7        85     -1        -1
+  1243    5       -1       45        48
+  1244    6       -1       46        47
+  1245    7        13     -1        -1
+  1246    7        3      -1        -1
+  1247    6       -1       49        50
+  1248    7        15     -1        -1
+  1249    7        41     -1        -1
+  1250    2       -1       52        75
+  1251    3       -1       53        64
+  1252    4       -1       54        59
+  1253    5       -1       55        56
+  1254    6        34     -1        -1
+  1255    6       -1       57        58
+  1256    7        62     -1        -1
+  1257    7        91     -1        -1
+  1258    5       -1       60        61
+  1259    6        14     -1        -1
+  1260    6       -1       62        63
+  1261    7        47     -1        -1
+  1262    7        87     -1        -1
+  1263    4       -1       65        70
+  1264    5       -1       66        67
+  1265    6        99     -1        -1
+  1266    6       -1       68        69
+  1267    7        64     -1        -1
+  1268    7        51     -1        -1
+  1269    5       -1       71        72
+  1270    6        82     -1        -1
+  1271    6       -1       73        74
+  1272    7        74     -1        -1
+  1273    7        57     -1        -1
+  1274    3       -1       76        87
+  1275    4       -1       77        82
+  1276    5       -1       78        79
+  1277    6        49     -1        -1
+  1278    6       -1       80        81
+  1279    7        60     -1        -1
+  1280    7        66     -1        -1
+  1281    5       -1       83        84
+  1282    6        53     -1        -1
+  1283    6       -1       85        86
+  1284    7        61     -1        -1
+  1285    7        21     -1        -1
+  1286    4       -1       88        93
+  1287    5       -1       89        90
+  1288    6        54     -1        -1
+  1289    6       -1       91        92
+  1290    7        50     -1        -1
+  1291    7        65     -1        -1
+  1292    5       -1       94        97
+  1293    6       -1       95        96
+  1294    7        63     -1        -1
+  1295    7        67     -1        -1
+  1296    6       -1       98        99
+  1297    7        23     -1        -1
+  1298    7        0      -1        -1
+  1299    1       -1       101       150
+  1300    2       -1       102       125
+  1301    3       -1       103       114
+  1302    4       -1       104       109
+  1303    5       -1       105       106
+  1304    6        22     -1        -1
+  1305    6       -1       107       108
+  1306    7        17     -1        -1
+  1307    7        40     -1        -1
+  1308    5       -1       110       111
+  1309    6        39     -1        -1
+  1310    6       -1       112       113
+  1311    7        35     -1        -1
+  1312    7        81     -1        -1
+  1313    4       -1       115       120
+  1314    5       -1       116       117
+  1315    6        75     -1        -1
+  1316    6       -1       118       119
+  1317    7        5      -1        -1
+  1318    7        6      -1        -1
+  1319    5       -1       121       122
+  1320    6        42     -1        -1
+  1321    6       -1       123       124
+  1322    7        12     -1        -1
+  1323    7        43     -1        -1
+  1324    3       -1       126       137
+  1325    4       -1       127       132
+  1326    5       -1       128       129
+  1327    6        36     -1        -1
+  1328    6       -1       130       131
+  1329    7        80     -1        -1
+  1330    7        48     -1        -1
+  1331    5       -1       133       134
+  1332    6        38     -1        -1
+  1333    6       -1       135       136
+  1334    7        37     -1        -1
+  1335    7        98     -1        -1
+  1336    4       -1       138       143
+  1337    5       -1       139       140
+  1338    6        19     -1        -1
+  1339    6       -1       141       142
+  1340    7        45     -1        -1
+  1341    7        44     -1        -1
+  1342    5       -1       144       147
+  1343    6       -1       145       146
+  1344    7        73     -1        -1
+  1345    7        24     -1        -1
+  1346    6       -1       148       149
+  1347    7        11     -1        -1
+  1348    7        9      -1        -1
+  1349    2       -1       151       174
+  1350    3       -1       152       163
+  1351    4       -1       153       158
+  1352    5       -1       154       155
+  1353    6        78     -1        -1
+  1354    6       -1       156       157
+  1355    7        96     -1        -1
+  1356    7        79     -1        -1
+  1357    5       -1       159       160
+  1358    6        32     -1        -1
+  1359    6       -1       161       162
+  1360    7        97     -1        -1
+  1361    7        95     -1        -1
+  1362    4       -1       164       169
+  1363    5       -1       165       166
+  1364    6        30     -1        -1
+  1365    6       -1       167       168
+  1366    7        28     -1        -1
+  1367    7        7      -1        -1
+  1368    5       -1       170       171
+  1369    6        31     -1        -1
+  1370    6       -1       172       173
+  1371    7        72     -1        -1
+  1372    7        29     -1        -1
+  1373    3       -1       175       186
+  1374    4       -1       176       181
+  1375    5       -1       177       178
+  1376    6        93     -1        -1
+  1377    6       -1       179       180
+  1378    7        77     -1        -1
+  1379    7        92     -1        -1
+  1380    5       -1       182       183
+  1381    6        94     -1        -1
+  1382    6       -1       184       185
+  1383    7        76     -1        -1
+  1384    7        25     -1        -1
+  1385    4       -1       187       192
+  1386    5       -1       188       189
+  1387    6        2      -1        -1
+  1388    6       -1       190       191
+  1389    7        10     -1        -1
+  1390    7        1      -1        -1
+  1391    5       -1       193       196
+  1392    6       -1       194       195
+  1393    7        8      -1        -1
+  1394    7        4      -1        -1
+  1395    6       -1       197       198
+  1396    7        27     -1        -1
+  1397    7        26     -1        -1
+
