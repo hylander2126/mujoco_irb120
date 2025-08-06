@@ -17,12 +17,12 @@
 
 	<actuator>
         <!-- Position Control -->
-		<position joint="joint_1" name="joint_1" kp="1000" kv="100" forcerange="-2 2"/>
-		<position joint="joint_2" name="joint_2" kp="1000" kv="100" forcerange="-2 2"/>
-		<position joint="joint_3" name="joint_3" kp="1000" kv="100" forcerange="-2 2"/>
-		<position joint="joint_4" name="joint_4" kp="1000" kv="100" forcerange="-2 2"/>
-		<position joint="joint_5" name="joint_5" kp="1000" kv="100" forcerange="-2 2"/>
-		<position joint="joint_6" name="joint_6" kp="1000" kv="100" forcerange="-2 2"/>
+		<position joint="joint_1" name="joint_1" kp="10" kv="1" forcerange="-10 10"/>
+		<position joint="joint_2" name="joint_2" kp="10" kv="1" forcerange="-10 10"/>
+		<position joint="joint_3" name="joint_3" kp="10" kv="1" forcerange="-10 10"/>
+		<position joint="joint_4" name="joint_4" kp="10" kv="1" forcerange="-10 10"/>
+		<position joint="joint_5" name="joint_5" kp="10" kv="1" forcerange="-10 10"/>
+		<position joint="joint_6" name="joint_6" kp="10" kv="1" forcerange="-10 10"/>
 
 		<!-- Velocity Control -->
 		<!-- <velocity joint="joint_1" name="joint_1" kv="1"/>
@@ -56,14 +56,8 @@
 			<geom size="0.15 0.25 0.03" type="box" mass="2000" material="table_mat" friction="1 0.005 0.0001"></geom>
 		</body>
 
-		<!-- Rectangular object -->
-		<!-- <include file="object_sim/box.xml"></include> -->
-
-		<!-- Flashlight object -->
-		<!-- <include file="object_sim/flash.xml"></include> -->
-
-		<!-- Stanford bunny object -->
-		<include file="object_sim/stanfordbunny.xml"></include>
+		<!-- Generic object import (see model_selection.py) -->
+		<include file="object_to_load.xml"></include>
 
 		<light directional="true" ambient="0.2 0.2 0.2" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" castshadow="false" pos="0 0 4" dir="0 0 -1" name="light0"></light>
 	</worldbody>

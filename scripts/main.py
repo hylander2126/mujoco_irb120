@@ -1,15 +1,60 @@
+# %% [markdown]
+# ![MuJoCo banner](https://raw.githubusercontent.com/google-deepmind/mujoco/main/banner.png)
+# 
+# # <h1><center>Tutorial  <a href="https://colab.research.google.com/github/google-deepmind/mujoco/blob/main/python/tutorial.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" width="140" align="center"/></a></center></h1>
+# 
+# This notebook provides an introductory tutorial for [**MuJoCo** physics](https://github.com/google-deepmind/mujoco#readme), using the native Python bindings.
+# 
+# <!-- Copyright 2021 DeepMind Technologies Limited
+# 
+#      Licensed under the Apache License, Version 2.0 (the "License");
+#      you may not use this file except in compliance with the License.
+#      You may obtain a copy of the License at
+# 
+#          http://www.apache.org/licenses/LICENSE-2.0
+# 
+#      Unless required by applicable law or agreed to in writing, software
+#      distributed under the License is distributed on an "AS IS" BASIS,
+#      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#      See the License for the specific language governing permissions and
+#      limitations under the License.
+# -->
+
+# %% [markdown]
+# # All imports
+
 # %%
-# %load_ext autoreload
-# %autoreload 2
+%load_ext autoreload
+%autoreload 2
 
 # Set up GPU rendering.
 import distutils.util
 import os
 import subprocess
+# # if subprocess.run('nvidia-smi').returncode:
+# #   raise RuntimeError(
+# #       'Cannot communicate with GPU. '
+# #       'Make sure you are using a GPU Colab runtime. '
+# #       'Go to the Runtime menu and select Choose runtime type.')
+
+# # Add an ICD config so that glvnd can pick up the Nvidia EGL driver.
+# # This is usually installed as part of an Nvidia driver package, but the Colab
+# # kernel doesn't install its driver via APT, and as a result the ICD is missing.
+# # (https://github.com/NVIDIA/libglvnd/blob/master/src/EGL/icd_enumeration.md)
+# NVIDIA_ICD_CONFIG_PATH = '/usr/share/glvnd/egl_vendor.d/10_nvidia.json'
+# if not os.path.exists(NVIDIA_ICD_CONFIG_PATH):
+#   with open(NVIDIA_ICD_CONFIG_PATH, 'w') as f:
+#     f.write("""{
+#     "file_format_version" : "1.0.0",
+#     "ICD" : {
+#         "library_path" : "libEGL_nvidia.so.0"
+#     }
+# }
+# """)
 
 # Configure MuJoCo to use the EGL rendering backend (requires GPU)
 print('Setting environment variable to use GPU rendering:')
-# %env MUJOCO_GL=egl
+%env MUJOCO_GL=egl
 
 # Check if installation was succesful.
 try:
@@ -33,9 +78,9 @@ import numpy as np
 from scipy.spatial.transform import Rotation as Robj
 from scipy.optimize import curve_fit, fsolve
 from helper_fns import *
-# import importlib
+from render_opts import *
 import robot_controller
-# importlib.reload(robot_controller)
+import model_selection
 
 # Graphics and plotting.
 import mediapy as media
@@ -47,64 +92,10 @@ np.set_printoptions(precision=3, suppress=True, linewidth=100)
 fonts = {'size' : 20}
 plt.rc('font', **fonts)
 
+# %% [markdown]
+# # Functions
 
-## __________________________________________________________________________________
-
-print("\nCWD: ", os.getcwd(), '\n')
-model_path = 'assets/table_push.xml'
-model = mujoco.MjModel.from_xml_path(model_path)
-data = mujoco.MjData(model)
-
-def set_render_opts(model, renderer):
-        # tweak scales of contact visualization elements
-        model.vis.scale.contactwidth = 0.025
-        model.vis.scale.contactheight = 0.25
-        model.vis.scale.forcewidth = 0.05
-        model.vis.map.force = 0.3
-        # viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True # joint viz
-        renderer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
-        renderer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
-        renderer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE # Show site frame(s)
-        # Make site frame arrows smaller
-        model.vis.scale.framewidth = 0.025
-        model.vis.scale.framelength = .75
-        # Set default camera position
-        renderer.cam.distance = 2.5       # Distance from the camera to the scene
-        renderer.cam.elevation = -30.0    # y-axis rotation
-        renderer.cam.azimuth = 100.0      # z-axis rotation
-        renderer.cam.lookat[:] = np.array([0.8, 0.0, 0.0])  # Center of the scene
-
-
-# The set_render_opts function as it was defined, applied to mujoco.viewer
-# For mujoco.Renderer, we will configure MjvCamera and MjvOption directly
-# and pass them to update_scene.
-def set_render_opts_for_renderer(model_obj, cam_obj, opt_obj):
-    # Tweak scales of contact visualization elements (these apply to model.vis)
-    model_obj.vis.scale.contactwidth = 0.025
-    model_obj.vis.scale.contactheight = 0.25
-    model_obj.vis.scale.forcewidth = 0.05
-    model_obj.vis.map.force = 0.3
-    model_obj.vis.scale.framewidth = 0.025
-    model_obj.vis.scale.framelength = .75
-
-    # Configure MjvOption flags
-    opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
-    opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
-    # To show frames, you typically enable a flag like mjVIS_JOINT, mjVIS_BODY, mjVIS_GEOM, mjVIS_SITE, etc.
-    # and then set the specific frame type using model.vis.frame.
-    # Removing mjVIS_FRAME as it does not exist.
-    # opt_obj.flags[mujoco.mjtVisFlag.mjVIS_SITE] = True # Example: enable site visualization, which includes their frames
-    opt_obj.frame = mujoco.mjtFrame.mjFRAME_SITE # Show site frame(s)
-
-
-    # Configure MjvCamera
-    cam_obj.distance = 2.5       # Distance from the camera to the scene
-    cam_obj.elevation = -30.0    # y-axis rotation
-    cam_obj.azimuth = 100.0      # z-axis rotation
-    cam_obj.lookat[:] = np.array([0.8, 0.0, 0.0])  # Center of the scene
-    
-
-
+# %%
 ## Helper function to align y-axis limits of multiple axes to zero
 def align_zeros(axes):
     ylims_current = {}   #  Current ylims
@@ -432,15 +423,13 @@ def get_com(max_tip_angle, f, times, pitch, irb_controller, plot=True):
     return x_c, y_c, topple_angle_est
 
 
-
-
 # %% [markdown]
 # ## Full simulation of toppling
 
 # %%
 ## Let's recall the model to reset the simulation
-model = mujoco.MjModel.from_xml_path(model_path)
-data = mujoco.MjData(model)
+model_path = '../assets/table_push.xml'
+model, data = model_selection.select_model(model_path, 'box')
 joints = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
 
 ## Setup based on robot model
@@ -454,18 +443,25 @@ T_init = np.array([[    0.0,   0.0,     1.0,     0.93 ],
 
 ## Set the robot to the desired initial pose
 # print("Method 2: Damped Least Squares")
-sol_Damped_LS = irb_controller.IK(np.array(T_init), method=2, damping=0.5, max_iters=1000)
-irb_controller.set_pose(sol_Damped_LS)
+q_init = irb_controller.IK(np.array(T_init), method=2, damping=0.5, max_iters=1000)
+irb_controller.set_pose(q_init)
 
-## FOR VELOCITY CONTROL (format: [vx vy vz wx wy wz])
-target_vel = np.array([0.0, 0.0, 0.0, 0.05, 0.0, 0.0])
 
-## Initialize force and tilt history for plotting
+## FOR POSITION CONTROL (format: 4x4 matrix)
+T_des = T_init.copy()
+T_des[0:3, 3] += np.array([0.15, 0.0, 0.0])  # Move EE forward by 0.5 m in x direction
+q_final = irb_controller.IK(T_des)
+
+# Get quintic polynomial coefficients for smooth trajectory
+TRAJ_DURATION = 8.0 # sec
+print(f"Generating a {TRAJ_DURATION:.2f} sec trajectory to reach the final pose.")
+traj_coeffs = irb_controller.generate_quintic_trajectory(q_init, q_final, TRAJ_DURATION)
+
+## Initialize time, force and tilt history for plotting
+data.time = 0.0
+t_hist = np.empty((0,))
 f_hist = np.zeros((0,3))
 pitch_hist = np.empty((0,))
-# Setup time step history
-t_hist = np.empty((0,))
-data.time = 0.0
 
 # Set the stop angle, for full sim this is when the payload topples over (i.e. pitch angle is 90 degrees)
 STOP_ANGLE = np.deg2rad(90.0)
@@ -479,23 +475,32 @@ frames = []
 framerate = 30
 duration = 10
 
-# with mujoco.viewer.launch_passive(model, data, show_left_ui=False) as viewer:
-# Create MjvCamera and MjvOption objects
-sim_cam = mujoco.MjvCamera() # This will be our camera for rendering
-sim_opt = mujoco.MjvOption() # This will be our visualization options
+## IMPORTANT: Set the rendering options
+# Create MjvCamera and MjvOption objects and initialize with default values
+cam_obj = mujoco.MjvCamera() # This will be our camera for rendering
+opt_obj = mujoco.MjvOption() # This will be our visualization options
+mujoco.mjv_defaultCamera(cam_obj)
+mujoco.mjv_defaultOption(opt_obj)
+set_render_opts_for_renderer(model, cam_obj, opt_obj)
 
-# Initialize them with default values (important!)
-mujoco.mjv_defaultCamera(sim_cam)
-mujoco.mjv_defaultOption(sim_opt)
-set_render_opts_for_renderer(model, sim_cam, sim_opt)  # Set the rendering options
+# Create the renderer for video recording
+renderer = mujoco.Renderer(model, height=720, width=1280)
 
-with mujoco.Renderer(model, height=720, width=1280) as renderer:
-    # set_render_opts(model, renderer)
+# ===========================================================================
+with mujoco.viewer.launch_passive(model, data, show_left_ui=False) as viewer:
+    set_render_opts_for_viewer(model, viewer) # Set rendering options for the interactive viewer
     
-    # while viewer.is_running() and not irb_controller.stop:
-    while not irb_controller.stop:
-        # Set joint velocities
-        irb_controller.set_velocity_control(target_vel)
+    while viewer.is_running() and not irb_controller.stop and data.time < duration: # add a seconds for trajectory to settle
+        # Determine target joint position for the current time step
+        if data.time < TRAJ_DURATION:
+            # Use the quintic polynomial trajectory to get the target joint position
+            q_desired = irb_controller.evaluate_trajectory(data.time, traj_coeffs)
+        else:
+            # After the trajectory duration, hold the final position
+            q_desired = q_final
+
+        # Set joint position control
+        irb_controller.set_pose(q_desired.reshape(6,1))
 
         # Get payload pitch and check toppling stop condition
         tip_angle = irb_controller.get_payload_pose(output='pitch')
@@ -506,13 +511,12 @@ with mujoco.Renderer(model, height=720, width=1280) as renderer:
 
         # Get contact force(s) ONLY between EE and payload
         f_curr = irb_controller.get_pushing_force()
-        f_curr_norm = np.linalg.norm(f_curr)
 
-        # Initialize contact vertices list
+        # Initialize contact vertices list for this time step
         contact_vertices = []
 
         # Only append if contact is occurring with pusher and payload AND force is decreasing
-        if f_curr_norm > 0.0:
+        if np.linalg.norm(f_curr) > 0.0:
             # Append current force, pitch angle, and time to history
             f_hist = np.vstack((f_hist, f_curr))
             pitch_hist = np.append(pitch_hist, tip_angle)
@@ -520,8 +524,7 @@ with mujoco.Renderer(model, height=720, width=1280) as renderer:
 
             ## We would like to define a plane on which the CoM lies. A plane can be defined by two lines:
             # In this case, one line is the contact edge of payload and table, and the second line is the 
-            # line-of-action of critical toppling angle
-            # If so, get the two contact points of tipping edge
+            # line-of-action of critical toppling angle. If so, get the two contact points of tipping edge
             for contact in irb_controller.data.contact:
                 geom_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, int(id)) for id in contact.geom]
                 # If the contact is between the pusher and payload, skip it
@@ -534,18 +537,21 @@ with mujoco.Renderer(model, height=720, width=1280) as renderer:
         if len(contact_vertices) == 2:
             tip_edge_pos.append(np.array(contact_vertices).ravel())  # Append the contact vertices as a row vector
 
-        # Update the viewer
+        # Step the simulation
         mujoco.mj_step(model, data)
         
-        # viewer.sync()
+        # Update the interactive viewer
+        viewer.sync()
 
+        # Add frame to the video recording
         if len(frames) < data.time * framerate:
-            renderer.update_scene(data, camera=sim_cam, scene_option=sim_opt)  # Update the renderer with the current scene
+            renderer.update_scene(data, camera=cam_obj, scene_option=opt_obj)  # Update the renderer with the current scene
             pixels = renderer.render()
             frames.append(pixels)  # Capture the current frame for video recording
 
-# %%
+renderer.close()  # Close the renderer after the simulation ends
 
+# %%
 media.show_video(frames, fps=60, loop=True)
 
 # %% [markdown]
@@ -621,12 +627,17 @@ print(f'\nEstimated CoM Method 3: {np.array([c_proj[0], c_proj[1], h_c])}\n')
 # %%
 f_hist_norm = np.linalg.norm(f_hist, axis=1)
 pitch_hist_deg = shift_pitch_data(np.rad2deg(pitch_hist), f_hist_norm)
+f_hist_norm = f_hist_norm[1:]  # Remove initial massive force
+pitch_hist_deg = pitch_hist_deg[1:]  # Remove initial massive force
+
 plt.plot(pitch_hist_deg, f_hist_norm, label='Sampled data')
 plt.xlabel('Payload Pitch (degrees)')
 plt.ylabel('Force Norm (N)')
 plt.title('Payload Pitch vs Force Norm')
 plt.legend()
 plt.show()
+
+print(f_hist_norm)
 
 # %% [markdown]
 # ### Now to do a small push and interpolate the force zero-crossing
