@@ -6,38 +6,37 @@ from helper_fns import *
 
 class controller:
     def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, ee_site='ee_site'):
-        self.model          = model
-        self.data           = data
-        self.joint_names    = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
-        self.joint_idx      = np.array([model.joint(name).qposadr for name in self.joint_names]) # This is same as dofadr (v_indices)
-        self.ee_site        = model.site(ee_site).id
-        self.table_site     = model.site('surface_site').id
-        self.stop           = False                              # Stop flag for the controller
-        self.q_min          = model.jnt_range[self.joint_idx, 0] # Max joint limits
-        self.q_max          = model.jnt_range[self.joint_idx, 1] # Min joint limits
-        self.v_max          = 1.5
+        self.model = model
+        self.data = data
+        self.joint_names = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
+        self.joint_idx = np.array([model.joint(name).qposadr for name in self.joint_names]) # This is same as dofadr (v_indices)
+        self.ee_site = model.site(ee_site).id
+        self.table_site = model.site('surface_site').id
+        self.stop = False                               # Stop flag for the controller
+        self.q_min = model.jnt_range[self.joint_idx, 0] # Max joint limits
+        self.q_max = model.jnt_range[self.joint_idx, 1] # Min joint limits
+        self.v_max = 1.5
 
         # --- Common Controller Variables ---
-        self.J              = np.zeros((6, 6))                   # Size 6 x num_joints
-        self.J_pinv         = np.zeros((6, 6))                   # Pseudo-inverse of the Jacobian
-        self.T              = np.eye(4)                          # Current end-effector pose (4x4)
-        self.R_desired      = np.eye(3)                          # Desired end-effector orientation (3x3)
-        self.v_admittance   = np.zeros(6)                        # Stores the velocity for admittance control
-        self.traj_coeffs    = np.zeros((6, 3))                   # Shape (6, 3) for each joint
-        self.traj_duration  = 0.0                                # Duration of the trajectory
-        self.traj_start_time = 0                                 # Start time of the trajectory
+        self.J = np.zeros((6, 6))                       # Size 6 x num_joints
+        self.J_pinv = np.zeros((6, 6))                  # Pseudo-inverse of the Jacobian
+        self.T = np.eye(4)                              # Current end-effector pose (4x4)
+        self.R_desired_orientation = np.eye(3)          # Desired end-effector orientation (3x3)
+        self.v_admittance = np.zeros(6)                 # Stores the velocity for admittance control
 
         # --- Manipulability Parameters ---
-        self.a_margin       = 1.22 * 0.98                        # from mfg ellipsoid (2% margin) # 0.58, 0.87
-        self.c_margin       = 1.74 * 0.98
-
+        self.a_margin = 1.22 * 0.98                     # from mfg ellipsoid (2% margin) # 0.58, 0.87
+        self.c_margin = 1.74 * 0.98
+        
         # --- Inverse Kinematics Parameters ---
-        self.error_history  = []
-        self.prev_error     = np.inf
+        self.error_history = []
+        self.prev_error = np.inf
 
         # --- Contact Force Calculation ---
-        self.f_sensor_id    = model.sensor('force_sensor').id
-        self.ft_offset      = np.zeros((3, 1))  # Force-torque sensor offset for biasing
+        self.payload_geom_id = model.geom('payload').id
+        self.table_geom_id = model.geom('table').id
+        self.pusher_geom_id = model.geom('push_rod').id
+        
 
     def FK(self):
         """Forward kinematics to get the current end-effector pose"""
@@ -60,21 +59,9 @@ class controller:
         self.J_pinv = np.linalg.pinv(self.J)  # Pseudo-inverse of the Jacobian
         return self.J
     
-    def get_ft_reading(self):
-        """Get the force-torque reading from the force sensor"""
-        mujoco.mj_rnePostConstraint(self.model, self.data)      # Ensure sensor data is computed
-        ft_data = self.data.sensordata[self.f_sensor_id:self.f_sensor_id + 3].reshape(3, 1)
-        ft_data -= self.ft_offset
-        return ft_data
-    
-    def bias_ft_reading(self):
-        print("Biasing F/T sensor...")
-        force_offset = self.get_ft_reading()
-        self.ft_offset = force_offset.copy()
-        print(f"Force offset: {self.ft_offset.flatten()}")
-    
     def set_pose(self, q=np.zeros((6,1))):
-        """Forcibly set the robot to a specific joint configuration by ignoring dynamics"""
+        """Reset robot to desired position; Default is the home position"""
+        # Check Manipulability
         if not self.is_in_ellipsoid():
             print("Warning: Desired pose is outside the manipulability ellipsoid.")
             return
@@ -163,101 +150,6 @@ class controller:
             mujoco.mj_fwdPosition(self.model, self.data)
             print("IK finished, robot state restored.")
             print("**********************************")
-    
-    def set_pos_ctrl(self, q_desired):
-        """Apply position control to the robot"""
-        if not self.is_in_ellipsoid():              # Check manipulability
-            return
-        self.data.ctrl[self.joint_idx] = q_desired.reshape(6,1)
-        mujoco.mj_forward(self.model, self.data)    # Update forward kinematics after control input
-
-    def set_vel_ctrl(self, v_desired, Kp_ori=0, damping=1e-4):
-        """Apply velocity control to the robot
-            v_desired: 6D vector [lin_vel, ang_vel] in world frame
-            damping: Damping factor for the control input
-        """
-        if not self.is_in_ellipsoid():              # Check manipulability
-            self.data.ctrl[:] = np.zeros(6)         # Stop motion
-            return
-        dq = self.diff_IK(v_desired, Kp_ori=Kp_ori, damping=damping)       # Stop motion if outside ellipsoid
-        self.data.ctrl[:] = dq.flatten()
-        mujoco.mj_forward(self.model, self.data)    # Update forward kinematics after control input
-
-    def get_surface_pos(self):
-        """Get the position of the table surface, NOT COM"""
-        mujoco.mj_forward(self.model, self.data)  # Ensure Mujoco state is updated
-        # Get global position of table surface CoM
-        tab_global_pos = self.data.site_xpos[self.table_site].flatten()
-        # account for height of table surface
-        tab_dims = self.model.geom('table').size
-        # Calculate the position of the surface (top plane)
-        surface_pos = tab_global_pos + np.array([0, 0, tab_dims[2]]).flatten()
-        return surface_pos
-
-    def is_in_ellipsoid(self):
-        """Check if the robot is within the manipulability ellipsoid"""
-        self.FK()
-        p = self.T[:3, 3].flatten()
-        r2 = ((p[0]**2 + p[1]**2) / self.a_margin**2) + (p[2]**2 / self.c_margin**2) # normalized-ellipsoid coordinate
-        if r2 > 1.0:
-            print(f'Robot is outside the manipulability ellipsoid.')
-            self.stop = True
-            return False
-        return True
-
-    def diff_IK(self, v_des, Kp_ori=2, damping=1e-4):
-        """
-        Solve differential kinematics to achieve desired end-effector velocity
-        v_des: 6D vector [lin_vel, ang_vel] in world frame
-        Returns: joint velocities
-        """
-        # --- Get Current State ---
-        self.FK()
-        self.get_jacobian()
-
-        # --- Calculate Orientation Error ---
-        R_current = self.T[:3, :3]
-        error_o_mat = self.R_desired @ R_current.T
-        error_o_axis_angle = Robj.from_matrix(error_o_mat).as_rotvec()
-
-        # --- Create Corrective Angular Velocity ---
-        dv_ang_corrective = Kp_ori * error_o_axis_angle.reshape(3, 1)
-
-        # --- Create Final Target Twist ---
-        v_des[:3] += dv_ang_corrective.flatten()
-
-        # --- Compute velocity (twist) error---
-        v_error = v_des - self.J @ self.data.qvel[self.joint_idx].reshape(-1,)
-        # --- Damped Least Squares ---
-        dv = self.J_pinv @ np.linalg.solve(self.J @ self.J_pinv + (damping * np.eye(6)), v_error)
-
-        # --- Limit joint velocities ---
-        # return np.clip(dv, -self.v_max, self.v_max).reshape(6,1)  # No need for this anymore, we set limits in model xml file
-        return dv.reshape(6, 1)
-
-    def update_velocity_control(self, Kp_joint=5.0):
-        """
-        Follows a pre-planned quintic trajectory using joint velocity control.
-        This uses a feedforward velocity command plus a feedback position correction.
-        """
-        if self.traj_start_time < 0:
-            return # No active trajectory
-        
-        elapsed_time = self.data.time - self.traj_start_time
-
-        # --- Get Desired state from Trajectory ---
-        dq_desired = self.evaluate_trajectory_vel(elapsed_time).reshape(6,1) # Feedforward (ideal) velocity at this time
-
-        # Feedback Term: corrective velocity based on position error
-        q_desired = self.evaluate_trajectory_pos(elapsed_time).reshape(6,1)
-        q_current = self.data.qpos[self.joint_idx].reshape(6,1)
-        q_error = q_desired - q_current
-
-        # --- Combine Final Velocity Command ---
-        dq_command = dq_desired + Kp_joint * q_error
-
-        # --- Apply Command to Actuators ---
-        self.data.ctrl[self.joint_idx] = dq_command
 
 
     def generate_quintic_trajectory(self, q_start, q_end, duration):
@@ -296,26 +188,113 @@ class controller:
         c345 = np.linalg.solve(A, b)
         
         print(f"\nGenerated a {duration:.2f} sec trajectory to reach final pose.")
-        self.traj_coeffs = np.vstack([c0, c1, c2, c345])  # Shape (6, 3) for each joint
-        self.traj_duration = duration
-        self.traj_start_time = self.data.time  # Start time of the trajectory
-        
         return np.vstack([c0, c1, c2, c345])
 
-    def evaluate_trajectory(self, t, order=1):
-        """Evaluates the trajectory position at a given time t. Order determines pos or vel traj"""
+    def evaluate_trajectory(self, t, coeffs, duration):
+        """Evaluates the trajectory at a given time t."""
         if t < 0: t = 0
-        if t > self.traj_duration: t = self.traj_duration
-        coeffs = self.traj_coeffs
-        if order == 1:      # Position control
-            return coeffs[0] + coeffs[1]*t + coeffs[2]*t**2 + coeffs[3]*t**3 + coeffs[4]*t**4 + coeffs[5]*t**5
-        elif order == 2:    # Velocity control
-            return coeffs[1] + 2*coeffs[2]*t + 3*coeffs[3]*t**2 + 4*coeffs[4]*t**3 + 5*coeffs[5]*t**4
+        if t > duration: t = duration
+        return coeffs[0] + coeffs[1]*t + coeffs[2]*t**2 + coeffs[3]*t**3 + coeffs[4]*t**4 + coeffs[5]*t**5
+    
+    def set_position_control(self, q_desired):
+        """Apply position control to the robot"""
+        if not self.is_in_ellipsoid():              # Check manipulability
+            return
+        self.data.ctrl[self.joint_idx] = q_desired.reshape(6,1)
+        mujoco.mj_forward(self.model, self.data)    # Update forward kinematics after control input
+
+    def set_velocity_control(self, v_desired, damping=1e-4):
+        """Apply velocity control to the robot"""
+        if not self.is_in_ellipsoid():              # Check manipulability
+            self.data.ctrl[:] = np.zeros(6)         # Stop motion
+            return
+        dq = self.diff_IK(v_desired, damping)       # Stop motion if outside ellipsoid
+        self.data.ctrl[:] = dq.flatten()
+        mujoco.mj_forward(self.model, self.data)    # Update forward kinematics after control input
+
+    def get_surface_pos(self):
+        """Get the position of the table surface, NOT COM"""
+        mujoco.mj_forward(self.model, self.data)  # Ensure Mujoco state is updated
+        # Get global position of table surface CoM
+        tab_global_pos = self.data.site_xpos[self.table_site].flatten()
+        # account for height of table surface
+        tab_dims = self.model.geom('table').size
+        # Calculate the position of the surface (top plane)
+        surface_pos = tab_global_pos + np.array([0, 0, tab_dims[2]]).flatten()
+        return surface_pos
+
+    def plot_error(self, tol):
+        """Plot error norm history with horizontal line at zero"""
+        plt.figure(figsize=(12, 6))
+        plt.plot(np.linalg.norm(self.error_history, axis=1))
+        plt.axhline(0, color='r')
+        plt.axhline(tol, color='g', linestyle='--')
+        plt.title("Error History")
+        plt.xlabel("Iteration")
+        plt.ylabel("Pose Error (norm)")
+        plt.show()
+
+    def is_in_ellipsoid(self):
+        """Check if the robot is within the manipulability ellipsoid"""
+        self.FK()
+        p = self.T[:3, 3].flatten()
+        r2 = ((p[0]**2 + p[1]**2) / self.a_margin**2) + (p[2]**2 / self.c_margin**2) # normalized-ellipsoid coordinate
+        if r2 > 1.0:
+            print(f'Robot is outside the manipulability ellipsoid.')
+            self.stop = True
+            return False
+        return True
+
+    def diff_IK(self, v_des, damping):
+        """
+        Solve differential kinematics to achieve desired end-effector velocity
+        v_des: 6D vector [lin_vel, ang_vel] in world frame
+        Returns: joint velocities
+        """
+        # --- Compute Jacobian ---
+        self.get_jacobian()
+        # --- Compute velocity (twist) error---
+        v_error = v_des - self.J @ self.data.qvel[self.joint_idx].reshape(-1,)
+        # --- Damped Least Squares ---
+        dv = self.J_pinv @ np.linalg.solve(self.J @ self.J_pinv + (damping * np.eye(6)), v_error).reshape(6, 1)
+        # --- Limit joint velocities ---
+        return np.clip(dv, -self.v_max, self.v_max).reshape(6,1)  # velocity limit = 1.5 rad/s
+
+    def start_cartesian_trajectory(self, T_end, duration):
+        """Initializes a straight-line trajectory in Cartesian space."""
+        self.T_start = self.FK().copy()
+        self.T_end = T_end.copy()
+        self.traj_duration = duration
+        self.traj_start_time = self.data.time
+
+    def get_pushing_force(self):
+        """ Get the contact force on the payload from the pusher."""
+        for ci in range(self.data.ncon):
+            c = self.data.contact[ci]
+
+            # Only care about payload and pusher (skip table contact)
+            if not (c.geom[0] == self.payload_geom_id or c.geom[1] == self.payload_geom_id ):
+                continue
+            other = c.geom[1] if c.geom[0] == self.payload_geom_id else c.geom[0]
+            if other != self.pusher_geom_id:
+                continue
 
 
-# ======================================================================================================
-# Unused fns
-# ======================================================================================================
+             # 1) world‐frame contact force (first 3 entries of mj_contactForce)
+            f6 = np.zeros(6, dtype=np.float64)
+            mujoco.mj_contactForce(self.model, self.data, ci, f6)
+            f_space = f6[:3]
+
+            # 2) get EE frame rotation (3x3) and position(3,)
+            R,_ = TransToRp(self.FK().copy())
+
+            # 3) change frame Space -> EE
+            f_ee = R.T @ f_space
+            
+            return f_ee.reshape(1, 3)
+        
+        return np.zeros((1, 3))  # No contact forces found
+    
 
     def get_payload_pose(self, site='payload_site', output='T', degrees=False):
         payload_site_id = self.model.site(site).id
