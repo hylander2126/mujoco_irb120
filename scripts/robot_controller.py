@@ -35,9 +35,12 @@ class controller:
         self.error_history  = []
         self.prev_error     = np.inf
 
-        # --- Contact Force Calculation ---
+        # --- Force Sensor Calculations ---
         self.f_sensor_id    = model.sensor('force_sensor').id
         self.ft_offset      = np.zeros((3, 1))  # Force-torque sensor offset for biasing
+        self.grav_offset    = np.zeros((3, 1))  # Gravity compensation offset
+        self.grav_mass      = 0.0339              # Gravity compensation mass
+
 
     def FK(self):
         """Forward kinematics to get the current end-effector pose"""
@@ -59,17 +62,27 @@ class controller:
         self.J = np.vstack([J_rot, J_pos]).squeeze()
         self.J_pinv = np.linalg.pinv(self.J)  # Pseudo-inverse of the Jacobian
         return self.J
+
+    def ft_get_reading(self):
+        """Get the force reading from the force sensor, optionally gravity compensated."""
+        # mujoco.mj_rnePostConstraint(self.model, self.data)
+        f_meas = self.data.sensordata[self.f_sensor_id:self.f_sensor_id + 3].reshape(3, 1)
+
+        # Apply any prior bias
+        f = f_meas - self.ft_offset
+
+        # Optional gravity comp (force only; torque left untouched since you read 3D force)
+        # site rotation: site frame -> world; take transpose for world -> site
+        R_sw = self.data.site_xmat[self.ee_site].reshape(3, 3).T
+        # gravity force expressed in site frame
+        f_g_site = R_sw @ (self.grav_mass * np.array([0, 0, 9.81])).reshape(3, 1)
+        f = f - f_g_site  # subtract mg
+
+        return f
     
-    def get_ft_reading(self):
-        """Get the force-torque reading from the force sensor"""
-        mujoco.mj_rnePostConstraint(self.model, self.data)      # Ensure sensor data is computed
-        ft_data = self.data.sensordata[self.f_sensor_id:self.f_sensor_id + 3].reshape(3, 1)
-        ft_data -= self.ft_offset
-        return ft_data
-    
-    def bias_ft_reading(self):
+    def bias_ft_reading(self): # NOTE: BROKEN, SO UNUSED
         print("Biasing F/T sensor...")
-        force_offset = self.get_ft_reading()
+        force_offset = self.ft_get_reading()
         self.ft_offset = force_offset.copy()
         print(f"Force offset: {self.ft_offset.flatten()}")
     
@@ -123,7 +136,7 @@ class controller:
                 self.error_history.append(xi_e_space)           # Log the errors for plotting (optional)
 
                 if np.linalg.norm(xi_e_space) < tol:
-                    print(f"\nIK converged in {i} iterations.")
+                    # print(f"\nIK converged in {i} iterations.")
                     return q                                    # Return successful solution
                 
                 # --- Compute Jacobian ---
@@ -161,7 +174,7 @@ class controller:
             ## --- Restore the original state ---
             self.data.qpos[self.joint_idx] = q_original
             mujoco.mj_fwdPosition(self.model, self.data)
-            print("IK finished, robot state restored.")
+            print("\nIK finished, robot state restored.")
             print("**********************************")
     
     def set_pos_ctrl(self, q_desired):
@@ -176,11 +189,13 @@ class controller:
             v_desired: 6D vector [lin_vel, ang_vel] in world frame
             damping: Damping factor for the control input
         """
+        self.get_jacobian()
         if not self.is_in_ellipsoid():              # Check manipulability
             self.data.ctrl[:] = np.zeros(6)         # Stop motion
             return
-        dq = self.diff_IK(v_desired, Kp_ori=Kp_ori, damping=damping)       # Stop motion if outside ellipsoid
-        self.data.ctrl[:] = dq.flatten()
+        # dq = self.diff_IK(v_desired, Kp_ori=Kp_ori, damping=damping)       # Stop motion if outside ellipsoid
+        q_dot = self.J_pinv @ v_desired
+        self.data.ctrl[:] = q_dot.flatten()
         mujoco.mj_forward(self.model, self.data)    # Update forward kinematics after control input
 
     def get_surface_pos(self):
@@ -209,6 +224,7 @@ class controller:
         """
         Solve differential kinematics to achieve desired end-effector velocity
         v_des: 6D vector [lin_vel, ang_vel] in world frame
+        damping: Damping factor for the control input
         Returns: joint velocities
         """
         # --- Get Current State ---
@@ -234,31 +250,6 @@ class controller:
         # --- Limit joint velocities ---
         # return np.clip(dv, -self.v_max, self.v_max).reshape(6,1)  # No need for this anymore, we set limits in model xml file
         return dv.reshape(6, 1)
-
-    def update_velocity_control(self, Kp_joint=5.0):
-        """
-        Follows a pre-planned quintic trajectory using joint velocity control.
-        This uses a feedforward velocity command plus a feedback position correction.
-        """
-        if self.traj_start_time < 0:
-            return # No active trajectory
-        
-        elapsed_time = self.data.time - self.traj_start_time
-
-        # --- Get Desired state from Trajectory ---
-        dq_desired = self.evaluate_trajectory_vel(elapsed_time).reshape(6,1) # Feedforward (ideal) velocity at this time
-
-        # Feedback Term: corrective velocity based on position error
-        q_desired = self.evaluate_trajectory_pos(elapsed_time).reshape(6,1)
-        q_current = self.data.qpos[self.joint_idx].reshape(6,1)
-        q_error = q_desired - q_current
-
-        # --- Combine Final Velocity Command ---
-        dq_command = dq_desired + Kp_joint * q_error
-
-        # --- Apply Command to Actuators ---
-        self.data.ctrl[self.joint_idx] = dq_command
-
 
     def generate_quintic_trajectory(self, q_start, q_end, duration):
         """
@@ -312,11 +303,6 @@ class controller:
         elif order == 2:    # Velocity control
             return coeffs[1] + 2*coeffs[2]*t + 3*coeffs[3]*t**2 + 4*coeffs[4]*t**3 + 5*coeffs[5]*t**4
 
-
-# ======================================================================================================
-# Unused fns
-# ======================================================================================================
-
     def get_payload_pose(self, site='payload_site', output='T', degrees=False):
         payload_site_id = self.model.site(site).id
         payload_R = self.data.site_xmat[payload_site_id].reshape(3, 3)
@@ -337,6 +323,117 @@ class controller:
         else:
             raise ValueError("Output must be 'pitch', 'p', or 'T'.")
         
+    def get_payload_axis_angle(self, site='payload_site', degrees=False, frame='world'):
+        """
+        Returns the finite axis–angle of the payload's rotation relative to its
+        initial pose, plus the instantaneous axis of rotation (from angular velocity).
+
+        Args:
+            site:    site name for payload
+            degrees: return angle in degrees if True (otherwise radians)
+            frame:   'world' (default) or 'body' to express axes in the current body frame
+
+        Returns:
+            angle, axis, axis_inst
+            - angle:   scalar >= 0  (radians or degrees)
+            - axis:    (3,) unit vector (undefined if angle≈0; we return [1,0,0] then)
+            - axis_inst: (3,) unit vector of instantaneous rotation axis
+                        (undefined if angular speed≈0; we return zeros then)
+        """
+        # Current world rotation of the site
+        sid = self.model.site(site).id
+        Rw = self.data.site_xmat[sid].reshape(3, 3)
+
+        # Initial reference orientation
+        if not hasattr(self, '_payload_R0'):
+            self._payload_R0 = Rw.copy()
+        R0 = self._payload_R0
+
+        # Relative rotation from initial pose
+        R_rel = Rw @ R0.T
+
+        # Axis–angle via rotation vector: rotvec = theta * axis, with theta in [0, pi]
+        rotvec = Robj.from_matrix(R_rel).as_rotvec()
+        angle = np.linalg.norm(rotvec)
+        if angle > 1e-12:
+            axis = rotvec / angle
+        else:
+            axis = np.array([1.0, 0.0, 0.0])  # arbitrary when angle ~ 0
+
+        # Instantaneous axis from angular velocity (world frame)
+        res = np.zeros(6)
+        mujoco.mj_objectVelocity(self.model, self.data, mujoco.mjtObj.mjOBJ_SITE, sid, res, 0)
+        angvel_w = res[:3]
+        wnorm = np.linalg.norm(angvel_w)
+        axis_inst = angvel_w / wnorm if wnorm > 1e-12 else np.zeros(3)
+
+        # Express axes in requested frame
+        if frame == 'body':
+            # current body frame (uses Rw): v_body = Rw^T v_world
+            axis = Rw.T @ axis
+            axis_inst = (Rw.T @ axis_inst) if wnorm > 1e-12 else axis_inst
+
+        if degrees:
+            angle = np.rad2deg(angle)
+
+        return angle, axis, axis_inst
+
+        
+    def check_topple(self):
+        payload_angle = self.get_payload_pose(output='pitch', degrees=True)
+        if payload_angle > 85:
+            self.stop = True
+
+    def get_tip_edge(self):
+        contact_verts = []
+        for contact in self.data.contact:
+            geom_names = [mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, int(id)) for id in contact.geom]
+            if 'pusher_link' in geom_names:         # If contact is between pusher and payload, skip it
+                continue
+            else:
+                contact_verts.append(contact.pos)
+        return np.array(contact_verts)
+    
+    def init_com_cone_from_edge(edge_verts):
+        """
+        A minimal cone representation:
+        - apex is the entire edge (any point along it)
+        - direction is +Z (up)
+        - half-angle is ~90° (very wide)
+        """
+        return {
+            "p1": edge_verts[0].copy(),     # (3,)
+            "p2": edge_verts[1].copy(),     # (3,)
+            "dir": np.array([0, 0, 1]),     # (3,) unit vector
+            "half_angle": np.pi/2 - 1e-6,   # radians (almost 90°)
+        }
+
+# ======================================================================================================
+# Unused fns
+# ======================================================================================================
+    def update_velocity_control(self, Kp_joint=5.0):
+        """
+        Follows a pre-planned quintic trajectory using joint velocity control.
+        This uses a feedforward velocity command plus a feedback position correction.
+        """
+        if self.traj_start_time < 0:
+            return # No active trajectory
+        
+        elapsed_time = self.data.time - self.traj_start_time
+
+        # --- Get Desired state from Trajectory ---
+        dq_desired = self.evaluate_trajectory_vel(elapsed_time).reshape(6,1) # Feedforward (ideal) velocity at this time
+
+        # Feedback Term: corrective velocity based on position error
+        q_desired = self.evaluate_trajectory_pos(elapsed_time).reshape(6,1)
+        q_current = self.data.qpos[self.joint_idx].reshape(6,1)
+        q_error = q_desired - q_current
+
+        # --- Combine Final Velocity Command ---
+        dq_command = dq_desired + Kp_joint * q_error
+
+        # --- Apply Command to Actuators ---
+        self.data.ctrl[self.joint_idx] = dq_command
 
     def update_admittance_control(self, f_target_linear, M=0.1, D=5.0, Kp_ori=25.0, Kv_ori=5.0):
         """

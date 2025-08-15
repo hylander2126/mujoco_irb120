@@ -27,7 +27,7 @@ def select_model(main_xml_path: str, object_name: str):
     Args:
         main_xml_path (str): The file path to the main template XML file.
                              This file should contain an <include file="object_to_load.xml"/>.
-        object_choice (str): The key for the desired object (e.g., 'rectangle', 'bunny').
+        object_choice (str): The key for the desired object (e.g., 'box', 'bunny', 'flashlight').
                              Must be a key in the OBJECT_DEFINITIONS dictionary.
 
     Returns:
