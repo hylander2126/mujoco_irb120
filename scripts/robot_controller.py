@@ -80,12 +80,6 @@ class controller:
 
         return f
     
-    def bias_ft_reading(self): # NOTE: BROKEN, SO UNUSED
-        print("Biasing F/T sensor...")
-        force_offset = self.ft_get_reading()
-        self.ft_offset = force_offset.copy()
-        print(f"Force offset: {self.ft_offset.flatten()}")
-    
     def set_pose(self, q=np.zeros((6,1))):
         """Forcibly set the robot to a specific joint configuration by ignoring dynamics"""
         if not self.is_in_ellipsoid():
@@ -220,36 +214,104 @@ class controller:
             return False
         return True
 
-    def diff_IK(self, v_des, Kp_ori=2, damping=1e-4):
+    def get_payload_pose(self, site='payload_site', output='T', degrees=False):
+        payload_site_id = self.model.site(site).id
+        payload_R = self.data.site_xmat[payload_site_id].reshape(3, 3)
+        payload_p = self.data.site_xpos[payload_site_id].flatten()
+        T_payload = np.eye(4)
+        T_payload[:3, :3] = payload_R
+        T_payload[:3, 3] = payload_p
+        if output == 'T':
+            return T_payload
+        elif output == 'pitch':
+            rot = Robj.from_matrix(payload_R).as_euler('xyz', degrees=False)
+            tip_angle = rot[1]  # pitch angle
+            if degrees:
+                tip_angle = np.degrees(tip_angle)
+            return tip_angle
+        elif output == 'p':
+            return payload_p
+        else:
+            raise ValueError("Output must be 'pitch', 'p', or 'T'.")
+        
+    def get_payload_axis_angle(self, site='payload_site', degrees=False, frame='world', reset_ref=False):
         """
-        Solve differential kinematics to achieve desired end-effector velocity
-        v_des: 6D vector [lin_vel, ang_vel] in world frame
-        damping: Damping factor for the control input
-        Returns: joint velocities
+        Finite axis–angle of the payload's rotation relative to its initial pose.
+
+        Args:
+            site:       site name for payload
+            degrees:    if True, return angle in degrees (else radians)
+            frame:      'world' (default) or 'body' to express the axis
+            reset_ref:  if True, set current pose as new zero-rotation reference
+
+        Returns:
+            angle, axis
+            - angle: scalar >= 0 (rad or deg)
+            - axis:  (3,) unit vector (undefined if angle≈0; we return [1,0,0])
         """
-        # --- Get Current State ---
-        self.FK()
-        self.get_jacobian()
+        sid = self.model.site(site).id
+        Rw = self.data.site_xmat[sid].reshape(3, 3)
 
-        # --- Calculate Orientation Error ---
-        R_current = self.T[:3, :3]
-        error_o_mat = self.R_desired @ R_current.T
-        error_o_axis_angle = Robj.from_matrix(error_o_mat).as_rotvec()
+        # cache/refresh reference orientation
+        if reset_ref or not hasattr(self, '_payload_R0'):
+            self._payload_R0 = Rw.copy()
+        R0 = self._payload_R0
 
-        # --- Create Corrective Angular Velocity ---
-        dv_ang_corrective = Kp_ori * error_o_axis_angle.reshape(3, 1)
+        # relative rotation
+        R_rel = Rw @ R0.T
 
-        # --- Create Final Target Twist ---
-        v_des[:3] += dv_ang_corrective.flatten()
+        # axis–angle via rotation vector
+        rotvec = Robj.from_matrix(R_rel).as_rotvec()
+        angle = float(np.linalg.norm(rotvec))
+        axis = (rotvec / angle) if angle > 1e-12 else np.array([1.0, 0.0, 0.0])
 
-        # --- Compute velocity (twist) error---
-        v_error = v_des - self.J @ self.data.qvel[self.joint_idx].reshape(-1,)
-        # --- Damped Least Squares ---
-        dv = self.J_pinv @ np.linalg.solve(self.J @ self.J_pinv + (damping * np.eye(6)), v_error)
+        # express axis in desired frame
+        if frame == 'body':
+            axis = Rw.T @ axis
 
-        # --- Limit joint velocities ---
-        # return np.clip(dv, -self.v_max, self.v_max).reshape(6,1)  # No need for this anymore, we set limits in model xml file
-        return dv.reshape(6, 1)
+        if degrees:
+            angle = np.rad2deg(angle)
+
+        return angle, axis
+        
+    def check_topple(self):
+        payload_angle = self.get_payload_pose(output='pitch', degrees=True)
+        if payload_angle > 85:
+            self.stop = True
+
+    def get_tip_edge(self):
+        contact_verts = []
+        for contact in self.data.contact:
+            geom_names = [mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, int(id)) for id in contact.geom]
+            if 'pusher_link' in geom_names:         # If contact is between pusher and payload, skip it
+                continue
+            else:
+                contact_verts.append(contact.pos)
+        return np.array(contact_verts)
+    
+    def init_com_cone_from_edge(edge_verts):
+        """
+        A minimal cone representation:
+        - apex is the entire edge (any point along it)
+        - direction is +Z (up)
+        - half-angle is ~90° (very wide)
+        """
+        return {
+            "p1": edge_verts[0].copy(),     # (3,)
+            "p2": edge_verts[1].copy(),     # (3,)
+            "dir": np.array([0, 0, 1]),     # (3,) unit vector
+            "half_angle": np.pi/2 - 1e-6,   # radians (almost 90°)
+        }
+
+# ======================================================================================================
+# Unused fns
+# ======================================================================================================
+'''
+    def bias_ft_reading(self): # NOTE: BROKEN, SO UNUSED
+        print("Biasing F/T sensor...")
+        force_offset = self.ft_get_reading()
+        self.ft_offset = force_offset.copy()
+        print(f"Force offset: {self.ft_offset.flatten()}")
 
     def generate_quintic_trajectory(self, q_start, q_end, duration):
         """
@@ -303,114 +365,6 @@ class controller:
         elif order == 2:    # Velocity control
             return coeffs[1] + 2*coeffs[2]*t + 3*coeffs[3]*t**2 + 4*coeffs[4]*t**3 + 5*coeffs[5]*t**4
 
-    def get_payload_pose(self, site='payload_site', output='T', degrees=False):
-        payload_site_id = self.model.site(site).id
-        payload_R = self.data.site_xmat[payload_site_id].reshape(3, 3)
-        payload_p = self.data.site_xpos[payload_site_id].flatten()
-        T_payload = np.eye(4)
-        T_payload[:3, :3] = payload_R
-        T_payload[:3, 3] = payload_p
-        if output == 'T':
-            return T_payload
-        elif output == 'pitch':
-            rot = Robj.from_matrix(payload_R).as_euler('xyz', degrees=False)
-            tip_angle = rot[1]  # pitch angle
-            if degrees:
-                tip_angle = np.degrees(tip_angle)
-            return tip_angle
-        elif output == 'p':
-            return payload_p
-        else:
-            raise ValueError("Output must be 'pitch', 'p', or 'T'.")
-        
-    def get_payload_axis_angle(self, site='payload_site', degrees=False, frame='world'):
-        """
-        Returns the finite axis–angle of the payload's rotation relative to its
-        initial pose, plus the instantaneous axis of rotation (from angular velocity).
-
-        Args:
-            site:    site name for payload
-            degrees: return angle in degrees if True (otherwise radians)
-            frame:   'world' (default) or 'body' to express axes in the current body frame
-
-        Returns:
-            angle, axis, axis_inst
-            - angle:   scalar >= 0  (radians or degrees)
-            - axis:    (3,) unit vector (undefined if angle≈0; we return [1,0,0] then)
-            - axis_inst: (3,) unit vector of instantaneous rotation axis
-                        (undefined if angular speed≈0; we return zeros then)
-        """
-        # Current world rotation of the site
-        sid = self.model.site(site).id
-        Rw = self.data.site_xmat[sid].reshape(3, 3)
-
-        # Initial reference orientation
-        if not hasattr(self, '_payload_R0'):
-            self._payload_R0 = Rw.copy()
-        R0 = self._payload_R0
-
-        # Relative rotation from initial pose
-        R_rel = Rw @ R0.T
-
-        # Axis–angle via rotation vector: rotvec = theta * axis, with theta in [0, pi]
-        rotvec = Robj.from_matrix(R_rel).as_rotvec()
-        angle = np.linalg.norm(rotvec)
-        if angle > 1e-12:
-            axis = rotvec / angle
-        else:
-            axis = np.array([1.0, 0.0, 0.0])  # arbitrary when angle ~ 0
-
-        # Instantaneous axis from angular velocity (world frame)
-        res = np.zeros(6)
-        mujoco.mj_objectVelocity(self.model, self.data, mujoco.mjtObj.mjOBJ_SITE, sid, res, 0)
-        angvel_w = res[:3]
-        wnorm = np.linalg.norm(angvel_w)
-        axis_inst = angvel_w / wnorm if wnorm > 1e-12 else np.zeros(3)
-
-        # Express axes in requested frame
-        if frame == 'body':
-            # current body frame (uses Rw): v_body = Rw^T v_world
-            axis = Rw.T @ axis
-            axis_inst = (Rw.T @ axis_inst) if wnorm > 1e-12 else axis_inst
-
-        if degrees:
-            angle = np.rad2deg(angle)
-
-        return angle, axis, axis_inst
-
-        
-    def check_topple(self):
-        payload_angle = self.get_payload_pose(output='pitch', degrees=True)
-        if payload_angle > 85:
-            self.stop = True
-
-    def get_tip_edge(self):
-        contact_verts = []
-        for contact in self.data.contact:
-            geom_names = [mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, int(id)) for id in contact.geom]
-            if 'pusher_link' in geom_names:         # If contact is between pusher and payload, skip it
-                continue
-            else:
-                contact_verts.append(contact.pos)
-        return np.array(contact_verts)
-    
-    def init_com_cone_from_edge(edge_verts):
-        """
-        A minimal cone representation:
-        - apex is the entire edge (any point along it)
-        - direction is +Z (up)
-        - half-angle is ~90° (very wide)
-        """
-        return {
-            "p1": edge_verts[0].copy(),     # (3,)
-            "p2": edge_verts[1].copy(),     # (3,)
-            "dir": np.array([0, 0, 1]),     # (3,) unit vector
-            "half_angle": np.pi/2 - 1e-6,   # radians (almost 90°)
-        }
-
-# ======================================================================================================
-# Unused fns
-# ======================================================================================================
     def update_velocity_control(self, Kp_joint=5.0):
         """
         Follows a pre-planned quintic trajectory using joint velocity control.
@@ -434,6 +388,37 @@ class controller:
 
         # --- Apply Command to Actuators ---
         self.data.ctrl[self.joint_idx] = dq_command
+
+    def diff_IK(self, v_des, Kp_ori=2, damping=1e-4):
+        """
+        Solve differential kinematics to achieve desired end-effector velocity
+        v_des: 6D vector [lin_vel, ang_vel] in world frame
+        damping: Damping factor for the control input
+        Returns: joint velocities
+        """
+        # --- Get Current State ---
+        self.FK()
+        self.get_jacobian()
+
+        # --- Calculate Orientation Error ---
+        R_current = self.T[:3, :3]
+        error_o_mat = self.R_desired @ R_current.T
+        error_o_axis_angle = Robj.from_matrix(error_o_mat).as_rotvec()
+
+        # --- Create Corrective Angular Velocity ---
+        dv_ang_corrective = Kp_ori * error_o_axis_angle.reshape(3, 1)
+
+        # --- Create Final Target Twist ---
+        v_des[:3] += dv_ang_corrective.flatten()
+
+        # --- Compute velocity (twist) error---
+        v_error = v_des - self.J @ self.data.qvel[self.joint_idx].reshape(-1,)
+        # --- Damped Least Squares ---
+        dv = self.J_pinv @ np.linalg.solve(self.J @ self.J_pinv + (damping * np.eye(6)), v_error)
+
+        # --- Limit joint velocities ---
+        # return np.clip(dv, -self.v_max, self.v_max).reshape(6,1)  # No need for this anymore, we set limits in model xml file
+        return dv.reshape(6, 1)
 
     def update_admittance_control(self, f_target_linear, M=0.1, D=5.0, Kp_ori=25.0, Kv_ori=5.0):
         """
@@ -623,3 +608,4 @@ class controller:
         # --- 7. Apply the Torques ---
         # This assumes your actuators are of type <motor> in the XML.
         self.data.ctrl[self.joint_idx] = tau_command
+'''
