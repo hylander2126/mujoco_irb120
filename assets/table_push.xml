@@ -6,7 +6,7 @@
 	
 	<compiler angle="radian" coordinate="local" meshdir="meshes/" texturedir="textures/"> </compiler>
 
-	<option timestep="0.002" integrator="implicitfast">
+	<option timestep="0.002" iterations="50" tolerance="1e-9" integrator="implicitfast">
 		<flag warmstart="enable" multiccd="enable"/>
 	</option>
 
