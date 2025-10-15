@@ -24,6 +24,50 @@ import numpy as np
 '''
 *** HYLAND ADDED FUNCTIONS ***
 '''
+def axisangle2rot(axis, angle):
+    '''
+    Convert a 3D rotation axis and angle (in radians) to a 3x3 rotation matrix.
+
+    axis : array-like, shape (3,)
+        The rotation axis (will be normalized if not already).
+    angle : float
+        The rotation angle in radians.
+    
+    - If angle is a scalar -> returns (3,3)
+    - If angle is array_like of shape (n,) -> returns (n,3,3)
+    
+    returns: ndarray, shape (3,3) corresponding rotation matrix.
+    '''
+    axis = np.asarray(axis, dtype=float)
+    nrm = np.linalg.norm(axis)
+    if nrm == 0:
+        raise ValueError('Rotation axis must be non-zero.')
+    (x, y, z) = axis / nrm
+
+    ang = np.asarray(angle, dtype=float)
+    c = np.cos(ang)
+    s = np.sin(ang)
+    C = 1.0 - c
+    
+    if ang.ndim == 0:
+        return np.array([
+            [c + x*x*C, x*y*C - z*s, x*z*C + y*s],
+            [y*x*C + z*s, c + y*y*C, y*z*C - x*s],
+            [z*x*C - y*s, z*y*C + x*s, c + z*z*C]], float, **('dtype',))
+
+    R = np.empty((ang.shape[0], 3, 3), dtype=float)
+    R[:, 0, 0] = c + x*x*C
+    R[:, 0, 1] = x*y*C - z*s
+    R[:, 0, 2] = x*z*C + y*s
+    R[:, 1, 0] = y*x*C + z*s
+    R[:, 1, 1] = c + y*y*C
+    R[:, 1, 2] = y*z*C - x*s
+    R[:, 2, 0] = z*x*C - y*s
+    R[:, 2, 1] = z*y*C + x*s
+    R[:, 2, 2] = c + z*z*C
+
+    return R
+
 def twistbody2space(xi_body, T):
     """ Converts a twist from body to space frame"""
     adT = Adjoint(T)
