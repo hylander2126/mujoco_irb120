@@ -2,7 +2,7 @@ import os
 import mujoco
 
 # Define all objects and their required files here
-OBJECTS = { 
+OBJECTS = {
     'box': {
         'xml_path': '../assets/object_sim/box.xml',
         'assets': []
@@ -14,6 +14,11 @@ OBJECTS = {
     'bunny': {
         'xml_path': '../assets/object_sim/stanfordbunny.xml',
         'assets': ['../assets/meshes/stanfordbunny.stl']
+    },
+    'box_exp': {
+        'xml_path': '../assets/object_sim/box_exp.xml',
+        'assets': [],
+        'com': [-0.05, 0.05, 0.15]
     },
 }
 
@@ -44,6 +49,7 @@ def select_model(main_xml_path: str, object_name: str):
     # --- 1. Get the definition for the chosen object ---
     definition = OBJECTS[object_name]
     object_xml_path = definition['xml_path']
+    obj_com = definition['com'] if 'com' in definition else [0, 0, 0]
 
     # --- 2. Build the assets dictionary for the VFS ---
     assets = {}
@@ -79,7 +85,7 @@ def select_model(main_xml_path: str, object_name: str):
         )
         data = mujoco.MjData(model)
         print("Model loaded successfully.")
-        return model, data
+        return model, data, obj_com
     except Exception as e:
         print(f"An error occurred during model compilation: {e}")
         raise

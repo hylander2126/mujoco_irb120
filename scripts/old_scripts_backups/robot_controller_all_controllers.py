@@ -2,7 +2,7 @@ import mujoco
 from scipy.spatial.transform import Rotation as Robj
 import numpy as np
 import matplotlib.pyplot as plt
-from helper_fns import *
+from utils.helper_fns import *
 
 class controller:
     def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, ee_site='ee_site'):
