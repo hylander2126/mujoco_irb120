@@ -402,4 +402,4 @@ FodyWeavers.xsd
 
 # Raw object files
 assets/object_sim/raw_files/
-experiments/*.mp4
+*.mp4
