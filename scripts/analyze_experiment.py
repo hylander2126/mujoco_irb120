@@ -14,7 +14,10 @@ def read_csv(file_path, trim_rows=0):
         return csv_arr[trim_rows:]
 
 # path = "../experiments/20251006_1.csv"
-path = "../experiments/run_2025-10-10_17-04-01_t001_ft.csv"
+# path = "../experiments/run_2025-10-10_17-04-01_t001_ft.csv"
+# path = "../experiments/run_2025-10-15_15-44-01_t001_ft.csv"
+path = "../experiments/run_2025-10-15_17-32-23_t001_ft.csv"
+
 f_data = read_csv(path, trim_rows=1)
 th_data = read_csv(path.replace("ft", "tag"), trim_rows=1)
 

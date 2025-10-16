@@ -1,15 +1,8 @@
 <mujoco>
     <!-- Root body of the robot arm with prismatic joints (XYZ slide) -->
-    <body name="base_link" pos="0.5 0 0">
-        <!-- Sliding joints for Cartesian motion -->
-        <!-- <joint name="robot0:slide0" type="slide" axis="1 0 0" damping="1e+11" armature="0.0001"/>
-        <joint name="robot0:slide1" type="slide" axis="0 1 0" damping="1e+11" armature="0.0001"/>
-        <joint name="robot0:slide2" type="slide" axis="0 0 1" damping="1e+11" armature="0.0001"/> -->
-
-        <!-- Base inertial properties and geometry -->
+    <body name="base_link" pos="0.5 0 0.05">
         <inertial pos="-0.0036 0 0.0014" quat="0.7605 -0.0133 -0.0061 0.6491" mass="70.1294" diaginertia="1.2869 1.2236 0.9868"/>
         <geom type="mesh" mesh="base_link" name="robot0:base_link" rgba="1 0.43 0 1" contype="0" conaffinity="0"/>
-        
         <!-- Begin kinematic chain -->
         <body name="link_1" pos="0 0 0" gravcomp="1">
             <joint name="joint_1" type="hinge" axis="0 0 1" range="-2.87979 2.87979" limited="true" damping="0.1" frictionloss="0.01"/>

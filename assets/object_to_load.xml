@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco>
+    <!-- Empty model (dummy) when not using an object -->
+    <body name="payload" pos="10 10 10">
+        <!-- <joint name="empty" type="free"/> -->
+        <geom size="1 1 1" type="box" name="empty" mass="1"/>
+        <site name="payload_site" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
+    </body>
+</mujoco>
