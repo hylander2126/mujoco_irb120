@@ -1,40 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mujoco>
+	<compiler angle="radian" meshdir="meshes/" texturedir="textures/"/>
+	<option timestep="0.001" tolerance="1e-9" integrator="implicitfast" iterations="100" ls_iterations="100">
+		<flag warmstart="enable" multiccd="enable"/>
+	</option>
 	<visual>
 		<global offwidth="1280" offheight="720"/>
 	</visual>
-	
-	<compiler angle="radian" coordinate="local" meshdir="meshes/" texturedir="textures/"/>
-
-	<option timestep="0.002" iterations="50" tolerance="1e-9" integrator="implicitfast">
-		<flag warmstart="enable" multiccd="enable"/>
-	</option>
 
 	<include file="shared.xml"></include>
 
 	<actuator>
         <!-- Position Control -->
-		<!-- <position joint="joint_1" name="joint_1" kp="1" kv="2" ctrlrange="-2.87979 2.87979" forcerange="-20 20"/>
-		<position joint="joint_2" name="joint_2" kp="1" kv="2" ctrlrange="-1.91986 1.91986" forcerange="-20 20"/>
-		<position joint="joint_3" name="joint_3" kp="1" kv="2" ctrlrange="-1.22173 1.91986" forcerange="-20 20"/>
-		<position joint="joint_4" name="joint_4" kp="1" kv="2" ctrlrange="-2.79252 2.79252" forcerange="-10 10"/>
-		<position joint="joint_5" name="joint_5" kp="1" kv="2" ctrlrange="-2.09440 2.90440" forcerange="-10 10"/>
-		<position joint="joint_6" name="joint_6" kp="1" kv="2" ctrlrange="-3.14200 3.14200" forcerange="-10 10"/> -->
-
-		<!-- <position joint="joint_1" name="joint_1" kp="400" kv="80" ctrlrange="-2.87979 2.87979" forcerange="-20 20"/>
-		<position joint="joint_2" name="joint_2" kp="350" kv="70" ctrlrange="-1.91986 1.91986" forcerange="-20 20"/>
-		<position joint="joint_3" name="joint_3" kp="300" kv="60" ctrlrange="-1.22173 1.91986" forcerange="-20 20"/>
-		<position joint="joint_4" name="joint_4" kp="200" kv="40" ctrlrange="-2.79252 2.79252" forcerange="-10 10"/>
-		<position joint="joint_5" name="joint_5" kp="150" kv="30" ctrlrange="-2.09440 2.90440" forcerange="-10 10"/>
-		<position joint="joint_6" name="joint_6" kp="100" kv="20" ctrlrange="-3.14200 3.14200" forcerange="-10 10"/> -->
+		<!-- kp, kv: (200,100) first 3, (100,50) last 3 -->
+		<position joint="joint_1" name="joint_1" kp="200" kv="100" ctrlrange="-2.87979 2.87979" forcerange="-20 20"/>
+		<position joint="joint_2" name="joint_2" kp="200" kv="100" ctrlrange="-1.91986 1.91986" forcerange="-20 20"/>
+		<position joint="joint_3" name="joint_3" kp="200" kv="100" ctrlrange="-1.22173 1.91986" forcerange="-20 20"/>
+		<position joint="joint_4" name="joint_4" kp="100" kv="50" ctrlrange="-2.79252 2.79252" forcerange="-10 10"/>
+		<position joint="joint_5" name="joint_5" kp="100" kv="50" ctrlrange="-2.09440 2.90440" forcerange="-10 10"/>
+		<position joint="joint_6" name="joint_6" kp="100" kv="50" ctrlrange="-3.14200 3.14200" forcerange="-10 10"/>
 
 		<!-- Velocity Control -->
-		<velocity joint="joint_1" name="joint_1" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+		<!-- <velocity joint="joint_1" name="joint_1" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
         <velocity joint="joint_2" name="joint_2" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
         <velocity joint="joint_3" name="joint_3" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
         <velocity joint="joint_4" name="joint_4" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
         <velocity joint="joint_5" name="joint_5" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
-        <velocity joint="joint_6" name="joint_6" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+        <velocity joint="joint_6" name="joint_6" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/> -->
 
 		<!-- Torque Control -->
 		<!-- <motor joint="joint_1" name="joint_1" gear="1" forcerange="-40 40"/>

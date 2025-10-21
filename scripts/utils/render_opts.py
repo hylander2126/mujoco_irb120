@@ -12,13 +12,10 @@ def set_viewer_opts(model_obj, viewer):
     viewer.opt.frame = mujoco.mjtFrame.mjFRAME_WORLD | mujoco.mjtFrame.mjFRAME_SITE
     model_obj.vis.scale.framewidth = 0.025
     model_obj.vis.scale.framelength = 0.75
-    viewer.cam.distance = 1.5
+    viewer.cam.distance = 1.5 # Zoom level
     viewer.cam.elevation = -10
     viewer.cam.azimuth = 90
-    viewer.cam.lookat[:] = np.array([
-        1,
-        0,
-        0.1])
+    viewer.cam.lookat[:] = np.array([0.75, 0, 0.25]) # structure: (x, y, z)
 
 
 def set_renderer_opts(model_obj, cam_obj, opt_obj):
