@@ -63,22 +63,24 @@ class controller:
         self.J_pinv = np.linalg.pinv(self.J)  # Pseudo-inverse of the Jacobian
         return self.J
 
-    def ft_get_reading(self):
+    def ft_get_reading(self, grav_comp=True):
         """Get the force reading from the force sensor, optionally gravity compensated."""
-        # mujoco.mj_rnePostConstraint(self.model, self.data)
         f_meas = self.data.sensordata[self.f_sensor_id:self.f_sensor_id + 3].reshape(3, 1)
 
         # Apply any prior bias
         f = f_meas - self.ft_offset
 
+        if not grav_comp:
+            return f
         # Optional gravity comp (force only; torque left untouched since you read 3D force)
         # site rotation: site frame -> world; take transpose for world -> site
         R_sw = self.data.site_xmat[self.ee_site].reshape(3, 3).T
         # gravity force expressed in site frame
-        f_g_site = R_sw @ (self.grav_mass * np.array([0, 0, 9.81])).reshape(3, 1)
-        f = f - f_g_site  # subtract mg
+        f_g_site = R_sw @ (self.grav_mass * np.array([0, 0, -9.81])).reshape(3, 1)
+        
+        # f_g_site = np.zeros((3,1))  # DISABLE GRAVITY COMPENSATION FOR NOW
 
-        return f
+        return f - f_g_site  # subtract mg
     
     def set_pose(self, q=np.zeros((6,1))):
         """Forcibly set the robot to a specific joint configuration by ignoring dynamics"""
@@ -171,11 +173,12 @@ class controller:
             print("\nIK finished, robot state restored.")
             print("**********************************")
     
-    def set_pos_ctrl(self, q_desired):
+    def set_pos_ctrl(self, q_desired, check_ellipsoid=True):
         """Apply position control to the robot"""
-        if not self.is_in_ellipsoid():              # Check manipulability
+        if check_ellipsoid and not self.is_in_ellipsoid():              # Check manipulability
             return
-        self.data.ctrl[self.joint_idx] = q_desired.reshape(6,1)
+        # self.data.ctrl[:] = q_desired.reshape(6,1)
+        self.data.ctrl[:] = q_desired.flatten()
         mujoco.mj_forward(self.model, self.data)    # Update forward kinematics after control input
 
     def set_vel_ctrl(self, v_desired, Kp_ori=0, damping=1e-4):
@@ -276,7 +279,7 @@ class controller:
         
     def check_topple(self):
         payload_angle = self.get_payload_pose(output='pitch', degrees=True)
-        if payload_angle > 85:
+        if payload_angle > 90:
             self.stop = True
 
     def get_tip_edge(self):
