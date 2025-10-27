@@ -1,6 +1,77 @@
 import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
+from .helper_fns import axisangle2rot
+
+## Theta model (input is theta, output is force)
+def theta_model(x, a, b):
+    F           = x.reshape(-1,3)  # ensure shape is (n,3)
+    m           = a
+    zc          = b
+    
+    g           = 9.81
+    rf0         = np.array([-0.1, 0.0, 0.25])
+    rc0_known   = np.array([-0.05, 0.0,  0.0])
+    e_hat       = np.array([  0.0, 1.0,  0.0])
+    z_hat       = np.array([  0.0, 0.0,  1.0])
+    rc0         = rc0_known + np.array([0.0, 0.0, zc])
+
+    a = np.cross(e_hat, rf0) # (3,)
+    b = np.cross(e_hat, rc0) # (3,)
+    # C = (a . F) + mg(b . z_hat) (but np shapes don't match. eF . a is equivalent but yield (n,) which is preferred)
+    C = (F @ a) + m*g*(b @ z_hat)
+    eF = np.cross(e_hat, F)
+    eZ = np.cross(e_hat, z_hat)
+    # D = (a . eF) + mg(b . eZ)
+    D = (eF @ a) + m*g*(b @ eZ)
+
+    return np.arctan2(C, D)  # (n,)
+
+## Force model (input is theta, output is force)
+def F_model(x, a, b, push_dirs):
+    theta       = np.asarray(x).reshape(-1,)  # ensure shape is (n,)
+    m           = a
+    zc          = b
+
+    g           = 9.81
+    rf0         = np.array([-0.1, 0.0, 0.25])
+    rc0_known   = np.array([-0.05, 0.0,  0.0])
+    e_hat       = np.array([  0.0, 1.0,  0.0])
+    z_hat       = np.array([  0.0, 0.0,  1.0])
+    rc0         = rc0_known + np.array([0.0, 0.0, zc])
+
+    # normalize push_dir
+    push_dirs = np.asarray(push_dirs).reshape(-1,3)  # ensure shape is (N,3)
+    d = push_dirs / np.linalg.norm(push_dirs, axis=1, keepdims=True) # (N,3)
+
+    # precompute some pieces
+    e_cross_rf0  = np.cross(e_hat, rf0)        # (3,)
+    z_cross_ehat = np.cross(z_hat, e_hat)      # (3,)
+
+    R_pos = axisangle2rot(e_hat, theta)   # (N,3,3)
+    R_neg = axisangle2rot(e_hat, -theta)  # (N,3,3)
+
+    # A(theta)
+    A = (R_pos @ e_cross_rf0.reshape(3,1)).reshape(-1,3)  # (N,3)
+
+    # tmp(theta)
+    tmp = (R_neg @ z_cross_ehat.reshape(3,1)).reshape(-1,3)  # (N,3)
+
+    # B(theta)
+    # B = m g * rc0^T * tmp
+    B = m * g * (tmp @ rc0.reshape(3,1)).reshape(-1)  # (N,)
+
+    # Now solve for alpha per theta:
+    # alpha = B / (A^T d)
+    denom = np.einsum('ij,ij->i', A, d)  # (N,), dot(A[i], d)
+    alpha = B / denom                   # (N,)
+
+    # F(theta) = alpha * d
+    F_pred = alpha[:,None] * d # [None,:]  # (N,3)
+
+    print(a, b)
+    
+    return F_pred
 
 ## Helper function to align y-axis limits of multiple axes to zero
 def align_zeros(axes):
