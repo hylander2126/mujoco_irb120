@@ -24,6 +24,30 @@ import numpy as np
 '''
 *** HYLAND ADDED FUNCTIONS ***
 '''
+# ---------- Rotation: vectorized Rodrigues (returns (n,3,3)) ----------
+def axisangle2rot_vec(axis: np.ndarray, theta: np.ndarray) -> np.ndarray:
+    axis  = np.asarray(axis, dtype=float).reshape(3,)
+    theta = np.asarray(theta, dtype=float).reshape(-1,)
+    axis  = axis / (np.linalg.norm(axis) + 1e-15)
+    x, y, z = axis
+
+    ct = np.cos(theta)[:, None, None]
+    st = np.sin(theta)[:, None, None]
+    vt = (1.0 - np.cos(theta))[:, None, None]
+
+    K = np.array([[ 0, -z,  y],
+                  [ z,  0, -x],
+                  [-y,  x,  0]], dtype=float)
+    K = np.broadcast_to(K, (theta.size, 3, 3))
+
+    I = np.eye(3)[None, :, :]
+    outer = np.array([[x*x, x*y, x*z],
+                      [y*x, y*y, y*z],
+                      [z*x, z*y, z*z]], dtype=float)[None, :, :]
+
+    return ct*I + st*K + vt*outer
+
+
 def axisangle2rot(axis, angle):
     '''
     Convert a 3D rotation axis and angle (in radians) to a 3x3 rotation matrix.

@@ -127,7 +127,7 @@ print(f"theta_star (ground truth) = {theta_star_gt:.2f} degrees")
 
 # ================ Plot the data ===================
 PLOT_RAW = False
-PLOT_INDIVIDUALS = True
+PLOT_INDIVIDUALS = False
 PLOT_RELATIONSHIP = True
 
 # Now let's plot the x_data over time
@@ -183,3 +183,36 @@ if PLOT_RELATIONSHIP:
     ax3.legend()
     ax3.grid(True)
     plt.show()
+
+
+## Now let's extract the sub-critical window data for model fitting
+## NOTE: f_max may be negative, we want to consider magnitude for safe force calculation
+k_safe = 0.25 # fraction of max force
+f_safe_value = (1-k_safe) * f_trim[fmax_idx,:]
+print(f"Safe force threshold: {k_safe}% of f_max for f_safe= {f_safe_value} N")
+
+# Extract subset of data where force exceeds safe threshold TODO: this just does x-comp for now.
+# idx_sub_crit = np.where(abs(f_hist_filt[:,0]) >= abs(f_safe[0]))[0]
+idx_sub_crit = np.where(np.linalg.norm(f_trim, axis=1) >= np.linalg.norm(f_safe_value))[0]
+
+# For curve fitting, we don't want the initial spike in force, let's scrub them (our cleaned data already starts with the spike at index 0 (relatively speaking))
+init_spike_idx = 4 #160 # Manually determined for now
+idx_sub_crit = idx_sub_crit[init_spike_idx:]  # Keep indices 80 onward
+
+## And record the sub-critical force, theta, and time values
+f_sub_crit = f_trim[idx_sub_crit,:]
+th_sub_crit = th_trim[idx_sub_crit]
+t_sub_crit = time_trim[idx_sub_crit]
+
+# print(f"Sub-critical window has {len(th_sub_crit)} samples from time {t_sub_crit[0]:.2f} s to {t_sub_crit[-1]:.2f} s")
+
+# And plot
+fig4, ax4 = plt.subplots(figsize=(8, 4.5))
+ax4.plot(np.rad2deg(th_trim), np.linalg.norm(f_trim, axis=1), color='k', linewidth=5, label='Simulated data')  # Plot the x-component of the force
+ax4.scatter(np.rad2deg(th_sub_crit), np.linalg.norm(f_sub_crit, axis=1), color='r', s=80, label='Sub-critical window')
+ax4.axhline(0, color='c', label='_')
+ax4.set_ylabel("Force Norm (N)", color='b', fontsize=20)
+ax4.set_xlabel("Object Angle (deg)", color='g', fontsize=20)
+ax4.legend(loc='upper right', fontsize=15)
+ax4.grid(True)
+plt.show()

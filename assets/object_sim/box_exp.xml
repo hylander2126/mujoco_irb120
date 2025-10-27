@@ -1,7 +1,7 @@
 <mujoco>
     <!-- NOTE: geom size is the HALF-SIZE of the box in meters -->
-    <!-- So the box's dimensions are: (w:x, l:y, h:z) = (0.08, 0.08, 0.2) -->
-    <!-- And the box starts at z = 0.2 - 0.1 = 0.1 -->
+    <!-- So the box's dimensions are: (w:x, l:y, h:z) = (0.1, 0.1, 0.3) -->
+    <!-- And the box starts at z = 0.2 - 0.15 = 0.05 -->
     <body name="payload" pos="1 0 0.2">
         <joint name="payload:joint" type="free" damping="0.01"></joint>
         <geom name="payload" type="box" mass="0.635" size="0.05 0.05 0.15" material="block_mat" friction="0 0 0" 

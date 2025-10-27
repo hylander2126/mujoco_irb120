@@ -237,6 +237,24 @@ class controller:
         else:
             raise ValueError("Output must be 'pitch', 'p', or 'T'.")
         
+    def get_payload_rpy(self, site='payload_site', degrees=False, frame='world'):
+        """
+        Get the Euler angles representation of the payload's orientation.
+        """
+
+        sid = self.model.site(site).id
+        Rw = self.data.site_xmat[sid].reshape(3, 3)
+
+        if frame == 'body':
+            Rb = Rw.T @ Rw  # Identity, since Rw.T @ Rw = I
+            R = Rb
+        else:
+            R = Rw
+
+        rot = Robj.from_matrix(R)
+        rpy = rot.as_euler('xyz', degrees=degrees)  # roll, pitch, yaw
+        return rpy
+
     def get_payload_axis_angle(self, site='payload_site', degrees=False, frame='world', reset_ref=False):
         """
         Finite axis–angle of the payload's rotation relative to its initial pose.
@@ -279,7 +297,7 @@ class controller:
         
     def check_topple(self):
         payload_angle = self.get_payload_pose(output='pitch', degrees=True)
-        if payload_angle > 90:
+        if np.isclose(payload_angle, 90, atol=1e-2):
             self.stop = True
 
     def get_tip_edge(self):
