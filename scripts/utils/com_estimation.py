@@ -2,30 +2,141 @@ import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from .helper_fns import axisangle2rot
+from scipy.optimize import least_squares
+
+def tau_app_model(F, rf):
+    """
+    Compute torque about pivot due to applied force F at position rf.
+
+    rf must be same shape as F (N, 3) and must account for object rotation.
+    """
+    # return np.cross(F, rf)
+    return np.cross(rf, F)
+
+
+def theta_from_tau(tau, m, zc, use_branch='minus'):
+    """
+    After fitting m and zc, compute theta from measured tau values.
+    """
+    g           = -9.81
+    rf0         = np.array([ -0.1,  0.0,  0.2]) # -0.1 , 0 , 0.2
+    rc0_known   = np.array([-0.05, 0.0,  0.0]) # -0.05 , 0 , 0
+    e_hat       = np.array([  0.0, 1.0,  0.0]) # 0 , 1 , 0
+    z_hat       = np.array([  0.0, 0.0,  1.0]) # 0 , 0 , 1
+    rc0         = rc0_known + np.array([0.0, 0.0, zc])
+
+    # tau in the tipping axis only (about e_hat)
+    # tau = tau @ e_hat  # (n,)
+    tau = -np.linalg.norm(tau, axis=1)  # (n,)
+
+    # helper direction a_vec = z_hat x e_hat
+    a_vec = np.cross(z_hat, e_hat)  # (3,)
+
+    # Scalars B, C, U, phi
+    B = m*g* (rc0 @ a_vec)          # scalar
+    C = m*g* (np.cross(e_hat, rc0) @ a_vec)  # scalar
+    U = np.sqrt(B**2 + C**2)        # scalar
+    phi = np.arctan2(C, B)          # scalar
+
+    # Avoid divide by zero (R==0 means no grav moment)
+    if U == 0:
+        return np.full(tau.shape[0], np.nan)
+
+    # clip argument of arccos for numerical safety [-1, 1]
+    arg = np.clip(tau / U, -1.0, 1.0)
+
+    theta_plus = phi + np.arccos(arg)   # (n,)
+    # print(f"theta_plus: {theta_plus}")
+    theta_minus = phi - np.arccos(arg)  # (n,)
+    # print(f"m= {m:.3f}, zc= {zc:.3f}")
+    # print(f"theta_minus: {theta_minus}")
+    
+    if use_branch == 'plus':
+        return theta_plus
+    else:
+        return theta_minus
+
+
+def tau_model(theta, m, zc):
+    """
+    Compute the gravity torque given theta, mass, and z-height of CoM
+    """
+    W           = np.array([0, 0, -9.8067 * m]) # Weight in space frame
+    rc0_known   = np.array([-0.05, 0.0,  0.0]) # -0.05 , 0 , 0
+    e_hat       = np.array([  0.0, 1.0,  0.0]) # 0 , 1 , 0
+    rc0         = rc0_known + np.array([0.0, 0.0, zc])
+    theta       = np.asarray(theta).flatten()  # ensure shape is (n,)
+
+    # TEMP testing new strategy
+    # Get (batch) rotation matrix from axis-angle
+    # -(rc0 x R(-theta)W)
+    R = axisangle2rot(e_hat, -theta)   # (N,3,3)
+
+    W_rotated = R @ W
+    tau = -np.cross(rc0, W_rotated)  # (N,3)
+    return tau.ravel()
+    
+
+
+    # cos_term = -np.cross(rc0, W)
+    # sin_term = np.cross(rc0, np.cross(e_hat, W))
+
+    # print(f"cos_term: {cos_term}, sin_term: {sin_term}")
+
+    # return (sin_term[:,None] @ np.sin(theta)[None,:] + \
+    #         cos_term[:,None] @ np.cos(theta)[None,:])#.ravel()
+
 
 ## Theta model (input is theta, output is force)
-def theta_model(x, a, b):
+def theta_model_working(x, a, b, ee_pos, o_obj):
     F           = x.reshape(-1,3)  # ensure shape is (n,3)
     m           = a
     zc          = b
     
     g           = 9.81
-    rf0         = np.array([-0.1, 0.0, 0.25])
-    rc0_known   = np.array([-0.05, 0.0,  0.0])
-    e_hat       = np.array([  0.0, 1.0,  0.0])
-    z_hat       = np.array([  0.0, 0.0,  1.0])
+    rf0         = np.array([ -0.1,  0.0,  0.2]) # -0.1 , 0 , 0.2
+    rc0_known   = np.array([-0.05, 0.0,  0.0]) # -0.05 , 0 , 0
+    e_hat       = np.array([  0.0, 1.0,  0.0]) # 0 , 1 , 0
+    z_hat       = np.array([  0.0, 0.0,  1.0]) # 0 , 0 , 1
     rc0         = rc0_known + np.array([0.0, 0.0, zc])
+
+    # o_obj       = # Object frame coords in world frame (WTF is the world frame??)
+    temp = ee_pos - o_obj  # Vector from object frame to EE in world frame
+    print(f"temp: {temp}")
 
     a = np.cross(e_hat, rf0) # (3,)
     b = np.cross(e_hat, rc0) # (3,)
     # C = (a . F) + mg(b . z_hat) (but np shapes don't match. eF . a is equivalent but yield (n,) which is preferred)
     C = (F @ a) + m*g*(b @ z_hat)
+    # C = (F @ a) - m*g*(b @ z_hat)
     eF = np.cross(e_hat, F)
     eZ = np.cross(e_hat, z_hat)
     # D = (a . eF) + mg(b . eZ)
     D = (eF @ a) + m*g*(b @ eZ)
+    # D = m*g*(b @ eZ) - (eF @ a)  # once again, shapes don't match so rearranged (valid)
 
     return np.arctan2(C, D)  # (n,)
+
+
+# --- Nonlinear fitting wrapper ---
+def fit_mass_and_zc(theta_data, F_exp, m_guess=0.5, zc_guess=0.1):
+    def residual(params):
+        m, z_c = params
+        
+        # IMPORTANT: convert measured forces -> force on object
+        F_obj_meas = -F_exp
+
+        push_dirs =  F_obj_meas / np.linalg.norm(F_obj_meas, axis=1, keepdims=True)  # (N,3)
+        # push_dirs = np.array([1, 0, 0])  # (3,)
+        F_pred = F_model(theta_data, m, z_c, push_dirs)
+        temp = (F_pred - F_obj_meas)
+        # print(temp) # TODO: check how residuals are changing each step
+        #TODO: Check curvy data and if its linear, the model is probably wrong
+        return temp.ravel()
+
+    result = least_squares(residual, [m_guess, zc_guess], bounds=([0,0],[np.inf,np.inf]))
+    return result.x[0], result.x[1], result
+
 
 ## Force model (input is theta, output is force)
 def F_model(x, a, b, push_dirs):

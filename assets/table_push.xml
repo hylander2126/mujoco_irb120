@@ -46,7 +46,7 @@
 		<!-- <camera name="closeup" pos="0 -100 .07" xyaxes="1 0 0 0 1 2"/> -->
 		<include file="robot/robot.xml"></include>
 		
-		<!-- Table Surface === Recall geom SIZE is half-dims so table surface is 2*(0.02) = 0.04 and the top of the surface is at z = 0.08 + 0.02 = 0.1 -->
+		<!-- Table Surface === Recall geom SIZE is half-dims so table surface is z=0.1 -->
 		<body pos="0.75 0 0" name="table0">
 			<geom size="1 0.5 0.05" type="box" name="table" mass="2000" material="table_mat" friction="1 0.005 0.0001"></geom>
 			<site name="surface_site" pos="0 0 0" size = "0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>

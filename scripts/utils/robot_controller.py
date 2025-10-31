@@ -12,6 +12,8 @@ class controller:
         self.joint_idx      = np.array([model.joint(name).qposadr for name in self.joint_names]) # This is same as dofadr (v_indices)
         self.ee_site        = model.site(ee_site).id
         self.table_site     = model.site('surface_site').id
+        self.obj_frame_site = model.site('obj_frame_site').id
+        self.o_obj          = self.data.site_xpos[self.obj_frame_site]  # (3,)
         self.stop           = False                              # Stop flag for the controller
         self.q_min          = model.jnt_range[self.joint_idx, 0] # Max joint limits
         self.q_max          = model.jnt_range[self.joint_idx, 1] # Min joint limits
