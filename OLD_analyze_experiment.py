@@ -3,7 +3,7 @@ import csv
 import matplotlib.pyplot as plt
 from scipy.signal import medfilt, butter, filtfilt
 from scipy.interpolate import interp1d
-from scripts.utils.com_estimation import tau_app_model, tau_model, theta_from_tau, align_zeros
+from scripts.utils.com_estimation import tau_app_model, tau_model, align_zeros
 from scipy.stats import linregress
 from scipy.optimize import curve_fit
 
@@ -28,19 +28,19 @@ path_root = "experiments/run_2025-11-03_11-59-03_t001_"
 f_data = read_csv(path_root + "ft.csv", trim_rows=1)
 f_exp_raw = np.zeros((len(f_data), 3))                        # n_samples x 3 (fx, fy, fz)
 for i, row in enumerate(f_data):
-    f_exp_raw[i, :] = [float(row[j + 1]) for j in range(3)]   # fx, fy, fz are in columns 2, 3, 4
+    f_exp_raw[i, :] = [float(row[j + 1]) for j in range(3)]   # fx, fy, fz are in columns 1, 2, 3
 
 ## Extract angle(s)
 tag_data = read_csv(path_root + "tag.csv", trim_rows=1)       # Discard headers
 tag_exp_raw = np.zeros((len(tag_data), 3))                    # n_samples x 3 (roll, pitch, yaw)
 for i, row in enumerate(tag_data):
-    tag_exp_raw[i, :] = [float(row[j + 2]) for j in range(3)] # roll, pitch, yaw are in columns 3, 4, 5
+    tag_exp_raw[i, :] = [float(row[j + 2]) for j in range(3)] # roll, pitch, yaw are in columns 2, 3, 4
 
 ## Extract EE XYZ position (orientation not used yet)
 ee_data = read_csv(path_root + "ee.csv", trim_rows=1)         # Discard headers
 ee_exp_raw = np.zeros((len(ee_data), 3))                      # n_samples x 3 (x, y, z)
 for i, row in enumerate(ee_data):
-    ee_exp_raw[i, :] = [float(row[j + 1]) for j in range(3)]  # x, y, z are in columns 2, 3, 4
+    ee_exp_raw[i, :] = [float(row[j + 2]) for j in range(3)]  # x, y, z are in columns 2, 3, 4
 
 ## Extract time (from each csv in order to downsample later)
 time_f = np.array([float(row[0]) for row in f_data])     # 'force' time is in column 0
@@ -53,7 +53,7 @@ time_ee -= time_ee[0]
 
 ## ================ Process the data (specifically force) ===================
 # Butterworth filter
-b, a = butter(2, 4, fs=500, btype='low') # 4,5,500 order, cutoff frequency, fs
+b, a = butter(4, 5, fs=500, btype='low') # order, cutoff frequency, fs
 f_exp_filt = filtfilt(b, a, f_exp_raw, axis=0)
 
 # And interpolate the FORCE to match the time steps of the angle data
@@ -114,45 +114,42 @@ fmax_idx = np.argmax(np.linalg.norm(f_trim, axis=1), axis=0)
 print(f"fmax time: {time_trim[fmax_idx]:.2f} s, fmax force: {f_trim[fmax_idx, :]}, fmax angle: {np.rad2deg(th_trim[fmax_idx]):.2f} degrees")
 
 # For clarity, let's only consider data when in contact (*AFTER* max force event)
-# f_contact = f_trim[fmax_idx:, :]
-# th_contact = th_trim[fmax_idx:]
-# ee_contact = ee_trim[fmax_idx:, :]
-# time_contact = time_trim[fmax_idx:]
+f_contact = f_trim[fmax_idx:, :]
+th_contact = th_trim[fmax_idx:]
+ee_contact = ee_trim[fmax_idx:, :]
+time_contact = time_trim[fmax_idx:]
 
 # Determine near-zero-crossing of force in primary axis (x) by searching after max force (fmax_idx) index
-f0_idxs = np.where(np.isclose(f_trim[:, 0], 0, atol=1e-2))[0]
+f0_idxs = np.isclose(f_contact[:, 0], 0, atol=1e-2)
 
-f0_idx = f0_idxs[-1]  # take last crossing before end of data
-print(f"f0 (last found) idx: {f0_idx}, num crossings found: {len(f0_idxs)}")
+# Select angles and times at those near-zero-crossings
+th_departure = th_contact[f0_idxs]
+time_departure = time_contact[f0_idxs]
+print(f"Corresponding angles and times at zero crossings: {np.rad2deg(th_departure)}, {time_departure}")
 
-# # Select angles and times at those near-zero-crossings
-# th_departure = th_contact[f0_idxs]
-# time_departure = time_contact[f0_idxs]
-# print(f"Corresponding angles and times at zero crossings: {np.rad2deg(th_departure)}, {time_departure}")
+# Get average of those first few near-zero-crossings
+if len(th_departure) == 0:
+    print("Warning: No zero crossings found after max force!")
+    avg_th_departure = np.nan
+    avg_time_departure = np.nan
+elif len(th_departure) < 3:
+    print("Warning: Fewer than 3 zero crossings found after max force, averaging what we have.")
+    avg_th_departure = np.mean(th_departure)
+    avg_time_departure = np.mean(time_departure)
+else:
+    avg_th_departure = np.mean(th_departure[:3])  # average first 3 crossings
+    avg_time_departure = np.mean(time_departure[:3])  # average first 3 crossings
 
-# # Get average of those first few near-zero-crossings
-# if len(th_departure) == 0:
-#     print("Warning: No zero crossings found after max force!")
-#     avg_th_departure = np.nan
-#     avg_time_departure = np.nan
-# elif len(th_departure) < 3:
-#     print("Warning: Fewer than 3 zero crossings found after max force, averaging what we have.")
-#     avg_th_departure = np.mean(th_departure)
-#     avg_time_departure = np.mean(time_departure)
-# else:
-#     avg_th_departure = np.mean(th_departure[:3])  # average first 3 crossings
-#     avg_time_departure = np.mean(time_departure[:3])  # average first 3 crossings
-
-# print(f"Mean time and angle at initial zero crossings: {avg_time_departure:.2f} s, {np.rad2deg(avg_th_departure):.2f} degrees")
+print(f"Mean time and angle at initial zero crossings: {avg_time_departure:.2f} s, {np.rad2deg(avg_th_departure):.2f} degrees")
 
 
 ## ==================== CALCULATE THETA* AND ZC ====================
-theta_star_calc = th_trim[f0_idx]
+theta_star_calc = avg_th_departure
 print(f"\nCalculated theta* = {np.rad2deg(theta_star_calc):.2f} degrees")
 
 xc_gt = 0.05
 zc_calc = xc_gt / np.tan(theta_star_calc)
-print(f"Calculated zc = {zc_calc:.3f} m")
+print(f"Calculated zc = {zc_calc:.3f} m\n")
 
 # ground truth from sim
 theta_star_gt = np.rad2deg(np.arctan2(0.05, 0.15))
@@ -172,8 +169,8 @@ if PLOT_RAW:
     ax.plot(time_f, f_exp_raw[:, 0], "b", label='X Force (raw)')
     ax.plot(time_f, f_exp_raw[:, 1], "r", label='Y Force (raw)')
     ax.plot(time_f, f_exp_raw[:, 2], "m", label='Z Force (raw)')
-    # ax2.plot(time_th, tag_exp_raw[:, 0], color='g', linestyle='-', label='Roll (raw)')
-    # ax2.plot(time_th, tag_exp_raw[:, 1], color='c', linestyle='-', label='Pitch (raw)')
+    ax2.plot(time_th, tag_exp_raw[:, 0], color='g', linestyle='-', label='Roll (raw)')
+    ax2.plot(time_th, tag_exp_raw[:, 1], color='c', linestyle='-', label='Pitch (raw)')
     ax2.plot(time_th, tag_exp_raw[:, 2], color='y', linestyle='-', label='Yaw (raw)')
     ax.tick_params(axis='y', labelcolor='b')
     ax2.tick_params(axis='y', labelcolor='g')
@@ -207,7 +204,6 @@ if PLOT_XYZ:
     plt.show()
 
 if PLOT_RELATIONSHIP:
-    # NOTE: This is plotting the primary pushing force, NOT the magnitude.
     fig, ax3 = plt.subplots(figsize=(9, 4.5))
     # ax3.plot(np.rad2deg(th_trim), np.linalg.norm(f_exp_filt, axis=1), "k", label='Force Magnitude')
     ax3.plot(np.rad2deg(th_trim), f_trim[:, 0], "b", alpha=0.25, label='X-Force (raw)')
@@ -224,17 +220,18 @@ if PLOT_RELATIONSHIP:
 
 
 ## ================= Extract sub-critical window ================
-# Now, "OFFICIALY" chop off zero-force transients using f0_idx above 
-# recall f0_idx accounts for fmax_idx (init transients removed already)
+
+# Then determine first zero-crossing of x-component of force (after initial transient)
+f0_idx = fmax_idx + np.where(np.isclose(f_trim[fmax_idx:,0], 0, atol=2e-3))[0][0]
+
+# Now, "OFFICIALY" chop off zero-force transients using f0_idx above
 f_trim = f_trim[:f0_idx, :]
 th_trim = th_trim[:f0_idx]
 time_trim = time_trim[:f0_idx]
-ee_trim = ee_trim[:f0_idx, :]
 
-## NOTE: f_max may be negative, we want to consider magnitude for safe force calculation
-k_safe = 0.25 # fraction of max force
-f_safe_value = (1-k_safe) * f_trim[fmax_idx,:]
-print(f"Safe force threshold: {k_safe}% of f_max for f_safe= {f_safe_value} N")
+K_SAFE = 0.25 # fraction of max force
+f_safe_value = (1-K_SAFE) * f_trim[fmax_idx,:]
+print(f"Safe force threshold: {K_SAFE}% of f_max for f_safe= {f_safe_value} N")
 
 # Extract subset of data where force exceeds safe threshold TODO: this just does x-comp for now.
 idx_sub_crit = np.where(np.linalg.norm(f_trim, axis=1) >= np.linalg.norm(f_safe_value))[0]
@@ -243,30 +240,20 @@ idx_sub_crit = np.where(np.linalg.norm(f_trim, axis=1) >= np.linalg.norm(f_safe_
 init_spike_idx = 8 #4 # Manually determined for now
 idx_sub_crit = idx_sub_crit[init_spike_idx:]  # Keep indices 80 onward
 
-## And capture the sub-critical force, theta, time, and EE pos values
-f_subcrit = f_trim[idx_sub_crit,:]
+## And record the sub-critical force, theta, and time values
+f_app_subcrit = -f_trim[idx_sub_crit,:] # NOTE: IMPORTANT NEGATE TO MATCH F OBJECT EXPERIENCES
 th_subcrit = th_trim[idx_sub_crit]
 t_subcrit = time_trim[idx_sub_crit]
-ee_subcrit = ee_trim[idx_sub_crit, :]
 
-# And plot
+
 PLOT_SUBCRIT = False
 
 if PLOT_SUBCRIT:
-    th_trim_deg = np.rad2deg(th_trim)
-    th_sc_deg = np.rad2deg(th_subcrit)
     fig4, ax4 = plt.subplots(figsize=(8, 4.5))
-    # ax4.plot(np.rad2deg(th_trim), np.linalg.norm(f_trim, axis=1), color='k', linewidth=5, label='Simulated data')  # Plot the x-component of the force
-    ax4.plot(th_trim_deg, f_trim[:,0], color='b', linewidth=5, label='Push force (x)')  # Plot the x-component of the force
-    ax4.plot(th_trim_deg, f_trim[:,1], color='r', linewidth=5, label='Push force (y)')  # Plot the y-component of the force
-    ax4.plot(th_trim_deg, f_trim[:,2], color='m', linewidth=5, label='Push force (z)')  # Plot the z-component of the force
-    # ax4.scatter(th_sc_deg, np.linalg.norm(f_subcrit, axis=1), color='r', s=80, label='Sub-critical window')
-    ax4.scatter(th_sc_deg, f_subcrit[:,0], color='k', s=80, label='Sub-critical window')
-    ax4.scatter(th_sc_deg, f_subcrit[:,1], color='k', s=80, label='')
-    ax4.scatter(th_sc_deg, f_subcrit[:,2], color='k', s=80, label='')
+    ax4.plot(np.rad2deg(th_trim), np.linalg.norm(f_trim, axis=1), color='k', linewidth=5, label='Simulated data')  # Plot the x-component of the force
+    ax4.scatter(np.rad2deg(th_subcrit), np.linalg.norm(f_app_subcrit, axis=1), color='r', s=80, label='Sub-critical window')
     ax4.axhline(0, color='c', label='_')
-    # ax4.set_ylabel("Force Norm (N)", color='b', fontsize=20)
-    ax4.set_ylabel("Force (N)", color='b', fontsize=20)
+    ax4.set_ylabel("Force Norm (N)", color='b', fontsize=20)
     ax4.set_xlabel("Object Angle (deg)", color='g', fontsize=20)
     ax4.legend(loc='upper right', fontsize=15)
     ax4.grid(True)
@@ -274,12 +261,20 @@ if PLOT_SUBCRIT:
 
 
 ## ================ Fit the COM models ===================
-f_app_subcrit = -f_subcrit # NOTE: IMPORTANT NEGATE TO MATCH F OBJECT EXPERIENCES
 
 ## Start by fitting straight line to sub-critical data to get initial guess
-# lin_slope, lin_b, _, _, _ = linregress(th_subcrit, np.linalg.norm(f_app_subcrit, axis=1))
-lin_slope, lin_b, _, _, _ = linregress(th_subcrit, f_app_subcrit[:,0])
 
+# Don't want norm of force, want primary force direction, let's determine the primary direction, THIS MIGHT NOT BE GLOBAL AXIS ALIGNED
+# x_intercepts = np.zeros((3,))
+# for i in range(3):
+#     slope, y_int, _, _, _ = linregress(th_subcrit, f_app_subcrit[:,i])
+#     x_intercepts[i] = -y_int / slope
+
+# OR just use the force norm for linear fit...
+lin_slope, lin_b, _, _, _ = linregress(th_subcrit, np.linalg.norm(f_app_subcrit, axis=1))
+
+# Check out all theta guesses and pick the one with reasonable value (not close to zero!)
+# theta_star_guess = x_intercepts[np.where(x_intercepts > 1e-2)[0][0]]
 theta_star_guess = -lin_b / lin_slope
 
 # tan(th) = d_c / z_c => z_c = d_c / tan(th)
@@ -291,12 +286,21 @@ print(f"mass: {m_guess:.3f} kg    zc: {zc_guess:.3f} m    theta*: {np.rad2deg(th
 
 ## =============== Fit using TAU model ==================
 # Before fitting, must pre-compute corresponding PUSH torque
-o_obj = np.array([0.627, 0, 0]) # APPROXIMATE OBJECT ORIGIN IN WORLD FRAME (HACK: TEMPORARY FIX) *******************
-tau_app_subcrit = tau_app_model(f_app_subcrit, (ee_subcrit - o_obj)).ravel()
+# tau_app_subcrit = tau_app_model(f_app_subcrit, (ee_subcrit - irb.o_obj)).ravel()
 
-com_gt = [0, 0, 0.15] # TEMP because ground truth is saved to sim obj model...
+#NOTE: SHIT! WE DONT HAVE EE POSITION OVER TIME... NEED TO REDO EXPERIMENT AND RECORD THAT
+# Temporarily use data from simulation... need to extrapolate to match sample size
+tau_app_subcrit = np.load('temp_tau_data.npy')
+
+# Make sure rows (n samples) match experiment
+n_samples = len(th_subcrit)
+
+# HI GEMINI! HERE IS WHERE I NEED YOU!!!
+
+com_gt = [0, 0, 0.692] # TEMP because ground truth is saved to sim obj model...
 
 [m_est, zc_est], pcov  = curve_fit(tau_model, th_subcrit, tau_app_subcrit, p0=[m_guess, zc_guess])
+
 # Now use fitted parameters to estimate theta_star
 theta_star_est = np.rad2deg(np.arctan2(dc_gt, zc_est))
 
@@ -308,31 +312,27 @@ print(f"mass: {0.635} kg    zc: {com_gt[2]:.3f} m    theta*: {theta_star_gt:.2f}
 
 ## ============================ PLOTTING ============================
 # Let's plot the whole curve, the sub-critical window, the linear fit, and whole curve w fit params
-f_app_full      = -f_trim[fmax_idx+init_spike_idx:, :] # expected: t=0 ~ fmax, t=end ~ f0
-ee_full         = ee_trim[fmax_idx+init_spike_idx:, :]
-tau_app_full    = tau_app_model(f_app_full, (ee_full - o_obj))
-
+f_app_full      = -f_meas_filt[fmax_idx+init_spike_idx:, :]
+ee_full         = ee_hist[fmax_idx+init_spike_idx:, :]
+tau_app_full    = tau_app_model(f_app_full, (ee_full - irb.o_obj))
 # Extract theta from torque calculation
 th_full         = theta_from_tau(tau_app_full, m_est, zc_est, use_branch='minus')
 # Plot the linear fit using y = mx + b
+# slope_full, b_full, _, _, _ = linregress(th_full, np.linalg.norm(f_app_full, axis=1))
+# f_app_lin = slope_full * th_full + b_full
 f_app_lin = lin_slope * th_full + lin_b
 
 ## Plot original data and sub-critical window
 fig, ax = plt.subplots(figsize=(8, 4.5))
-# ax.plot(np.rad2deg(th_trim), np.linalg.norm(f_trim, axis=1), '--k', linewidth=5, label='Original data')  # Plot F norm
-ax.plot(np.rad2deg(th_trim), f_trim[:,0], '--k', linewidth=5, label='Original data')  # Plot the x-component of the force
-# ax.scatter(np.rad2deg(th_subcrit), np.linalg.norm(f_app_subcrit, axis=1), color='r', s=200, alpha=0.9, label='Sub-critical window')
-ax.scatter(np.rad2deg(th_subcrit), -f_app_subcrit[:,0], color='r', s=200, alpha=0.9, label='Sub-critical window')
+ax.plot(np.rad2deg(th_hist), np.linalg.norm(f_meas_filt, axis=1), '--k', linewidth=5, label='Original data')  # Plot the x-component of the force
+ax.scatter(np.rad2deg(th_subcrit), np.linalg.norm(f_app_subcrit, axis=1), color='r', s=200, alpha=0.9, label='Sub-critical window')
 
-ax.plot(np.rad2deg(th_full), -f_app_lin, color='orange', linewidth=3, label='Sub-crit linear fit')
+ax.plot(np.rad2deg(th_full), f_app_lin, color='orange', linewidth=3, label='Linear fit')
 ## FOR FUN, plot ALL theta and force
-# ax.scatter(np.rad2deg(th_full), np.linalg.norm(f_app_full, axis=1), color='g', label='Full fit')
-ax.scatter(np.rad2deg(th_full), -f_app_full[:,0], color='g', label='Full fit')
+ax.scatter(np.rad2deg(th_full), np.linalg.norm(f_app_full, axis=1), color='g', label='Full fit')
 
 ax.axhline(0, color='c', linewidth=2) # Horizontal line at zero for reference
 ax.set_ylabel("Force Norm (N)", color='b', fontsize=20)
 ax.set_xlabel("Object Angle (degrees)", color='g', fontsize=20)
 ax.legend(loc='upper right', fontsize=15)
 ax.grid(True)
-plt.tight_layout()
-plt.show()

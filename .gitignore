@@ -403,3 +403,4 @@ FodyWeavers.xsd
 # Raw object files
 assets/object_sim/raw_files/
 *.mp4
+.venv/
