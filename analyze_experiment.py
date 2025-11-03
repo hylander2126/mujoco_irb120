@@ -3,7 +3,7 @@ import csv
 import matplotlib.pyplot as plt
 from scipy.signal import medfilt, butter, filtfilt
 from scipy.interpolate import interp1d
-from scripts.utils.com_estimation import theta_model, align_zeros
+from scripts.utils.com_estimation import tau_app_model, tau_model, align_zeros
 from scipy.stats import linregress
 from scipy.optimize import curve_fit
 
@@ -23,6 +23,8 @@ def read_csv(file_path, trim_rows=0):
 # path = "experiments/run_2025-10-15_17-32-23_t001_ft.csv"
 path = "experiments/run_2025-10-16_12-04-17_t001_ft.csv"
 
+# SHIT! Load the simulated EE position
+ee_data = np.load('temp_ee_data.npy')
 
 ## Extract force
 f_data = read_csv(path, trim_rows=1)
@@ -47,8 +49,17 @@ time -= time[0]
 b, a = butter(4, 5, fs=500, btype='low') # order, cutoff frequency, fs
 f_exp_filt = filtfilt(b, a, f_exp_raw, axis=0)
 
+# TODO: FIX THIS SHIT
 # And interpolate to match the time steps of the angle data
 f_exp_interp = np.array([np.interp(time, time_f, f_exp_filt[:, i]) for i in range(3)]).T
+
+# TEMP interpolate EE position to match time steps
+print(f"Shape of ee_data before interp: {ee_data.shape}")
+print(f"Shape of f_exp_inter or time_f: {f_exp_interp.shape}, {time_f.shape}, {tag_exp_raw.shape}")
+
+ee_exp = np.array([np.interp(time, time_f, ee_data[:, i]) for i in range(3)]).T
+
+print(f"Shape of f_interp data: {f_exp_interp.shape}, and ee_exp shape: {ee_exp.shape}")
 
 # Let's bias the force and angle data using START & END values (end looks better for f, start for th)
 f_exp_interp -= np.mean(f_exp_interp[-20:, :], axis=0)
@@ -129,7 +140,7 @@ print(f"theta_star (ground truth) = {theta_star_gt:.2f} degrees")
 
 # ================ Plot the data ===================
 PLOT_RAW = False
-PLOT_XYZ = True
+PLOT_XYZ = False
 PLOT_RELATIONSHIP = False
 
 # Now let's plot the x_data over time
@@ -248,43 +259,61 @@ lin_slope, lin_b, _, _, _ = linregress(th_subcrit, np.linalg.norm(f_app_subcrit,
 theta_star_guess = -lin_b / lin_slope
 
 # tan(th) = d_c / z_c => z_c = d_c / tan(th)
-d_c         = np.linalg.norm(np.array([-0.05, 0]))      # ground truth for d_c from 2D com estimation
-zc_guess    = d_c / np.tan(theta_star_guess) # gt is 0.15 m
-m_guess     = 0                              # gt is 0.634 kg
-print(f"Initial guess from linear fit: theta*: {np.rad2deg(theta_star_guess):.3f} deg    mass: {m_guess:.3f} kg    zc: {zc_guess:.3f} m")
-    
-## Fit using THETA model
-popt, pcov = curve_fit(theta_model, f_app_subcrit, th_subcrit, p0=[m_guess, zc_guess])
-m_est_th, zc_est_th = popt
-print(f"\nFit using THETA model: mass: {m_est_th:.3f} kg    zc: {zc_est_th:.3f} m")
-# Use fitted parameters to generate estimated THETA values over sub-critical FORCE data
-th_pred_fit = theta_model(f_app_subcrit, m_est_th, zc_est_th)
+dc_gt       = np.linalg.norm(np.array([-0.05, 0]))      # ground truth for d_c from 2D com estimation
+zc_guess    = dc_gt / np.tan(th_subcrit[-1])
+m_guess     = abs(lin_slope) #0.5                              # gt is 0.634 kg # TODO: Make better guess
+print(f"Initial guess from linear fit:")
+print(f"mass: {m_guess:.3f} kg    zc: {zc_guess:.3f} m    theta*: {np.rad2deg(theta_star_guess):.3f} deg")
 
-## Back-check by estimating force zero-crossing (or theta_star_est)
-theta_star_est_th = np.rad2deg(np.arctan2(0.05, zc_est_th))
-print(f"Estimated theta* (THETA model): {theta_star_est_th:.2f} degrees")
-print(f"Ground Truth: {theta_star_gt:.2f} degrees")
+## =============== Fit using TAU model ==================
+# Before fitting, must pre-compute corresponding PUSH torque
+# tau_app_subcrit = tau_app_model(f_app_subcrit, (ee_subcrit - irb.o_obj)).ravel()
 
-# And let's compare against all recorded force for fun (and visualization!)
-f_all = f_trim[fmax_idx+init_spike_idx:, :]
-th_all = theta_model(f_all, m_est_th, zc_est_th)  # use all measured forces to get theta estimates
-t_all = time_trim[fmax_idx+init_spike_idx:]
+#NOTE: SHIT! WE DONT HAVE EE POSITION OVER TIME... NEED TO REDO EXPERIMENT AND RECORD THAT
+# Temporarily use data from simulation... need to extrapolate to match sample size
+tau_app_subcrit = np.load('temp_tau_data.npy')
+
+# Make sure rows (n samples) match experiment
+n_samples = len(th_subcrit)
+
+# HI GEMINI! HERE IS WHERE I NEED YOU!!!
+
+com_gt = [0, 0, 0.692] # TEMP because ground truth is saved to sim obj model...
+
+[m_est, zc_est], pcov  = curve_fit(tau_model, th_subcrit, tau_app_subcrit, p0=[m_guess, zc_guess])
+
+# Now use fitted parameters to estimate theta_star
+theta_star_est = np.rad2deg(np.arctan2(dc_gt, zc_est))
+
+print(f"\nFit using TAU model:")
+print(f"mass: {m_est:.3f} kg    zc: {zc_est:.3f} m    theta*: {theta_star_est:.2f} deg")
+print(f"\nGround Truth:")
+print(f"mass: {0.635} kg    zc: {com_gt[2]:.3f} m    theta*: {theta_star_gt:.2f} deg")
+
+
+## ============================ PLOTTING ============================
+# Let's plot the whole curve, the sub-critical window, the linear fit, and whole curve w fit params
+f_app_full      = -f_meas_filt[fmax_idx+init_spike_idx:, :]
+ee_full         = ee_hist[fmax_idx+init_spike_idx:, :]
+tau_app_full    = tau_app_model(f_app_full, (ee_full - irb.o_obj))
+# Extract theta from torque calculation
+th_full         = theta_from_tau(tau_app_full, m_est, zc_est, use_branch='minus')
+# Plot the linear fit using y = mx + b
+# slope_full, b_full, _, _, _ = linregress(th_full, np.linalg.norm(f_app_full, axis=1))
+# f_app_lin = slope_full * th_full + b_full
+f_app_lin = lin_slope * th_full + lin_b
 
 ## Plot original data and sub-critical window
 fig, ax = plt.subplots(figsize=(8, 4.5))
-ax.plot(np.rad2deg(th_trim), np.linalg.norm(f_trim, axis=1), color='k', linewidth=5, label='Original data')  # Plot the x-component of the force
-ax.scatter(np.rad2deg(th_subcrit), np.linalg.norm(f_app_subcrit, axis=1), color='r', s=100, alpha=0.9, label='Sub-critical window')
+ax.plot(np.rad2deg(th_hist), np.linalg.norm(f_meas_filt, axis=1), '--k', linewidth=5, label='Original data')  # Plot the x-component of the force
+ax.scatter(np.rad2deg(th_subcrit), np.linalg.norm(f_app_subcrit, axis=1), color='r', s=200, alpha=0.9, label='Sub-critical window')
 
-## Plot fitted THETA curve
-# ax.plot(np.rad2deg(th_pred_fit), np.linalg.norm(f_sub_crit, axis=1), color='k', linewidth=2, linestyle='--', label='Fitted curve (THETA model)')
-
+ax.plot(np.rad2deg(th_full), f_app_lin, color='orange', linewidth=3, label='Linear fit')
 ## FOR FUN, plot ALL theta and force
-ax.scatter(np.rad2deg(th_all), np.linalg.norm(f_all, axis=1), color='g', label='Full fit')
+ax.scatter(np.rad2deg(th_full), np.linalg.norm(f_app_full, axis=1), color='g', label='Full fit')
 
 ax.axhline(0, color='c', linewidth=2) # Horizontal line at zero for reference
 ax.set_ylabel("Force Norm (N)", color='b', fontsize=20)
 ax.set_xlabel("Object Angle (degrees)", color='g', fontsize=20)
 ax.legend(loc='upper right', fontsize=15)
 ax.grid(True)
-plt.tight_layout()
-plt.show()
