@@ -21,34 +21,46 @@ def read_csv(file_path, trim_rows=0):
 # path = "../experiments/run_2025-10-10_17-04-01_t001_ft.csv"
 # path = "../experiments/run_2025-10-15_15-44-01_t001_ft.csv"
 # path = "experiments/run_2025-10-15_17-32-23_t001_ft.csv"
-path = "experiments/run_2025-10-16_12-04-17_t001_ft.csv"
+# path = "experiments/run_2025-10-16_12-04-17_t001_ft.csv"
+path_root = "experiments/run_2025-11-03_11-59-03_t001_" #ft.csv"
 
 
 ## Extract force
-f_data = read_csv(path, trim_rows=1)
-f_exp_raw = np.zeros((len(f_data), 3))                      # n_samples x 3 (fx, fy, fz)
+f_data = read_csv(path_root + "ft.csv", trim_rows=1)
+f_exp_raw = np.zeros((len(f_data), 3))                        # n_samples x 3 (fx, fy, fz)
 for i, row in enumerate(f_data):
-    f_exp_raw[i, :] = [float(row[j + 1]) for j in range(3)]  # fx, fy, fz are in columns 1, 2, 3
+    f_exp_raw[i, :] = [float(row[j + 1]) for j in range(3)]   # fx, fy, fz are in columns 1, 2, 3
 
 ## Extract angle(s)
-tag_data = read_csv(path.replace("ft", "tag"), trim_rows=1) # Discard headers
-tag_exp_raw = np.zeros((len(tag_data), 3))                      # n_samples x 3 (roll, pitch, yaw)
+tag_data = read_csv(path_root + "tag.csv", trim_rows=1)       # Discard headers
+tag_exp_raw = np.zeros((len(tag_data), 3))                    # n_samples x 3 (roll, pitch, yaw)
 for i, row in enumerate(tag_data):
-    tag_exp_raw[i, :] = [float(row[j + 2]) for j in range(3)]  # roll, pitch, yaw are in columns 2, 3, 4
+    tag_exp_raw[i, :] = [float(row[j + 2]) for j in range(3)] # roll, pitch, yaw are in columns 2, 3, 4
 
-## Extract time (from both f and th in order to downsample later)
+## Extract EE XYZ position (orientation not used yet)
+ee_data = read_csv(path_root + "ee.csv", trim_rows=1)         # Discard headers
+ee_exp_raw = np.zeros((len(ee_data), 3))                      # n_samples x 3 (x, y, z)
+for i, row in enumerate(ee_data):
+    ee_exp_raw[i, :] = [float(row[j + 2]) for j in range(3)]  # x, y, z are in columns 2, 3, 4
+
+## Extract time (from each csv in order to downsample later)
 time_f = np.array([float(row[0]) for row in f_data])     # 'force' time is in column 0
 time_f -= time_f[0]                                       # Normalize time to start at zero
-time = np.array([float(row[0]) for row in tag_data])     # time is in column 0 (let's use tag_data since its already the correct length)
-time -= time[0]    
+time_th = np.array([float(row[0]) for row in tag_data])     # time is in column 0 (let's use tag_data since its already the correct length)
+time_th -= time_th[0]
+time_ee = np.array([float(row[0]) for row in ee_data])     # time is in column 0
+time_ee -= time_ee[0]
+
 
 ## ================ Process the data (specifically force) ===================
 # Butterworth filter
 b, a = butter(4, 5, fs=500, btype='low') # order, cutoff frequency, fs
 f_exp_filt = filtfilt(b, a, f_exp_raw, axis=0)
 
-# And interpolate to match the time steps of the angle data
-f_exp_interp = np.array([np.interp(time, time_f, f_exp_filt[:, i]) for i in range(3)]).T
+# And interpolate the FORCE to match the time steps of the angle data
+f_exp_interp = np.array([np.interp(time_th, time_f, f_exp_filt[:, i]) for i in range(3)]).T
+# Also interpolate EE data to match time steps of angle data
+ee_exp_interp = np.array([np.interp(time_th, time_ee, ee_exp_raw[:, i]) for i in range(3)]).T
 
 # Let's bias the force and angle data using START & END values (end looks better for f, start for th)
 f_exp_interp -= np.mean(f_exp_interp[-20:, :], axis=0)
@@ -61,31 +73,31 @@ th_exp = tag_exp_raw[:, 2]  # HACK: assume ONLY tip in 'yaw' axis (column 2)
 # ================ Find contact, settling, and start moments ===================
 # First, let's find when we make contact (will be the maximal magnitude of force)
 contact_idx_orig = np.argmax(np.linalg.norm(f_exp_interp, axis=1))
-contact_time_orig = time[contact_idx_orig]
+contact_time_orig = time_th[contact_idx_orig]
 
 # Then, let's find when the angle settles (after contact)
 settle_indices_orig = np.where(np.isclose(th_exp, th_exp[-1], atol=1e-2))[0]#[0]
 valid_settle_indices = settle_indices_orig[settle_indices_orig > contact_idx_orig]          # make sure we only look for settling AFTER contact
 if len(valid_settle_indices) == 0:
     print("Warning: No settling found after contact!")
-    settle_idx_orig = len(time) - 1 # fall back to end of data
+    settle_idx_orig = len(time_th) - 1 # fall back to end of data
 else:
     settle_idx_orig = valid_settle_indices[0]  # take the first one
-settle_time_orig = time[settle_idx_orig]
+settle_time_orig = time_th[settle_idx_orig]
 
 # Define start of analysis window (a few seconds before contact)
 start_time_orig = contact_time_orig - 0.25
-start_idx_orig = np.where(time >= start_time_orig)[0][0]
+start_idx_orig = np.where(time_th >= start_time_orig)[0][0]
 
 print(f"Contact detected at index {contact_idx_orig} ({contact_time_orig:.2f} s)")
 print(f"Settling detected at index {settle_idx_orig} ({settle_time_orig:.2f} s)")
-print(f"Analysis window will start at index {start_idx_orig} ({time[start_idx_orig]:.2f} s)")
+print(f"Analysis window will start at index {start_idx_orig} ({time_th[start_idx_orig]:.2f} s)")
 
 
 # =============== Trim the data to the analysis window ===================
 end_idx_orig = settle_idx_orig + 5  # add a few extra samples to be safe
 
-time_trim = np.array(time[start_idx_orig:end_idx_orig])
+time_trim = np.array(time_th[start_idx_orig:end_idx_orig])
 f_trim = np.array(f_exp_interp[start_idx_orig:end_idx_orig, :])
 th_trim = np.array(th_exp[start_idx_orig:end_idx_orig])
 print(f"Rough time range of contact window: {time_trim[0]:.2f} s to {time_trim[-1]:.2f} s\n")
@@ -139,9 +151,9 @@ if PLOT_RAW:
     ax.plot(time_f, f_exp_raw[:, 0], "b", label='X Force (raw)')
     ax.plot(time_f, f_exp_raw[:, 1], "r", label='Y Force (raw)')
     ax.plot(time_f, f_exp_raw[:, 2], "m", label='Z Force (raw)')
-    ax2.plot(time, tag_exp_raw[:, 0], color='g', linestyle='-', label='Roll (raw)')
-    ax2.plot(time, tag_exp_raw[:, 1], color='c', linestyle='-', label='Pitch (raw)')
-    ax2.plot(time, tag_exp_raw[:, 2], color='y', linestyle='-', label='Yaw (raw)')
+    ax2.plot(time_th, tag_exp_raw[:, 0], color='g', linestyle='-', label='Roll (raw)')
+    ax2.plot(time_th, tag_exp_raw[:, 1], color='c', linestyle='-', label='Pitch (raw)')
+    ax2.plot(time_th, tag_exp_raw[:, 2], color='y', linestyle='-', label='Yaw (raw)')
     ax.tick_params(axis='y', labelcolor='b')
     ax2.tick_params(axis='y', labelcolor='g')
     ax.set_xlabel('Time (s)', fontsize=10)
