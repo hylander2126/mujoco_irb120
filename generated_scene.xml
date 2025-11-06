@@ -30,14 +30,14 @@
 
 	<!-- Per-object assets (meshes, mats) will inject here -->
 	
-    <include file="object_sim/common.xml"/>
-    <compiler meshdir="object_sim/wristwatch" texturedir="object_sim/wristwatch"/>
-    <include file="object_sim/wristwatch/assets.xml"/>
-    <compiler meshdir="meshes" texturedir="textures"/>
+    <include file="assets/object_sim/common.xml"/>
+    <compiler meshdir="assets/object_sim/wristwatch" texturedir="assets/object_sim/wristwatch"/>
+    <include file="assets/object_sim/wristwatch/assets.xml"/>
+    <compiler meshdir="assets/meshes" texturedir="assets/textures"/>
     
 
 	<worldbody>
-		<geom name="floor" size="5 5 5" type="plane" material="grid_mat"/>
+		<geom name="floor" size="5 5 5" type="plane"/> <!-- material="grid_mat" -->
 		<!-- <camera name="closeup" pos="0 -100 .07" xyaxes="1 0 0 0 1 2"/> -->
 		<include file="robot.xml"></include>
 		
@@ -54,7 +54,7 @@
 		<!-- Object body goes here -->
 		
     <body name="wristwatch_base" pos="0.75 0.00 0.06" quat="1 0 0 0">
-      <include file="object_sim/wristwatch/body.xml"/>
+      <include file="assets/object_sim/wristwatch/body.xml"/>
     </body>
     
 
