@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco>
+	<compiler angle="radian" meshdir="meshes/" texturedir="textures/"/>
+	<option timestep="0.001" tolerance="1e-9" integrator="implicitfast" iterations="100" ls_iterations="100">
+		<flag warmstart="enable" multiccd="enable"/>
+	</option>
+	<visual>
+		<global offwidth="1280" offheight="720"/>
+	</visual>
+
+	<include file="shared.xml"></include>
+
+	<actuator>
+        <!-- Position Control -->
+		<!-- kp, kv: (200,100) first 3, (100,50) last 3 -->
+		<position joint="joint_1" name="joint_1" kp="200" kv="100" ctrlrange="-2.87979 2.87979" forcerange="-20 20"/>
+		<position joint="joint_2" name="joint_2" kp="200" kv="100" ctrlrange="-1.91986 1.91986" forcerange="-20 20"/>
+		<position joint="joint_3" name="joint_3" kp="200" kv="100" ctrlrange="-1.22173 1.91986" forcerange="-20 20"/>
+		<position joint="joint_4" name="joint_4" kp="100" kv="50" ctrlrange="-2.79252 2.79252" forcerange="-10 10"/>
+		<position joint="joint_5" name="joint_5" kp="100" kv="50" ctrlrange="-2.09440 2.90440" forcerange="-10 10"/>
+		<position joint="joint_6" name="joint_6" kp="100" kv="50" ctrlrange="-3.14200 3.14200" forcerange="-10 10"/>
+
+		<!-- Velocity Control -->
+		<!-- <velocity joint="joint_1" name="joint_1" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+        <velocity joint="joint_2" name="joint_2" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+        <velocity joint="joint_3" name="joint_3" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+        <velocity joint="joint_4" name="joint_4" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+        <velocity joint="joint_5" name="joint_5" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+        <velocity joint="joint_6" name="joint_6" kv="1" ctrllimited="true" ctrlrange="-1.5 1.5"/> -->
+
+		<!-- Torque Control -->
+		<!-- <motor joint="joint_1" name="joint_1" gear="1" forcerange="-40 40"/>
+		<motor joint="joint_2" name="joint_2" gear="1" forcerange="-40 40"/>
+		<motor joint="joint_3" name="joint_3" gear="1" forcerange="-40 40"/>
+		<motor joint="joint_4" name="joint_4" gear="1" forcerange="-10 10"/>
+		<motor joint="joint_5" name="joint_5" gear="1" forcerange="-10 10"/>
+		<motor joint="joint_6" name="joint_6" gear="1" forcerange="-10 10"/> -->
+	</actuator>
+
+	<sensor>
+		<force name="force_sensor" site="sensor_site"/>
+	</sensor>
+
+	<worldbody>
+		<geom name="floor" size="5 5 5" type="plane" material="grid_mat"/>
+		<!-- <camera name="closeup" pos="0 -100 .07" xyaxes="1 0 0 0 1 2"/> -->
+		<include file="robot/robot.xml"></include>
+		
+		<!-- Table Surface === Recall geom SIZE is half-dims so table surface is z=0.1 -->
+		<body pos="0.75 0 0" name="table0">
+			<geom size="1 0.5 0.05" type="box" name="table" mass="2000" material="table_mat" friction="1 0.005 0.0001"></geom>
+			<site name="surface_site" pos="0 0 0" size = "0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
+		</body>
+
+		<!-- Generic object import (see model_selection.py) -->
+		<include file="object_to_load.xml"></include>
+
+		<light directional="true" ambient="0.2 0.2 0.2" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" castshadow="false" pos="0 0 4" dir="0 0 -1" name="light0"></light>
+	</worldbody>
+</mujoco>

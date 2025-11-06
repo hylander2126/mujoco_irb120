@@ -24,33 +24,5 @@
         <mesh name="link_5" file="link_5.stl" />
         <mesh name="link_6" file="link_6.stl" />
         <mesh name="pusher_link" file="pusher_link.stl" scale="0.001 0.001 0.001"/>
-
-        <mesh name="flashlight" file="flashlight.stl" scale="1.2 1.2 1.2"/>
-        <mesh name="flash_contact0" file="flash_contact0.stl"/>
-        <mesh name="flash_contact1" file="flash_contact1.stl"/>
-
-        <mesh name="stanfordbunny" file="stanfordbunny.stl" scale="1.5 1.5 1.5"/>
-        <mesh name="bunny_contact0" file="bunny_contact0.stl"/>
-        <mesh name="bunny_contact1" file="bunny_contact1.stl"/>
-        <mesh name="bunny_contact2" file="bunny_contact2.stl"/>
-        <mesh name="bunny_contact3" file="bunny_contact3.stl"/>
-        <mesh name="bunny_contact4" file="bunny_contact4.stl"/>
-        <mesh name="bunny_contact5" file="bunny_contact5.stl"/>
     </asset>
-    
-    <!-- <equality>
-        <weld body1="Abb-Robot" body2="robot0:gripper_link" solimp="0.9 0.95 0.001" solref="0.02 1"></weld>
-    </equality> -->
-     
-    <!-- <default>
-        <default class="robot0:fetch">
-            <geom margin="0.001" material="robot0:geomMat" rgba="1 1 1 1" solimp="0.99 0.99 0.01" solref="0.01 1" type="mesh" user="0"></geom>
-            <joint armature="1" damping="50" frictionloss="0" stiffness="0"></joint>
-            
-            <default class="robot0:fetchGripper">
-                <geom condim="4" margin="0.02" type="box" user="0" rgba="0.356 0.361 0.376 1.0" gap="0.02"></geom>
-                <joint armature="100" damping="1000" limited="true" solimplimit="0.99 0.999 0.01" solreflimit="0.01 1" type="slide"></joint>
-            </default>
-        </default>
-    </default> -->
 </mujoco>
