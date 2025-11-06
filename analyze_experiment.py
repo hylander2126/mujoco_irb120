@@ -6,6 +6,7 @@ from scipy.interpolate import interp1d
 from scripts.utils.com_estimation import tau_app_model, tau_model, theta_from_tau, align_zeros
 from scipy.stats import linregress
 from scipy.optimize import curve_fit
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 
 
 def read_csv(file_path, trim_rows=0):
@@ -152,8 +153,8 @@ print(f"\nGround truth from geometry:\ntheta*: {theta_star_gt:.2f} deg, zc = 0.1
 
 # ================ Plot the data ===================
 PLOT_RAW = False
-PLOT_XYZ = False
-PLOT_RELATIONSHIP = True
+PLOT_XYZ = True
+PLOT_RELATIONSHIP = False
 
 import matplotlib.ticker as ticker
 
@@ -183,7 +184,7 @@ if PLOT_XYZ:
     ax1.plot(time_trim, f_trim[:, 0], "b", linewidth=5, label='Push force (x)')
     ax1.plot(time_trim, f_trim[:, 1], "r", linewidth=5, label='Push force (y)')
     ax1.plot(time_trim, f_trim[:, 2], "m", linewidth=5, label='Push force (z)')
-    ax2.plot(time_trim, np.rad2deg(th_trim), color='g', linewidth=5, linestyle='-', label='Object angle')
+    ax2.plot(time_trim, np.rad2deg(th_trim), color='g', linewidth=5, linestyle='-.', label='Object angle')
     ax1.tick_params(axis='x', labelsize=20)
     ax1.tick_params(axis='y', labelcolor='b', labelsize=20)
     ax2.tick_params(axis='y', labelcolor='g', labelsize=20)
@@ -206,18 +207,43 @@ if PLOT_XYZ:
 
 if PLOT_RELATIONSHIP:
     # NOTE: This is plotting the primary pushing force, NOT the magnitude.
-    fig, ax = plt.subplots(figsize=(9, 4.5))
-    ax.axhline(0, color='c', linewidth=2)
+    # Now plot force (in primary tipping axis) versus payload pitch
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.axhline(0, color='c') # Horizontal line at zero for reference
     ax.plot(np.rad2deg(th_trim[:f0_idx+100]), f_trim[:f0_idx+100, 0], \
-            color='k', linewidth=5, label='Push force (x)', fontsize=20)
-    ax.set_xlabel('Object Angle (degrees)', color='g', fontsize=20)
-    ax.set_ylabel('X-Force Magnitude (N)', color='b', fontsize=20)
-    ax.set_title('Primary Axis (X) Force vs. Object Angle')
-    # ax3.set_xlim([-1, 25])
-    # ax3.set_ylim([-0.05, fmax+0.2])
-    ax.axvline(theta_star_gt, color='g', linestyle='--', linewidth=2, label=r'Ground Truth $\theta_*$')
-    ax.legend()
+            color='k', linewidth=5, label='Push force (x)')  # Plot the x-component of the force (up to 100 indices after zero-crossing)
+    ax.set_ylabel("X-Force (N)", color='b', fontsize=20)
+    ax.set_xlabel("Object Angle (deg)", color='g', fontsize=20)
+    ax.axvline(theta_star_gt, color='g', linestyle='--', linewidth=5, label=r'Ground truth $\theta^*$')
+    ax.scatter(np.rad2deg(theta_star_calc), f_trim[f0_idx,0], s=500, marker='*', color='r', label=r'Calculated $\theta^*$', zorder=2)
+    
     ax.grid(True)
+    fig.legend(loc='upper left', fontsize=15, bbox_to_anchor=(0.2, 0.85)) # # Now also plot a * at zero-crossing
+
+    ax.tick_params(axis='y', labelcolor='b', labelsize=20)
+    ax.tick_params(axis='x', labelcolor='g', labelsize=20)
+
+    # ======= Same figure, add zoomed-in view around theta* ========
+    # Choose x-lims around theta*
+    x0 = np.rad2deg(max(th_trim.min(), theta_star_calc - np.deg2rad(0.25)))
+    x1 = np.rad2deg(min(th_trim.max(), theta_star_calc + np.deg2rad(0.25)))
+    # y-lims around bottom 10% of force
+    y0 = -0.05
+    y1 = 0.025
+
+    # axins = inset_axes(ax3, width="30%", height="30%", loc='upper left')#, borderpad=2.2)
+    axins = inset_axes(ax, width="30%", height="30%", loc='lower right', borderpad=2.2)
+    axins.plot(np.rad2deg(th_trim), f_trim[:,0], color='k', linewidth=5)  # Plot the x-component of the force
+    axins.scatter(np.rad2deg(theta_star_calc), f_trim[f0_idx,0], s=500, marker='*', color='r', label=r'Calculated $\theta^*$', zorder=3)
+    axins.axvline(theta_star_gt, color='g', linestyle='--', linewidth=5, label=r'Ground truth $\theta^*$')
+    axins.axhline(0, color='c', linewidth=2) # Horizontal line at zero for reference
+    axins.set_xlim(x0, x1)
+    axins.set_ylim(y0, y1)
+    axins.grid(True)
+    axins.tick_params(axis='y', labelsize=15)
+    axins.tick_params(axis='x', labelsize=15)
+    mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5", linewidth=3)
+    plt.tight_layout()
     plt.show()
 
 
@@ -344,14 +370,17 @@ if USE_X_ONLY:
 
     ax.plot(np.rad2deg(th_full), -f_app_lin, color='orange', linewidth=3, label='Sub-crit linear fit')
     ## FOR FUN, plot ALL theta and force
-    ax.scatter(np.rad2deg(th_full), -f_app_full[:,0], color='g', label='Full fit')
+    ax.scatter(np.rad2deg(th_full), -f_app_full[:,0], color='b', label='Full fit')
+    ax.axvline(theta_star_gt, color='g', linestyle='--', linewidth=5, label=r'Ground truth $\theta^*$')
 
     ax.axhline(0, color='c', linewidth=2) # Horizontal line at zero for reference
     ax.set_ylabel("X-Force (N)", color='b', fontsize=20)
     ax.set_xlabel("Object Angle (degrees)", color='g', fontsize=20)
     ax.legend(loc='lower right', fontsize=15)
     # Make the tick marks bigger
-    ax.tick_params(axis='both', which='major', labelsize=15)
+    # ax.tick_params(axis='both', which='major', )
+    ax.tick_params(axis='x', labelcolor='g', labelsize=20)
+    ax.tick_params(axis='y', labelcolor='b', labelsize=20)
     ax.grid(True)
     plt.tight_layout()
     plt.show()
