@@ -18,7 +18,8 @@ OBJECT_CONFIGS = {
     # ... add your other 7 objects here
 }
 
-COMMON_DEFAULTS = "object_sim/common.xml"
+OBJ_SIM_ROOT = "assets/object_sim"
+COMMON_DEFAULTS = "assets/object_sim/common.xml"
 SHARED_DEFAULTS = "shared.xml"
 
 # -----------------------------------------------------------------
@@ -30,9 +31,9 @@ def create_scene_xml(object_id, template_path="table_push.xml", out="generated_s
     name = cfg["name"]
 
     asset_block = f"""
-    <include file="assets/object_sim/common.xml"/>
-    <compiler meshdir="assets/object_sim/{name}" texturedir="assets/object_sim/{name}"/>
-    <include file="assets/object_sim/{name}/assets.xml"/>
+    <include file="{COMMON_DEFAULTS}"/>
+    <compiler meshdir="{OBJ_SIM_ROOT}/{name}" texturedir="{OBJ_SIM_ROOT}/{name}"/>
+    <include file="{OBJ_SIM_ROOT}/{name}/assets.xml"/>
     <compiler meshdir="assets/meshes" texturedir="assets/textures"/>
     """
 
