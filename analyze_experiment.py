@@ -18,8 +18,13 @@ def read_csv(file_path, trim_rows=0):
         return csv_arr[trim_rows:]
 
 # ================ Load the data ===================
-path = "experiments/run_2025-11-03_17-57-03_t001_SYNC_FTCLK.csv"
-# path = "experiments/run_2025-11-03_19-29-44_t001_SYNC.csv"
+# path = "experiments/run_2025-11-10_15-28-42_t001_SYNC.csv"
+
+path = "experiments/run_2025-11-10_15-52-45_t002_SYNC.csv" # Best
+# path = "experiments/run_2025-11-10_16-14-31_t002_SYNC.csv" # Super tilted experiment
+
+# path = "experiments/run_2025-11-10_16-14-31_t007_SYNC.csv" # Weird z force experiment
+
 csv_data = read_csv(path, trim_rows=1)  # Discard headers
 
 
@@ -46,26 +51,52 @@ for i, row in enumerate(csv_data):
 
 time -= time[0]  # Normalize time to start at zero
 
+# END EFFECTOR is offset +3.5cm in z-axis due to mounting of robot
+ee_exp[:, 2] -= 0.035  # Adjust Z position of EE for offset
+
+
+## ================ Plot raw data ===================
+PLOT_RAW = False
+
+if PLOT_RAW:
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    ax2 = plt.twinx()
+    ax.plot(time, f_exp_raw[:, 0], "b", label='X Force (raw)')
+    ax.plot(time, f_exp_raw[:, 1], "r", label='Y Force (raw)')
+    ax.plot(time, f_exp_raw[:, 2], "m", label='Z Force (raw)')
+    # ax2.plot(time_th, tag_exp_raw[:, 0], color='g', linestyle='-', label='Roll (raw)')
+    # ax2.plot(time_th, tag_exp_raw[:, 1], color='c', linestyle='-', label='Pitch (raw)')
+    ax2.plot(time, tag_exp_raw[:, 2], color='y', linestyle='-', label='Yaw (raw)')
+    ax.tick_params(axis='y', labelcolor='b')
+    ax2.tick_params(axis='y', labelcolor='g')
+    ax.set_xlabel('Time (s)', fontsize=10)
+    ax.set_ylabel('Force (N)', color='b', fontsize=10)
+    ax.set_title('Raw X, Y, Z Data Over Time')
+    ax.legend()
+    ax.grid(True)
+    align_zeros([ax, ax2])
+    plt.show()
+
+
+## Plot the xyz of ee pos
+# plt.figure(figsize=(9,4.5))
+# plt.plot(time, ee_exp[:,0], 'b', label='EE X pos')
+# plt.plot(time, ee_exp[:,1], 'r', label='EE Y pos')
+# plt.plot(time, ee_exp[:,2], 'm', label='EE Z pos')
+# plt.xlabel('Time (s)', fontsize=10)
+# plt.ylabel('EE Position (m)', fontsize=10)
+# plt.title('End Effector Position Over Time')
+# plt.legend()
+
 ## ================ Process the data (specifically force) ===================
 # Butterworth filter
 b, a         = butter(4, 5, fs=500, btype='low') # 4,5,500 : order, cutoff freq (<0.5*fs), sampling freq
 f_exp_filt   = filtfilt(b, a, f_exp_raw, axis=0)
 
 
-
-# NOTE: I tried to use the slower apriltag clock as the master, but it doesn't allow me to filter the FT sensor noise well
-# TODO: I have to instead go with the FT as master and interpolate the apriltag data to match timepoints...
 # TODO: I also have to estimate/calculate e_hat from experiment instead of manually entering it
 
 
-# Take all nans from tag data and interpolate linearly
-for col in range(tag_exp_raw.shape[1]):
-    tag_col = tag_exp_raw[:, col]
-    nans = np.isnan(tag_col)
-    if np.any(nans):
-        not_nans = ~nans
-        interp_func = interp1d(time[not_nans], tag_col[not_nans], kind='linear', fill_value="extrapolate")
-        tag_exp_raw[nans, col] = interp_func(time[nans])
 # Now we can also filter the tag data
 # b, a        = butter(4, 2, fs=500, btype='low') # 4,2,500 : order, cutoff freq (<0.5*fs), sampling freq
 tag_exp_filt = filtfilt(b, a, tag_exp_raw, axis=0)
@@ -152,32 +183,12 @@ print(f"\nGround truth from geometry:\ntheta*: {theta_star_gt:.2f} deg, zc = 0.1
 
 
 # ================ Plot the data ===================
-PLOT_RAW = False
 PLOT_XYZ = True
 PLOT_RELATIONSHIP = False
 
 import matplotlib.ticker as ticker
 
 # Now let's plot the x_data over time
-if PLOT_RAW:
-    fig, ax = plt.subplots(figsize=(9, 4.5))
-    ax2 = plt.twinx()
-    ax.plot(time, f_exp_raw[:, 0], "b", label='X Force (raw)')
-    ax.plot(time, f_exp_raw[:, 1], "r", label='Y Force (raw)')
-    ax.plot(time, f_exp_raw[:, 2], "m", label='Z Force (raw)')
-    # ax2.plot(time_th, tag_exp_raw[:, 0], color='g', linestyle='-', label='Roll (raw)')
-    # ax2.plot(time_th, tag_exp_raw[:, 1], color='c', linestyle='-', label='Pitch (raw)')
-    ax2.plot(time, tag_exp_raw[:, 2], color='y', linestyle='-', label='Yaw (raw)')
-    ax.tick_params(axis='y', labelcolor='b')
-    ax2.tick_params(axis='y', labelcolor='g')
-    ax.set_xlabel('Time (s)', fontsize=10)
-    ax.set_ylabel('Force (N)', color='b', fontsize=10)
-    ax.set_title('Raw X, Y, Z Data Over Time')
-    ax.legend()
-    ax.grid(True)
-    align_zeros([ax, ax2])
-    plt.show()
-
 if PLOT_XYZ:
     fig, ax1 = plt.subplots(figsize=(9, 4.5))
     ax2 = plt.twinx()
@@ -302,9 +313,11 @@ if PLOT_SUBCRIT:
 
 ## =================== HACK: Modify experiment parameters to make better fitting ===================
 print("\n ************** SUB CRITICAL FIT CALCULATION ****************")
-# Don't currently have exact measure for o_obj. HOWEVER, at theta_crit, the EE x-pos should be equal to o x-pos!
+# # Don't currently have exact measure for o_obj. HOWEVER, at theta_crit, the EE x-pos should be equal to o x-pos!
 ee_at_theta_star = ee_subcrit[np.argmin(np.abs(th_subcrit - theta_star_calc)), :] + 0.04 # Small 4cm offset makes it match!! TODO: Investigate tiny error propagation
 o_obj = np.array([ee_at_theta_star[0], 0, 0])
+
+# o_obj = np.array([0.398, 0, 0]) # Experimentally determined for now
 print(f"\nUsing o_obj = {o_obj} for analysis\n")
 
 
