@@ -13,19 +13,18 @@ from xml.etree import ElementTree as ET
 
 OBJECT_CONFIGS = {
     0: {"name": "box_exp"},
-    1: {"name": "alarmclock",  "pos": "1.0 0.00 0.225", "quat": "1 0 0 0",  'scale': "1.0"},
-    2: {"name": "binoculars",  "pos": "1.0 0.00 0.225", "quat": "1 0 0 0",  'scale': "1.0"},
-    3: {"name": "camera",      "pos": "0.75 0.00 0.15", "quat": "1 0 0 0",  'scale': "1.0"},
-    4: {"name": "elephant",    "pos": "1.0 0.00 0.225", "quat": "1 0 0 0",  'scale': "1.0"},
+    1: {"name": "alarmclock",  "pos": "1.0 0.00 0.1", "quat": "1 0 0 0",  'scale': "1.0"},
+    2: {"name": "binoculars",  "pos": "1.0 0.00 0.1", "quat": "1 0 0 0",  'scale': "1.0"},
+    3: {"name": "camera",      "pos": "1.0 0.00 0.1", "quat": "1 0 0 0",  'scale': "1.0"},
+    4: {"name": "elephant",    "pos": "1.0 0.00 0.1", "quat": "1 0 0 0",  'scale': "1.0"},
     5: {"name": "flashlight",  "pos": "1.0 0.00 0.225", "quat": "1 0 0 0",  'scale': "2.0"},
-    6: {"name": "hammer",      "pos": "1.0 0.00 0.225", "quat": "1 0 0 0",  'scale': "1.0"},
-    7: {"name": "waterbottle", "pos": "1.00 0.00 0.15", "quat": "1 0 0 0",  'scale': "2.0"},
-    8: {"name": "wineglass",   "pos": "0.75 0.00 0.15", "quat": "1 0 0 0",  'scale': "1.0"},
-    # ... add your other 7 objects here
+    6: {"name": "hammer",      "pos": "1.0 0.00 0.225", "quat": "0.707107 0 -0.707107 0",  'scale': "1.0"},
+    7: {"name": "waterbottle", "pos": "1.0 0.00 0.2", "quat": "1 0 0 0",  'scale': "2.0"},
+    8: {"name": "wineglass",   "pos": "1.0 0.00 0.14", "quat": "1 0 0 0",  'scale': "1.0"},
 }
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1] # Adjust if needed
+REPO_ROOT = Path(__file__).resolve().parents[1]
 ASSETS_DIR = REPO_ROOT / "assets"
 OBJ_DIR = ASSETS_DIR / "object_sim"
 GEN_DIR = ASSETS_DIR / "_generated"
@@ -40,7 +39,7 @@ def create_scene_xml(
     ):
     
     if not object_id:
-        asset_block = ""
+        asset_block = f'<include file="{(ASSETS_DIR / "common_modified.xml").as_posix()}"/>'
         object_block = '<include file="my_objects/box/box_exp.xml"/>'
     else:
         print(f"Current directory: {os.getcwd()}")
