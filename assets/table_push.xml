@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <mujoco>
-	<compiler angle="radian" texturedir="textures/" meshdir="meshes/"/> <!-- meshdir="meshes/" -->
+	<compiler angle="radian" texturedir="textures/" /> <!-- meshdir="meshes/" -->
 	
 	<option timestep="0.001" tolerance="1e-9" integrator="implicitfast" iterations="100" ls_iterations="100">
 		<flag warmstart="enable" multiccd="enable"/>
@@ -41,23 +41,19 @@
         <material name="robot0:base_mat" shininess="0.03" specular="0.4" reflectance="0"></material>
         <material name="grid_mat" texture="grid" texrepeat="8 8" reflectance="0.2"/>
 
-        <mesh name="base_link" file="base_link.stl" />
-        <mesh name="link_1" file="link_1.stl" />
-        <mesh name="link_2" file="link_2.stl" />
-        <mesh name="link_3" file="link_3.stl" />
-        <mesh name="link_4" file="link_4.stl" />
-        <mesh name="link_5" file="link_5.stl" />
-        <mesh name="link_6" file="link_6.stl" />
-        <mesh name="pusher_link" file="pusher_link.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="base_link" file="meshes/base_link.stl" />
+        <mesh name="link_1" file="meshes/link_1.stl" />
+        <mesh name="link_2" file="meshes/link_2.stl" />
+        <mesh name="link_3" file="meshes/link_3.stl" />
+        <mesh name="link_4" file="meshes/link_4.stl" />
+        <mesh name="link_5" file="meshes/link_5.stl" />
+        <mesh name="link_6" file="meshes/link_6.stl" />
+        <mesh name="pusher_link" file="meshes/pusher_link.stl" scale="0.001 0.001 0.001"/>
     </asset>
 
 
 	<!-- v Per-object assets (meshes, mats) will inject here v -->
-	
-        <include file="object_sim/common.xml"/>
-        <compiler meshdir="object_sim/wristwatch"/>
-        <include file="object_sim/wristwatch/assets.xml"/>
-        
+	{asset_block}
 	<!-- ^ Per-object assets (meshes, mats) will inject here ^ -->
 
 	<worldbody>
@@ -77,11 +73,7 @@
 		</body>
 
 		<!-- v Object body will inject here v -->
-		
-        <body name="wristwatch_base" pos="0.75 0.00 0.06" quat="1 0 0 0">
-            <include file="object_sim/wristwatch/body.xml"/>
-        </body>
-        
+		{object_block}
 		<!-- ^ Object body will inject here ^ -->
 
 		<light directional="true" ambient="0.2 0.2 0.2" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" castshadow="false" pos="0 0 4" dir="0 0 -1" name="light0"></light>
