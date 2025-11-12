@@ -43,8 +43,6 @@ def select_model(main_xml_path: str, object_name: str):
         FileNotFoundError: If any of the required XML or asset files are not found.
     """
     if object_name is not None:
-
-        print('This shouldnt be printing')
         if object_name not in OBJECTS:
             raise ValueError(f"Invalid object choice: '{object_name}'. "
                             f"Valid choices are: {list(OBJECTS.keys())}")
