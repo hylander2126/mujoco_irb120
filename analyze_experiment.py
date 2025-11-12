@@ -1,7 +1,7 @@
 import numpy as np
 import csv
 import matplotlib.pyplot as plt
-from scipy.signal import medfilt, butter, filtfilt
+from scipy.signal import medfilt, butter, filtfilt, savgol_filter
 from scipy.interpolate import interp1d
 from scripts.utils.com_estimation import tau_app_model, tau_model, theta_from_tau, align_zeros
 from scipy.stats import linregress
@@ -63,20 +63,28 @@ PLOT_RAW = True
 if PLOT_RAW:
     fig, ax = plt.subplots(figsize=(9, 4.5))
     ax2 = plt.twinx()
-    ax.plot(time, f_exp_raw[:, 0], "b", label='X Force (raw)')
-    ax.plot(time, f_exp_raw[:, 1], "r", label='Y Force (raw)')
-    ax.plot(time, f_exp_raw[:, 2], "m", label='Z Force (raw)')
+    ax.plot(time, f_exp_raw[:, 0], "b", linewidth=3, label='X Force (raw)')
+    ax.plot(time, f_exp_raw[:, 1], "r", linewidth=3, label='Y Force (raw)')
+    ax.plot(time, f_exp_raw[:, 2], "m", linewidth=3, label='Z Force (raw)')
     # ax2.plot(time_th, tag_exp_raw[:, 0], color='g', linestyle='-', label='Roll (raw)')
     # ax2.plot(time_th, tag_exp_raw[:, 1], color='c', linestyle='-', label='Pitch (raw)')
-    ax2.plot(time, tag_exp_raw[:, 2], color='y', linestyle='-', label='Yaw (raw)')
-    ax.tick_params(axis='y', labelcolor='b')
-    ax2.tick_params(axis='y', labelcolor='g')
-    ax.set_xlabel('Time (s)', fontsize=10)
-    ax.set_ylabel('Force (N)', color='b', fontsize=10)
-    ax.set_title('Raw X, Y, Z Data Over Time')
-    ax.legend()
+    ax2.plot(time, np.rad2deg(tag_exp_raw[:, 2]), color='g', linestyle='-', linewidth=3, label='Object angle (raw)')
+    ax.tick_params(axis='y', labelcolor='b', labelsize=15)
+    ax.tick_params(axis='x', labelsize=15)
+    ax2.tick_params(axis='y', labelcolor='g', labelsize=15)
+    ax.set_xlabel('Time (s)', fontsize=15)
+    ax.set_ylabel('Force (N)', color='b', fontsize=15)
+    ax2.set_ylabel('Angle (rad)', color='g', fontsize=15)
+    ax.legend(loc='upper left', fontsize=15)
     ax.grid(True)
+
+    # FOR PAPER FIGURE, TRIM THE AXES LIMITS
+    ax.set_xlim(1.6, 6)
+    # ax1.set_yticks(np.arange(-1.5, 1.6, 0.5))
+    ax2.set_ylim(0, 30)
+
     align_zeros([ax, ax2])
+    plt.tight_layout()
     plt.show()
 
 
@@ -95,6 +103,16 @@ if PLOT_RAW:
 b, a         = butter(4, 5, fs=500, btype='low') # 4,5,500 : order, cutoff freq (<0.5*fs), sampling freq
 f_exp_filt   = filtfilt(b, a, f_exp_raw, axis=0)
 
+x1 = medfilt(f_exp_raw[:,0], kernel_size=5)
+x2 = medfilt(f_exp_raw[:,1], kernel_size=5)
+x3 = medfilt(f_exp_raw[:,2], kernel_size=5)
+
+k_sg = int(0.09*500)|1
+k_sg = 89
+x_sg1 = savgol_filter(x1, k_sg, 3)
+x_sg2 = savgol_filter(x2, k_sg, 3)
+x_sg3 = savgol_filter(x3, k_sg, 3)
+f_exp_filt = np.vstack((x_sg1, x_sg2, x_sg3)).T
 
 # TODO: I also have to estimate/calculate e_hat from experiment instead of manually entering it
 
@@ -290,7 +308,7 @@ t_subcrit = time_trim[idx_sub_crit]
 ee_subcrit = ee_trim[idx_sub_crit, :]
 
 # And plot
-PLOT_SUBCRIT = False
+PLOT_SUBCRIT = True
 
 if PLOT_SUBCRIT:
     th_trim_deg = np.rad2deg(th_trim)
@@ -310,6 +328,7 @@ if PLOT_SUBCRIT:
     ax4.set_xlabel("Object Angle (deg)", color='g', fontsize=20)
     ax4.legend(loc='lower right', fontsize=15)
     ax4.grid(True)
+    plt.tight_layout()
     plt.show()
 
 
