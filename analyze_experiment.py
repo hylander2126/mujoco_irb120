@@ -21,9 +21,11 @@ def read_csv(file_path, trim_rows=0):
 # path = "experiments/run_2025-11-10_15-28-42_t001_SYNC.csv"
 
 path = "experiments/run_2025-11-10_15-52-45_t002_SYNC.csv" # Best
-# path = "experiments/run_2025-11-10_16-14-31_t002_SYNC.csv" # Super tilted experiment
 
+# path = "experiments/run_2025-11-10_16-14-31_t002_SYNC.csv" # Super tilted experiment
 # path = "experiments/run_2025-11-10_16-14-31_t007_SYNC.csv" # Weird z force experiment
+
+path = "experiments/run_2025-11-10_20-00-09_t002_SYNC.csv" # Best
 
 csv_data = read_csv(path, trim_rows=1)  # Discard headers
 
@@ -56,7 +58,7 @@ ee_exp[:, 2] -= 0.035  # Adjust Z position of EE for offset
 
 
 ## ================ Plot raw data ===================
-PLOT_RAW = False
+PLOT_RAW = True
 
 if PLOT_RAW:
     fig, ax = plt.subplots(figsize=(9, 4.5))
