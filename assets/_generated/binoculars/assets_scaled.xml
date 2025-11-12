@@ -1,0 +1,9 @@
+<mujocoinclude model="">
+
+    <asset>
+        <mesh name="binoculars" file="../object_sim/binoculars/binoculars.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact0" file="../object_sim/binoculars/contact0.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact1" file="../object_sim/binoculars/contact1.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact2" file="../object_sim/binoculars/contact2.stl" scale="1.0 1.0 1.0" />
+    </asset>
+</mujocoinclude>

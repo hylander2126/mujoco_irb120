@@ -1,0 +1,8 @@
+<mujocoinclude model="">
+
+    <asset>
+        <mesh name="flashlight" file="../object_sim/flashlight/flashlight.stl" scale="2.0 2.0 2.0" />
+        <mesh name="contact0" file="../object_sim/flashlight/contact0.stl" scale="2.0 2.0 2.0" />
+        <mesh name="contact1" file="../object_sim/flashlight/contact1.stl" scale="2.0 2.0 2.0" />
+    </asset>
+</mujocoinclude>

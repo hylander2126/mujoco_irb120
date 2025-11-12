@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <mujoco>
-	<compiler angle="radian" texturedir="textures/" meshdir="meshes/"/> <!-- meshdir="meshes/" -->
+	<compiler angle="radian" />
+	 <!-- texturedir="textures/" /> meshdir="meshes/" -->
 	
 	<option timestep="0.001" tolerance="1e-9" integrator="implicitfast" iterations="100" ls_iterations="100">
 		<flag warmstart="enable" multiccd="enable"/>
@@ -41,22 +42,22 @@
         <material name="robot0:base_mat" shininess="0.03" specular="0.4" reflectance="0"></material>
         <material name="grid_mat" texture="grid" texrepeat="8 8" reflectance="0.2"/>
 
-        <mesh name="base_link" file="base_link.stl" />
-        <mesh name="link_1" file="link_1.stl" />
-        <mesh name="link_2" file="link_2.stl" />
-        <mesh name="link_3" file="link_3.stl" />
-        <mesh name="link_4" file="link_4.stl" />
-        <mesh name="link_5" file="link_5.stl" />
-        <mesh name="link_6" file="link_6.stl" />
-        <mesh name="pusher_link" file="pusher_link.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="base_link"   file="/home/airlab07/Documents/github/mujoco_irb120/assets/my_objects/robot/base_link.stl" />
+        <mesh name="link_1"      file="/home/airlab07/Documents/github/mujoco_irb120/assets/my_objects/robot/link_1.stl" />
+        <mesh name="link_2"      file="/home/airlab07/Documents/github/mujoco_irb120/assets/my_objects/robot/link_2.stl" />
+        <mesh name="link_3"      file="/home/airlab07/Documents/github/mujoco_irb120/assets/my_objects/robot/link_3.stl" />
+        <mesh name="link_4"      file="/home/airlab07/Documents/github/mujoco_irb120/assets/my_objects/robot/link_4.stl" />
+        <mesh name="link_5"      file="/home/airlab07/Documents/github/mujoco_irb120/assets/my_objects/robot/link_5.stl" />
+        <mesh name="link_6"      file="/home/airlab07/Documents/github/mujoco_irb120/assets/my_objects/robot/link_6.stl" />
+        <mesh name="pusher_link" file="/home/airlab07/Documents/github/mujoco_irb120/assets/my_objects/robot/pusher_link.stl" scale="0.001 0.001 0.001"/>
     </asset>
 
 
 	<!-- v Per-object assets (meshes, mats) will inject here v -->
 	
-        <include file="object_sim/common.xml"/>
-        <compiler meshdir="object_sim/wristwatch"/>
-        <include file="object_sim/wristwatch/assets.xml"/>
+        <compiler meshdir="/home/airlab07/Documents/github/mujoco_irb120/assets/object_sim"/>
+        <include file="/home/airlab07/Documents/github/mujoco_irb120/assets/common_modified.xml"/>
+        <include file="/home/airlab07/Documents/github/mujoco_irb120/assets/_generated/flashlight/assets_scaled.xml"/>
         
 	<!-- ^ Per-object assets (meshes, mats) will inject here ^ -->
 
@@ -64,22 +65,24 @@
 		<geom name="floor" size="5 5 5" type="plane" material="grid_mat"/>
 		
 		<!-- <camera name="closeup" pos="0 -100 .07" xyaxes="1 0 0 0 1 2"/> -->
-		<include file="robot.xml"></include>
-		<!-- <include file="../assets/robot.xml"></include> -->
+		<include file="my_objects/robot/robot.xml"></include>
 		
 		<!-- Table Surface === Recall geom SIZE is half-dims so table surface is z=0.1 -->
 		<body pos="0.75 0 0" name="table0">
 			<geom size="1 0.5 0.05" type="box" name="table" mass="2000" material="table_mat" friction="1 0.005 0.0001"></geom>
 			<site name="surface_site" pos="0 0 0" size = "0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
 			<!-- TEMPORARY SITE -->
-			<site name="obj_frame_site" pos="0 0 0.1" size="0.01" type="sphere" rgba="1 0 0 0.5"/>
-			<site name="payload_site" pos="0 0 0.1" size="0.01" type="sphere" rgba="1 0 0 0.5"/>
+			<!-- <site name="obj_frame_site" pos="0 0 0.1" size="0.01" type="sphere" rgba="1 0 0 0.5"/>
+			<site name="payload_site" pos="0 0 0.1" size="0.01" type="sphere" rgba="1 0 0 0.5"/> -->
 		</body>
 
 		<!-- v Object body will inject here v -->
 		
-        <body name="wristwatch_base" pos="0.75 0.00 0.06" quat="1 0 0 0">
-            <include file="object_sim/wristwatch/body.xml"/>
+        <body name="flashlight_base" pos="1.0 0.00 0.225" quat="1 0 0 0" childclass="grab">
+            <joint type="free"/>
+            <site name="payload_site" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
+            <site name="obj_frame_site" pos="0.05 0.0 -0.15" size="0.02 0.02 0.02" type="box" rgba="1 0 0 0"></site>
+            <include file="/home/airlab07/Documents/github/mujoco_irb120/assets/object_sim/flashlight/body.xml"/>
         </body>
         
 		<!-- ^ Object body will inject here ^ -->

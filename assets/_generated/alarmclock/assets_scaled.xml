@@ -1,0 +1,9 @@
+<mujocoinclude model="">
+
+
+    <asset>
+        <mesh name="alarmclock" file="../object_sim/alarmclock/alarmclock.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact0" file="../object_sim/alarmclock/contact0.stl" scale="1.0 1.0 1.0" />
+    </asset>
+
+</mujocoinclude>

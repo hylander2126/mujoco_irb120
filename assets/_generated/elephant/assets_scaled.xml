@@ -1,0 +1,18 @@
+<mujocoinclude model="">
+
+    <asset>
+        <mesh name="elephant" file="../object_sim/elephant/elephant.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact0" file="../object_sim/elephant/contact0.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact1" file="../object_sim/elephant/contact1.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact2" file="../object_sim/elephant/contact2.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact3" file="../object_sim/elephant/contact3.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact4" file="../object_sim/elephant/contact4.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact5" file="../object_sim/elephant/contact5.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact6" file="../object_sim/elephant/contact6.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact7" file="../object_sim/elephant/contact7.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact8" file="../object_sim/elephant/contact8.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact9" file="../object_sim/elephant/contact9.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact10" file="../object_sim/elephant/contact10.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact11" file="../object_sim/elephant/contact11.stl" scale="1.0 1.0 1.0" />
+    </asset>
+</mujocoinclude>
