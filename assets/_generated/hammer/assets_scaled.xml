@@ -1,0 +1,9 @@
+<mujocoinclude model="">
+
+    <asset>
+        <mesh name="hammer_head" file="../object_sim/hammer/hammer_head.stl" scale="1.0 1.0 1.0" />
+        <mesh name="hammer_neck" file="../object_sim/hammer/hammer_neck.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact0" file="../object_sim/hammer/contact0.stl" scale="1.0 1.0 1.0" />
+        <mesh name="contact1" file="../object_sim/hammer/contact1.stl" scale="1.0 1.0 1.0" />
+    </asset>
+</mujocoinclude>
