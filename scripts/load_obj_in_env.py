@@ -12,36 +12,58 @@ import os
 # 1cm above the table, centered at (0.75, 0.0).
 
 OBJECT_CONFIGS = {
+    0: {"name": "box_exp"},
     1: {"name": "wristwatch",  "pos": "0.75 0.00 0.06", "quat": "1 0 0 0"},
     2: {"name": "toothbrush",  "pos": "0.75 0.10 0.06", "quat": "0.707 0.707 0 0"},
     3: {"name": "waterbottle", "pos": "0.70 -0.10 0.06", "quat": "1 0 0 0"},
     # ... add your other 7 objects here
 }
 
-OBJ_SIM_ROOT = "assets/object_sim"
-COMMON_DEFAULTS = "assets/object_sim/common.xml"
-SHARED_DEFAULTS = "shared.xml"
+OBJ_SIM_ROOT = "object_sim"
+# COMMON_DEFAULTS = "object_sim/common.xml"
+# SHARED_DEFAULTS = "../shared.xml"
 
 # -----------------------------------------------------------------
 # 2. CREATE THE XML-GENERATING FUNCTION
 # -----------------------------------------------------------------
-def create_scene_xml(object_id, template_path="table_push.xml", out="generated_scene.xml"):
-    """out also defines the ROOT of all relative paths in the generated XML."""
-    cfg = OBJECT_CONFIGS[object_id]
-    name = cfg["name"]
+def create_scene_xml(
+        object_id, 
+        template_path="../assets/table_push.xml", 
+        out="../assets/generated_scene.xml"
+    ):
+    
+    if not object_id:
+        print(f"[INFO] 'None' object imported. Using base template only.")
+        # asset_block = ""
+        # object_block = ""
+        
+        asset_block = ""
+        object_block = f"""
+        <include file="my_objects/box_exp.xml"></include>
+        """
 
-    asset_block = f"""
-    <include file="{COMMON_DEFAULTS}"/>
-    <compiler meshdir="{OBJ_SIM_ROOT}/{name}" texturedir="{OBJ_SIM_ROOT}/{name}"/>
-    <include file="{OBJ_SIM_ROOT}/{name}/assets.xml"/>
-    <compiler meshdir="assets/meshes" texturedir="assets/textures"/>
-    """
+    else:
+        print(f"Current directory: {os.getcwd()}")
+        cfg = OBJECT_CONFIGS[object_id]
+        name = cfg["name"]
 
-    object_block = f"""
-    <body name="{name}_base" pos="{cfg['pos']}" quat="{cfg['quat']}">
-      <include file="assets/object_sim/{name}/body.xml"/>
-    </body>
-    """
+        # asset_block = f"""
+        # <include file="{COMMON_DEFAULTS}"/>
+        # <compiler meshdir="{OBJ_SIM_ROOT}/{name}" texturedir="{OBJ_SIM_ROOT}/{name}"/>
+        # <include file="{OBJ_SIM_ROOT}/{name}/assets.xml"/>
+        # <compiler meshdir="../assets/meshes" texturedir="../assets/textures"/>
+        # """
+        asset_block = f"""
+        <include file="{OBJ_SIM_ROOT}/common.xml"/>
+        <compiler meshdir="{OBJ_SIM_ROOT}/{name}"/>
+        <include file="{OBJ_SIM_ROOT}/{name}/assets.xml"/>
+        """
+
+        object_block = f"""
+        <body name="{name}_base" pos="{cfg['pos']}" quat="{cfg['quat']}">
+            <include file="{OBJ_SIM_ROOT}/{name}/body.xml"/>
+        </body>
+        """
 
     with open(template_path, "r") as f:
         tpl = f.read()
