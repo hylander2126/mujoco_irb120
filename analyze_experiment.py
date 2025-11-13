@@ -57,6 +57,12 @@ time -= time[0]  # Normalize time to start at zero
 ee_exp[:, 2] -= 0.035  # Adjust Z position of EE for offset
 
 
+## =================== SET THE GROUND TRUTH COM & MASS ===================
+com_gt = [-0.05, 0.0, 0.13781]  # Ground truth CoM position for box_exp
+m_gt = 0.615
+## =======================================================================
+
+
 ## ================ Plot raw data ===================
 PLOT_RAW = True
 
@@ -193,13 +199,12 @@ print(f"Force at zero crossing from theta*: {f_trim[f0_idx,0]:.3f} N")
 ## ==================== CALCULATE THETA* AND ZC ====================
 print("\n ************** FULL TOPPLING CALCULATION ****************")
 theta_star_calc = th_trim[f0_idx]
-xc_gt = 0.05
-zc_calc = xc_gt / np.tan(theta_star_calc)
+zc_calc = abs(com_gt[0]) / np.tan(theta_star_calc)
 print(f"\nCalculated from full toppling:\ntheta* = {np.rad2deg(theta_star_calc):.2f} deg, zc = {zc_calc:.3f} m")
 
 # Ground truth from geometry
-theta_star_gt = np.rad2deg(np.arctan2(0.05, 0.136))
-print(f"\nGround truth from geometry:\ntheta*: {theta_star_gt:.2f} deg, zc = 0.136 m")
+theta_star_gt = np.rad2deg(np.arctan2(abs(com_gt[0]), com_gt[2]))
+print(f"\nGround truth from geometry:\ntheta*: {theta_star_gt:.2f} deg, zc = {com_gt[2]:.3f} m")
 
 
 # ================ Plot the data ===================
@@ -349,8 +354,8 @@ print(f"\nUsing o_obj = {o_obj} for analysis\n")
 
 
 # Whether to use the primary tipping and push axes (for plotting too!)
-USE_X_ONLY = True
-# USE_X_ONLY = False
+# USE_X_ONLY = True
+USE_X_ONLY = False
 
 if USE_X_ONLY:
 
@@ -381,7 +386,7 @@ if USE_X_ONLY:
     print(f"\nFit using TAU model:")
     print(f"mass: {m_est:.3f} kg    zc: {zc_est:.3f} m    theta*: {theta_star_est:.2f} deg")
     print(f"\nGround Truth:")
-    print(f"mass: {0.635} kg    zc: {0.1378} m    theta*: {theta_star_gt:.2f} deg")
+    print(f"mass: {m_gt} kg    zc: {com_gt[2]:.3f} m    theta*: {theta_star_gt:.2f} deg")
 
 
     ## ============================ PLOTTING ============================
