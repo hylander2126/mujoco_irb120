@@ -21,6 +21,7 @@ OBJECT_CONFIGS = {
     6: {"name": "hammer",      "pos": "1.0 0.00 0.225", "quat": "0.707107 0 -0.707107 0",  'scale': "1.0"},
     7: {"name": "waterbottle", "pos": "1.0 0.00 0.2", "quat": "1 0 0 0",  'scale': "2.0"},
     8: {"name": "wineglass",   "pos": "1.0 0.00 0.14", "quat": "1 0 0 0",  'scale': "1.0"},
+    10: {"name": "heart_exp"},
 }
 
 
@@ -41,6 +42,9 @@ def create_scene_xml(
     if not object_id:
         asset_block = f'<include file="{(ASSETS_DIR / "common_modified.xml").as_posix()}"/>'
         object_block = '<include file="my_objects/box/box_exp.xml"/>'
+    elif object_id==10:
+        asset_block = f'<include file="{(ASSETS_DIR / "common_modified.xml").as_posix()}"/>'
+        object_block = '<include file="my_objects/heart/heart_exp.xml"/>'
     else:
         print(f"Current directory: {os.getcwd()}")
         cfg = OBJECT_CONFIGS[object_id]
