@@ -70,8 +70,8 @@ class RendererViewerOpts:
     @staticmethod
     def _apply_viewer_opts(viewer_ctx):
         """ Set visualization options for the passive viewer context """
-        viewer_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True
-        viewer_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True
+        viewer_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
+        # viewer_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Contact 'translucent' force 'disc'
         viewer_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_SITE
         viewer_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_WORLD | mujoco.mjtFrame.mjFRAME_SITE
         viewer_ctx.cam.distance                                       = 1.5 # Zoom level
@@ -81,17 +81,17 @@ class RendererViewerOpts:
 
     @staticmethod
     def _apply_model_vis(model_obj):
-        model_obj.vis.scale.contactwidth    = 0.025
-        model_obj.vis.scale.contactheight   = 0.25
-        model_obj.vis.scale.forcewidth      = 0.05
-        model_obj.vis.map.force             = 0.3
-        model_obj.vis.scale.framewidth      = 0.025
-        model_obj.vis.scale.framelength     = 0.75
+        model_obj.vis.scale.contactwidth    = 0.000001#0.025
+        model_obj.vis.scale.contactheight   = 0.00001#0.25
+        model_obj.vis.scale.forcewidth      = 0.00001#0.05
+        model_obj.vis.map.force             = 0.00001#0.3
+        model_obj.vis.scale.framewidth      = 0.00001#0.025
+        model_obj.vis.scale.framelength     = 0.00001#0.75
 
     @staticmethod
     def _apply_offscreen_opts(cam_obj, opt_obj):
-        opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True
-        opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True
+        opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
+        # opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Contact 'translucent' force 'disc'
         opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_SITE
         
         cam_obj.distance               = 1.5

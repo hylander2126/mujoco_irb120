@@ -14,21 +14,6 @@
 
 	<!-- v ROBOT actuators will inject here v -->
 	
-<actuator>
-    <!-- Position Control -->
-    <!-- kp, kv: (200,100) first 3, (100,50) last 3 -->
-    <position joint="joint_1" name="joint_1" kp="200" kv="100" ctrlrange="-2.87979 2.87979" forcerange="-20 20"/>
-    <position joint="joint_2" name="joint_2" kp="200" kv="100" ctrlrange="-1.91986 1.91986" forcerange="-20 20"/>
-    <position joint="joint_3" name="joint_3" kp="200" kv="100" ctrlrange="-1.22173 1.91986" forcerange="-20 20"/>
-    <position joint="joint_4" name="joint_4" kp="100" kv="50" ctrlrange="-2.79252 2.79252" forcerange="-10 10"/>
-    <position joint="joint_5" name="joint_5" kp="100" kv="50" ctrlrange="-2.09440 2.90440" forcerange="-10 10"/>
-    <position joint="joint_6" name="joint_6" kp="100" kv="50" ctrlrange="-3.14200 3.14200" forcerange="-10 10"/>
-</actuator>
-
-<sensor>
-    <force name="force_sensor" site="sensor_site"/>
-</sensor>
-
 	<!-- v ROBOT actuators will inject here v -->
 
 	<size njmax="500" nconmax="100" />
@@ -36,7 +21,11 @@
 
 
 	<!-- v Per-object assets (meshes, mats) will inject here v -->
-	<include file="/home/hylander/Documents/github/mujoco/assets/common_modified.xml"/>
+	
+    <compiler meshdir="/home/hylander/Documents/github/mujoco/assets/object_sim"/>
+    <include file="/home/hylander/Documents/github/mujoco/assets/common_modified.xml"/>
+    <include file="/home/hylander/Documents/github/mujoco/assets/object_sim/flashlight/assets.xml"/>
+    
 	<!-- ^ Per-object assets (meshes, mats) will inject here ^ -->
 
 	<worldbody>
@@ -56,10 +45,35 @@
 
 		<!-- v Object body will inject here v -->
 		
-        <include file="my_objects/robot/robot.xml"> </include>
+            <body name="box_base" pos="0.1 0.0 0.2" euler="0 0 0">
+                <geom name="payload" type="box" mass="0.615" size="0.05 0.05 0.15" material="block_mat"/>
+            </body>
+            
 
-        <include file="my_objects/soda/soda_exp.xml"/>
-        
+            <body name="heart_base" pos="0.2 0.0 0.05" euler="0 0 0">
+                <geom name="heart" type="mesh" mesh="heart_exp" rgba="1 0 0 1"/>
+            </body>
+            
+
+            <body name="L_base" pos="0.45 0.0 0.05" euler="0 0 0">
+                <geom name="L" type="mesh" mesh="L_exp" rgba="1 0 0 1"/>
+            </body>
+            
+
+            <body name="monitor_base" pos="0.5 0.0 0.05" euler="0 0 0">
+                <geom name="monitor" type="mesh" mesh="monitor_exp" rgba="0.1 0.1 0.1 1"/>
+            </body>
+            
+
+            <body name="soda_base" pos="0.75 0.0 0.05" euler="1.5719 0 0">
+                <geom name="soda" type="mesh" mesh="soda_exp" rgba="0 0.6 0.6 0.6"/>
+            </body>
+            
+
+            <body name="flashlight_base" pos="0.7 0.0 0.12" quat="1 0 0 0" childclass="grab">
+                <geom name="flashlight_visual" mesh="flashlight" rgba="0.8 0.8 0.2 1" />
+            </body>
+            
 		<!-- ^ Object body will inject here ^ -->
 
 		<light directional="true" ambient="0.2 0.2 0.2" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" castshadow="false" pos="0 0 4" dir="0 0 -1" name="light0"></light>

@@ -30,6 +30,9 @@
         <mesh name="pusher_link" file="my_objects/robot/pusher_link.stl" scale="0.001 0.001 0.001"/>
 
         <mesh name="heart_exp" file="my_objects/heart/heart_exp.stl" />
+        <mesh name="L_exp" file="my_objects/L/L_exp.stl" />
+        <mesh name="monitor_exp" file="my_objects/monitor/monitor_exp.stl" />
+        <mesh name="soda_exp" file="my_objects/soda/soda_exp.stl" scale="0.001 0.001 0.001"/>
     </asset>
 
 <!-- These are vendor's -->
