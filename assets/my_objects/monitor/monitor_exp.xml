@@ -1,12 +1,10 @@
 <mujoco>
-    <!-- <compiler meshdir="." /> -->
+    <!-- euler 0 0 0 yields space-aligned axes, but poor push config -->
+    <body name="monitor" pos="1.1 -0.075 0.05" euler="0 0 1.571">
+        <joint type="free" damping="0.01"></joint>
+        <geom name="monitor" type="mesh" mesh="monitor_exp" rgba="0.1 0.1 0.1 1" mass="5.0"/>
 
-    <!-- <worldbody> -->
-    <body name="monitor" pos="1.1 -0.075 0" euler="0 0 1.571">
-        <geom name="monitor" type="mesh" mesh="monitor_exp" rgba="0.5 0.5 0.5 1"/>
-        <joint name="payload:joint" type="free" damping="0.01"></joint>
         <site name="payload_site" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
         <site name="obj_frame_site" pos="0.05 0.0 -0.15" size="0.02 0.02 0.02" type="box" rgba="1 0 0 0"></site>
     </body>
-    <!-- </worldbody> -->
 </mujoco>
