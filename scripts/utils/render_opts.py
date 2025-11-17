@@ -2,6 +2,16 @@ import mujoco
 import numpy as np
 import contextlib
 
+
+### Camera parameters for BOTH viewer and offscreen renderer ###
+
+CAM_DISTANCE   = 1.5 # Zoom level
+CAM_ELEVATION  = -30 # Camera elevation angle
+CAM_AZIMUTH    = 90 # Camera azimuth angle
+CAM_LOOKAT     = np.array([0.75, 0, 0.25]) # structure: (x, y, z)
+
+
+
 class RendererViewerOpts:
     def __init__(self, model_obj, data_obj, vis=True, width=1280, height=720, framerate=60):
 
@@ -68,33 +78,40 @@ class RendererViewerOpts:
             self.frames.append(self.renderer.render())        # Capture the current frame for video recording
 
     @staticmethod
-    def _apply_viewer_opts(viewer_ctx):
+    def _apply_viewer_opts(v_ctx):
         """ Set visualization options for the passive viewer context """
-        viewer_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
-        # viewer_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Contact 'translucent' force 'disc'
-        viewer_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_SITE
-        viewer_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_WORLD | mujoco.mjtFrame.mjFRAME_SITE
-        viewer_ctx.cam.distance                                       = 1.5 # Zoom level
-        viewer_ctx.cam.elevation                                      = -10
-        viewer_ctx.cam.azimuth                                        = 90
-        viewer_ctx.cam.lookat[:]                                      = np.array([0.75, 0, 0.25]) # structure: (x, y, z)
+        v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
+        # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Gross... Contact 'translucent' force 'disc'
+        
+        # v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_SITE # Visualize SITE frames only
+        v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_BODY # Visualize BODY frames only
+        # v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_WORLD # Visualize WORLD frames only
+
+        # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_COM]              = True # Center of mass spheres
+
+        v_ctx.cam.distance                                       = CAM_DISTANCE
+        v_ctx.cam.elevation                                      = CAM_ELEVATION
+        v_ctx.cam.azimuth                                        = CAM_AZIMUTH
+        v_ctx.cam.lookat[:]                                      = CAM_LOOKAT
 
     @staticmethod
     def _apply_model_vis(model_obj):
-        model_obj.vis.scale.contactwidth    = 0.000001#0.025
-        model_obj.vis.scale.contactheight   = 0.00001#0.25
-        model_obj.vis.scale.forcewidth      = 0.00001#0.05
-        model_obj.vis.map.force             = 0.00001#0.3
-        model_obj.vis.scale.framewidth      = 0.00001#0.025
-        model_obj.vis.scale.framelength     = 0.00001#0.75
+        model_obj.vis.scale.contactwidth    = 0.025  # Contact arrow width
+        model_obj.vis.scale.contactheight   = 0.25   # Contact arrow height
+        # model_obj.vis.scale.forcewidth      = 0.05 # Gross... force 'disc' size
+        # model_obj.vis.map.force             = 0.3  # Gross... force 'disc' scale
+        model_obj.vis.scale.framewidth      = 0.025  # Frame axis width
+        model_obj.vis.scale.framelength     = 0.75   # Frame axis length
 
     @staticmethod
     def _apply_offscreen_opts(cam_obj, opt_obj):
+        """ Set visualization options for the offscreen renderer (video recording) """
         opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
         # opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Contact 'translucent' force 'disc'
-        opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_SITE
-        
-        cam_obj.distance               = 1.5
-        cam_obj.elevation              = -30
-        cam_obj.azimuth                = 100
-        cam_obj.lookat[:]              = np.array([1, 0, 0.1])
+        # opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_BODY # Visualize BODY frames only
+        opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_SITE # Visualize SITE frames only NOT WORKING TODO
+
+        cam_obj.distance                                       = CAM_DISTANCE
+        cam_obj.elevation                                      = CAM_ELEVATION
+        cam_obj.azimuth                                        = CAM_AZIMUTH
+        cam_obj.lookat[:]                                      = CAM_LOOKAT

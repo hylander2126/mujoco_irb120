@@ -17,7 +17,7 @@ OBJECT_CONFIGS = {
     2: {"name": "binoculars",   "pos": "1.0 0.0 0.1",   "quat": "1 0 0 0",  'scale': "1.0"},
     3: {"name": "camera",       "pos": "1.0 0.0 0.1",   "quat": "1 0 0 0",  'scale': "1.0"},
     4: {"name": "elephant",     "pos": "1.0 0.0 0.1",   "quat": "1 0 0 0",  'scale': "1.0"},
-    5: {"name": "flashlight",   "pos": "1.0 0.0 0.225", "quat": "1 0 0 0",  'scale': "2.0", "euler": "0 0 0", "rgba": "0.8 0.8 0.2 1"},
+    # 5: {"name": "flashlight",   "pos": "1.0 0.0 0.225", "quat": "1 0 0 0",  'scale': "2.0", "euler": "0 0 0", "rgba": "0.8 0.8 0.2 1"},
     6: {"name": "hammer",       "pos": "1.0 0.0 0.225", "quat": "0.707107 0 -0.707107 0",  'scale': "1.0"},
     7: {"name": "waterbottle",  "pos": "1.0 0.0 0.2",   "quat": "1 0 0 0",  'scale': "2.0"},
     8: {"name": "wineglass",    "pos": "1.0 0.0 0.14",  "quat": "1 0 0 0",  'scale': "1.0"},
@@ -25,6 +25,7 @@ OBJECT_CONFIGS = {
     11: {"name": "L",           "pos": "0.45 0.0 0.05", "euler": "0 0 0",   "rgba": "1 0 0 1"},
     12: {"name": "monitor",     "pos": "0.5 0.0 0.05",  "euler": "0 0 0",   "rgba": "0.1 0.1 0.1 1"},
     13: {"name": "soda",        "pos": "0.75 0.0 0.05", "euler": "1.5719 0 0", "rgba": "0 0.6 0.6 0.6"},
+    14: {"name": "flashlight",  "pos": "1.0 0.0 0.225", "euler": "0 0 0",   "rgba": "0.9 0.1 0.1 1", 'scale': "1.0"},
 }
 
 ACTUATOR_BLOCK = f"""
@@ -59,7 +60,8 @@ def create_scene_xml(
         out           = str(ASSETS_DIR / "generated_scene.xml")
     ):
     
-    if object_id in [0, 10, 11, 12, 13]:
+    if object_id in [0, 10, 11, 12, 13, 14
+    ]:
         name = OBJECT_CONFIGS[object_id]["name"]
         asset_block = f'<include file="{(ASSETS_DIR / "common_modified.xml").as_posix()}"/>'
         object_block = f"""
