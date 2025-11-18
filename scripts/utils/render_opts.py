@@ -84,7 +84,7 @@ class RendererViewerOpts:
         # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Gross... Contact 'translucent' force 'disc'
         
         # v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_SITE # Visualize SITE frames only
-        v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_BODY # Visualize BODY frames only
+        # v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_BODY # Visualize BODY frames only
         # v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_WORLD # Visualize WORLD frames only
 
         # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_COM]              = True # Center of mass spheres

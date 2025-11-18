@@ -1,6 +1,6 @@
 <mujoco>
     <!-- Root body of the robot arm with prismatic joints (XYZ slide) -->
-    <body name="base_link" pos="0.5 0 0.085"> <!-- 0.05 for table surface and 0.035 for mounting bracket -->
+    <body name="base_link" pos="0.5 0 0.05">
         <inertial pos="-0.0036 0 0.0014" quat="0.7605 -0.0133 -0.0061 0.6491" mass="70.1294" diaginertia="1.2869 1.2236 0.9868"/>
         <geom type="mesh" mesh="base_link" name="robot0:base_link" rgba="1 0.43 0 1" contype="0" conaffinity="0"/>
         <!-- Begin kinematic chain -->
@@ -33,24 +33,18 @@
                                 <joint name="joint_6" type="hinge" axis="1 0 0" range="-3.142 3.142" limited="true" damping="0.1" frictionloss="0.01"/> <!---range +-6.98132 -->
                                 <inertial pos="-0.0065 0.0002 0" quat="0.7063 0.7079 -0.0015 -0.0016" mass="0.0139" diaginertia="2.66e-6 1.52e-6 1.48e-6"/>
                                 <geom type="mesh" mesh="link_6" name="robot0:link_6" rgba="0 0 0 1" contype="0" conaffinity="0"/>
-                                
-                                <!-- SITE: tool0 flange -->
-                                <site name="site:tool0" pos="0 0 0" euler="0 0 0" size="0.01" rgba="0 1 0 0"/> <!-- 0.072-->
+                                <!-- Force Sensor Site -->
+                                <site name="sensor_site" pos="0 0 0" euler="0 3.1416 0" size="0.01" rgba="1 0 0 0"/>
 
-                                <!-- Force sensor adapter, body, etc. -->
-                                <body name="ft_and_adapter_link" pos="0.03325 0 0" euler="0 1.570795 0" gravcomp="1">
-                                    <geom type="cylinder" size="0.0375 0.03325" rgba="0.5 0.5 0.5 1"/>
-
-                                    <!-- Force Sensor Site -->
-                                    <site name="sensor_site" pos="0 0 0.03325" euler="0 3.1416 0" size="0.01" rgba="1 0 0 0"/>
-
-                                    <!-- Pusher link -->
-                                    <body name="pusher_link" pos="0 0 0.03325" euler="0 0 0" gravcomp="1"> <!-- 0 1.5708 0 -->
-                                        <geom name="push_rod" type="mesh" mass="0.066" mesh="pusher_link" material="robot0:gripper_mat" friction="0 0 0"/>
-
-                                        <!-- Pusher contact site -->
-                                        <site name="site:fingertip" pos="0.0 0.0 0.1143" euler="0 -1.5708 0" size="0.01" rgba="1 0 0 0"/>
-                                    </body>
+                                <!-- Pusher link -->
+                                <body name="pusher_link" pos="0 0 0" euler="0 1.5708 0" gravcomp="1"> <!-- 0 1.5708 0 -->
+                                    <!-- <joint name="pusher_joint" type="slide" axis="1 0 0" damping="1e+11" armature="0.0001"/> -->
+                                    <inertial pos="-0.09 -0.0001 -0.0017" quat="0 0.7071 0 0.7071" mass="0.02" diaginertia="0.0024 0.0019 0.0013"/>
+                                    <geom name="push_rod" type="mesh" mesh="pusher_link" material="robot0:gripper_mat" friction="0 0 0"/>
+                                    <!-- <geom name="push_rod" type="cylinder" size="0.005 0.09" friction="0.1 0 0"/> -->
+                                    <!-- Pusher contact site -->
+                                    <site name="ee_site" pos="0.0 0.0 0.0847" euler="0 -1.5708 0" size="0.01" rgba="1 0 0 0"/>
+                                    <!-- <site name="ee_site" pos="0.0 0.0 0.0847" euler="0 0 0" size="0.01" rgba="1 0 0 0"/> -->
                                 </body>
                             </body>
                         </body>

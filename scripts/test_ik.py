@@ -16,8 +16,8 @@ Z_OFFFSET = 0.035 # Robot mounting offset
 
 # ==================================================
 # NOTE: THIS IK USES THE FINGERTIP POSITION AS THE FRAME OF REFERENCE
-# The FT has length 0.03m and the pusher has length 0.1143m
-FINGER_OFFSET = 0.03 + 0.1143 # compensate
+# The FT has length 0.0665m and the pusher has length 0.1143m
+FINGER_OFFSET = 0.0665 + 0.1143 # compensate
 # ==================================================
 
 COMPLETE_OFFSET = [-FINGER_OFFSET, 0, -Z_OFFFSET]
@@ -36,17 +36,21 @@ COMPLETE_OFFSET = [-FINGER_OFFSET, 0, -Z_OFFFSET]
 # Let's see the initial pose (should be home)
 temp = irb.FK()
 temp[0:3,3] += COMPLETE_OFFSET
-print("Initial pose (in flange frame):\n", temp)
+print("Initial pose (fingertip):\n", temp)
 
-DESIRED_XYZ = [0.8 , 0.0, 0.25] # DESIRED FINGERTIP POSITION (IGNORING OFFSETS)
+DESIRED_XYZ = [1.1 , 0.0, 0.25] # DESIRED FINGERTIP POSITION (IGNORING OFFSETS)
 
 desired_pose = np.eye(4)  # Example desired pose (identity matrix to keep home orientation)
-desired_pose[0:3, 3] = [0.8 + FINGER_OFFSET, 0, 0.25 - Z_OFFFSET]  # Set desired position
+desired_pose[0:3, 3] = np.add(DESIRED_XYZ, COMPLETE_OFFSET)
 
 desired_q = irb.IK(desired_pose, method=2, damping=0.5, max_iters=1000)
 
 if desired_q is None:
     print("IK solution not found\n")
+    with mujoco.viewer.launch_passive(model, data) as viewer:
+        while viewer.is_running():
+            irb.set_pose(np.zeros((6,1)))
+            viewer.sync()
     exit(0)
 
 
@@ -56,6 +60,11 @@ irb.set_pose(desired_q)
 
 # Let's see what the robot looks like in this pose
 with mujoco.viewer.launch_passive(model, data) as viewer:
+    viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE # Visualize BODY frames only
+    model.vis.scale.framewidth      = 0.025  # Frame axis width
+    model.vis.scale.framelength     = 0.75   # Frame axis length
+
     while viewer.is_running():
-        irb.set_pose(desired_q)
+        irb.set_pos_ctrl(desired_q)
+        # mujoco.mj_step(model, data)
         viewer.sync()
