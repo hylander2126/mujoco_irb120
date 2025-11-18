@@ -12,7 +12,7 @@ from xml.etree import ElementTree as ET
 # so this has to be done empirically, for now
 
 OBJECT_CONFIGS = {
-    0: {"name": "box",          "pos": "0.1 0.0 0.2",   "euler": "0 0 0",   "rgba": "1 0 0 1"},
+    0: {"name": "box",          "pos": "0.1 0.0 0.2",   "euler": "0 0 0",   "rgba": "1 0 0 0.2"},
     1: {"name": "alarmclock",   "pos": "1.0 0.0 0.1",   "quat": "1 0 0 0",  'scale': "1.0"},
     2: {"name": "binoculars",   "pos": "1.0 0.0 0.1",   "quat": "1 0 0 0",  'scale': "1.0"},
     3: {"name": "camera",       "pos": "1.0 0.0 0.1",   "quat": "1 0 0 0",  'scale': "1.0"},
@@ -60,8 +60,7 @@ def create_scene_xml(
         out           = str(ASSETS_DIR / "generated_scene.xml")
     ):
     
-    if object_id in [0, 10, 11, 12, 13, 14
-    ]:
+    if object_id in [0, 10, 11, 12, 13, 14]:
         name = OBJECT_CONFIGS[object_id]["name"]
         asset_block = f'<include file="{(ASSETS_DIR / "common_modified.xml").as_posix()}"/>'
         object_block = f"""

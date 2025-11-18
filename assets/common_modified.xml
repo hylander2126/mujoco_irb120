@@ -27,7 +27,7 @@
         <mesh name="link_4"      file="my_objects/robot/link_4.stl" />
         <mesh name="link_5"      file="my_objects/robot/link_5.stl" />
         <mesh name="link_6"      file="my_objects/robot/link_6.stl" />
-        <mesh name="pusher_link" file="my_objects/robot/pusher_link.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="pusher_link" file="my_objects/robot/pusher_link.stl"/>
 
         <!-- MY OBJECTS -->
         <mesh name="flashlight_exp" file="my_objects/flashlight/flashlight_exp.stl" />

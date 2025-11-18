@@ -36,7 +36,7 @@
 
 
 	<!-- v Per-object assets (meshes, mats) will inject here v -->
-	<include file="/home/airlab07/Documents/github/mujoco_irb120/assets/common_modified.xml"/>
+	<include file="/home/hylander/Documents/github/mujoco/assets/common_modified.xml"/>
 	<!-- ^ Per-object assets (meshes, mats) will inject here ^ -->
 
 	<worldbody>

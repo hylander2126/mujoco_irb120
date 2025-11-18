@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from utils.helper_fns import *
 
 class controller:
-    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, ee_site='ee_site'):
+    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, ee_site='site:tool0'):
         self.model          = model
         self.data           = data
         self.joint_names    = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
