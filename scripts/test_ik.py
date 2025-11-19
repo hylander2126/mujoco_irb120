@@ -50,6 +50,18 @@ desired_pose = np.eye(4)  # Example desired pose (identity matrix to keep home o
 desired_pose[0:3, 3] = DESIRED_XYZ
 print("Desired pose (FLANGE):\n", desired_pose)
 
+# TEMPORARY TESTING REAL ROBOT IK AND FK:
+# known_q = np.zeros(6)
+# irb.set_pose(known_q)
+test_pose = irb.FK()
+test_q = irb.IK(test_pose, method=2, damping=0.5, max_iters=1000)
+
+# print("Known joint angles:\n", known_q)
+print("IK solution for known pose:\n", test_q)
+# print("Difference:\n", test_q - known_q)
+
+
+
 desired_q = irb.IK(desired_pose, method=2, damping=0.5, max_iters=1000)
 
 if desired_q is None:
