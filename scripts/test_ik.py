@@ -16,8 +16,8 @@ Z_OFFFSET = 0.035 # Robot mounting offset
 
 # ==================================================
 # NOTE: THIS IK USES THE FINGERTIP POSITION AS THE FRAME OF REFERENCE
-# The FT has length 0.0665m and the pusher has length 0.1143m
-FINGER_OFFSET = 0.0665 + 0.1143 # compensate
+# The FT has length 0.08225 and the pusher has length 0.110
+FINGER_OFFSET = 0.08225 + 0.110 # approx .19225 m total
 # ==================================================
 
 COMPLETE_OFFSET = [-FINGER_OFFSET, 0, -Z_OFFFSET]
@@ -30,18 +30,25 @@ COMPLETE_OFFSET = [-FINGER_OFFSET, 0, -Z_OFFFSET]
 # 2) SUBTRACT Z_OFFSET from Z_desired
 # 3) SUBTRACT FINGER_OFFSET from X_desired
 
-# e.g. real home position is [0.373, 0.000, 0.626]
+# e.g. real home position is [0.374, 0.000, 0.630]
 
 
 # Let's see the initial pose (should be home)
 temp = irb.FK()
-temp[0:3,3] += COMPLETE_OFFSET
-print("Initial pose (fingertip):\n", temp)
+OG_POSE = temp.copy()
+temp[2,3] -= Z_OFFFSET # TOOL FLANGE IN *ROBOT* FRAME (must compensate for mounting 
+                                    # ROBOT IS NOW INSIDE THE TABLE AND ABOVE Z_W0 BY Z_OFFSET)
+print("Initial pos (FLANGE):\n", temp[0:3, 3])
 
-DESIRED_XYZ = [1.1 , 0.0, 0.25] # DESIRED FINGERTIP POSITION (IGNORING OFFSETS)
+temp[0,3] += FINGER_OFFSET
+# print("Initial pose (FINGERTIP):\n", temp)
 
+DESIRED_XYZ = OG_POSE[0:3, 3].copy()
+DESIRED_XYZ[0] -= 0.05
+DESIRED_XYZ[2] = 0.175 #- Z_OFFFSET # DESIRED FINGERTIP POSITION (IGNORING OFFSETS)
 desired_pose = np.eye(4)  # Example desired pose (identity matrix to keep home orientation)
-desired_pose[0:3, 3] = np.add(DESIRED_XYZ, COMPLETE_OFFSET)
+desired_pose[0:3, 3] = DESIRED_XYZ
+print("Desired pose (FLANGE):\n", desired_pose)
 
 desired_q = irb.IK(desired_pose, method=2, damping=0.5, max_iters=1000)
 
@@ -53,10 +60,11 @@ if desired_q is None:
             viewer.sync()
     exit(0)
 
-
-
-print("Desired joint angles from IK:\n", np.round(desired_q, 3))
 irb.set_pose(desired_q)
+print("Desired joint angles from IK:\n", np.round(desired_q, 3).flatten())
+f_pos = irb.FK()[0:3, 3]
+f_pos[0] += FINGER_OFFSET
+print("Current Fingertip Position (from table/robot frame):\n", np.round(f_pos, 4))
 
 # Let's see what the robot looks like in this pose
 with mujoco.viewer.launch_passive(model, data) as viewer:

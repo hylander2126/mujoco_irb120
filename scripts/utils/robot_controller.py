@@ -172,7 +172,7 @@ class controller:
             ## --- Restore the original state ---
             self.data.qpos[self.joint_idx] = q_original
             mujoco.mj_fwdPosition(self.model, self.data)
-            print("\nIK finished, robot state restored.")
+            print("IK done, robot state restored.")
             print("**********************************")
     
     def set_pos_ctrl(self, q_desired, check_ellipsoid=True):
