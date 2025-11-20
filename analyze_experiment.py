@@ -20,12 +20,11 @@ def read_csv(file_path, trim_rows=0):
 # ================ Load the data ===================
 # path = "experiments/run_2025-11-10_15-28-42_t001_SYNC.csv"
 
-path = "experiments/run_2025-11-10_15-52-45_t002_SYNC.csv" # Best
+# path = "experiments/run_2025-11-10_15-52-45_t002_SYNC.csv" # Best
 
-# path = "experiments/run_2025-11-10_16-14-31_t002_SYNC.csv" # Super tilted experiment
-# path = "experiments/run_2025-11-10_16-14-31_t007_SYNC.csv" # Weird z force experiment
+# path = "experiments/run_2025-11-10_20-00-09_t002_SYNC.csv" # Best
 
-path = "experiments/run_2025-11-10_20-00-09_t002_SYNC.csv" # Best
+path = "experiments/run_2025-11-20_16-56-00_t013_SYNC.csv" # Testing new force stop
 
 csv_data = read_csv(path, trim_rows=1)  # Discard headers
 
@@ -85,9 +84,8 @@ if PLOT_RAW:
     ax.grid(True)
 
     # FOR PAPER FIGURE, TRIM THE AXES LIMITS
-    ax.set_xlim(1.6, 6)
-    # ax1.set_yticks(np.arange(-1.5, 1.6, 0.5))
-    ax2.set_ylim(0, 30)
+    # ax.set_xlim(1.6, 6)
+    # ax2.set_ylim(0, 30)
 
     align_zeros([ax, ax2])
     plt.tight_layout()
