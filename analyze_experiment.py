@@ -24,7 +24,7 @@ def read_csv(file_path, trim_rows=0):
 
 # path = "experiments/run_2025-11-10_20-00-09_t002_SYNC.csv" # Best
 
-path = "experiments/run_2025-11-20_16-56-00_t013_SYNC.csv" # Testing new force stop
+path = "experiments/run_2025-11-21_13-34-38_t001_SYNC.csv" # Testing new force stop
 
 csv_data = read_csv(path, trim_rows=1)  # Discard headers
 
@@ -90,6 +90,11 @@ if PLOT_RAW:
     align_zeros([ax, ax2])
     plt.tight_layout()
     plt.show()
+
+
+
+exit(1)
+
 
 
 ## Plot the xyz of ee pos
