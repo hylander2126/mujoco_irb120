@@ -46,7 +46,8 @@
 
                                     <!-- Pusher link -->
                                     <body name="pusher_link" pos="0 0 0.041125" euler="0 0 0" gravcomp="1"> <!-- 0 1.5708 0 -->
-                                        <geom name="push_rod" type="mesh" mass="0.066" mesh="pusher_link" material="robot0:gripper_mat" friction="0 0 0"/>
+                                        <geom name="push_rod" type="mesh" mass="0.066" mesh="pusher_link" material="robot0:gripper_mat"/>
+                                         <!-- friction="0 0 0"/> -->
 
                                         <!-- Pusher contact site -->
                                         <site name="site:fingertip" pos="0.0 0.0 0.110" euler="0 -1.570795 0" size="0.01" rgba="1 0 0 0"/>

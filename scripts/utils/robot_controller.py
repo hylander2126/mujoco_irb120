@@ -54,7 +54,7 @@ class controller:
         self.T[:3, 3] = p_curr.flatten()
         return self.T
     
-    def get_jacobian(self):
+    def get_jacobian(self, set_pinv=True):
         """Calculate the Jacobian matrix for the end-effector site"""
         jacp = np.zeros((3, self.model.nv))
         jacr = np.zeros((3, self.model.nv))
@@ -62,7 +62,8 @@ class controller:
         J_pos = jacp[:, self.joint_idx]
         J_rot = jacr[:, self.joint_idx]
         self.J = np.vstack([J_rot, J_pos]).squeeze()
-        self.J_pinv = np.linalg.pinv(self.J)  # Pseudo-inverse of the Jacobian
+        if set_pinv:
+            self.J_pinv = np.linalg.pinv(self.J)  # Pseudo-inverse of the Jacobian
         return self.J
 
     def ft_get_reading(self, grav_comp=True):
@@ -127,18 +128,15 @@ class controller:
                 self.FK()                                       # Get current end-effector pose
 
                 # --- Compute error ---                         # AKA which T gets me from T_curr to T_des
-                T_e = np.linalg.inv(self.T) @ T_des        # By definition, this is in the body frame
+                T_e = np.linalg.inv(self.T) @ T_des             # By definition, this is in the body frame
                 xi_e = ht2screw(T_e)                            # Convert to twist form
-                xi_e_space = twistbody2space(xi_e, self.T) # Convert to space twist form because Jacobian given in space frame from Mujoco
+                xi_e_space = twistbody2space(xi_e, self.T)      # Convert to space twist form because Jacobian given in space frame from Mujoco
 
                 self.error_history.append(xi_e_space)           # Log the errors for plotting (optional)
 
                 if np.linalg.norm(xi_e_space) < tol:
                     # print(f"\nIK converged in {i} iterations.")
                     return q                                    # Return successful solution
-                
-                # --- Compute Jacobian ---
-                self.get_jacobian()  # Update the Jacobian matrix
 
                 ## --- Back track dynamic damping size ---
                 if np.linalg.norm(xi_e_space) > self.prev_error:
@@ -147,6 +145,9 @@ class controller:
                 #     damping *= 1.5
                 self.prev_error = np.linalg.norm(xi_e_space)
 
+                # --- Compute Jacobian ---
+                self.get_jacobian()  # Update the Jacobian matrix
+                
                 ## --- Choose update method ---
                 if method == 2:     # Damped least squares (Levenberg-Marquardt)
                     J_update = self.J.T @ np.linalg.pinv((self.J @ self.J.T) + (damping**2 * np.eye(6))).real
@@ -164,9 +165,9 @@ class controller:
                 q = np.clip(q, self.q_min, self.q_max)          # Clamp to joint limits
 
             # If loop finishes without converging
-            print(f"\nIK did not converge within {max_iters} iterations. Final error norm: {np.linalg.norm(xi_e_space):.3f}")
-            print("**********************************\n")
-            return None
+            print("\n**********************************")
+            print("IK failed to converge!")
+            raise RuntimeError(f"IK did not converge within the {max_iters} number of iterations. Final error norm: {np.linalg.norm(xi_e_space):.3f}")
 
         finally:
             ## --- Restore the original state ---
@@ -301,6 +302,15 @@ class controller:
         payload_angle = self.get_payload_pose(output='pitch', degrees=True)
         if np.isclose(payload_angle, 90, atol=1e-2):
             self.stop = True
+
+    def check_contact(self):
+        for contact in self.data.contact:
+            geom_names = [mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, int(id)) for id in contact.geom]
+            if 'pusher_link' in geom_names:         # If contact is between pusher and payload, skip it
+                continue
+            else:
+                return True
+        return False
 
     def get_tip_edge(self):
         contact_verts = []

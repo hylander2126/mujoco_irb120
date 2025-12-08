@@ -75,19 +75,10 @@ def tau_model(theta, m, zc):
     W_rotated = R @ W
     tau = -np.cross(rc0, W_rotated)  # (N,3)
     return tau.ravel()
-    
 
 
-    # cos_term = -np.cross(rc0, W)
-    # sin_term = np.cross(rc0, np.cross(e_hat, W))
-
-    # print(f"cos_term: {cos_term}, sin_term: {sin_term}")
-
-    # return (sin_term[:,None] @ np.sin(theta)[None,:] + \
-    #         cos_term[:,None] @ np.cos(theta)[None,:])#.ravel()
-
-
-## Theta model (input is theta, output is force)
+## Theta model (input is force, output is theta)
+# TODO: verify this is correct
 def theta_model_working(x, a, b, ee_pos, o_obj):
     F           = x.reshape(-1,3)  # ensure shape is (n,3)
     m           = a
@@ -139,50 +130,62 @@ def fit_mass_and_zc(theta_data, F_exp, m_guess=0.5, zc_guess=0.1):
 
 
 ## Force model (input is theta, output is force)
-def F_model(x, a, b, push_dirs):
-    theta       = np.asarray(x).reshape(-1,)  # ensure shape is (n,)
-    m           = a
-    zc          = b
+def F_model(theta, m, zc, rf):
+    """
+    Force model: given angle(s) theta, mass m, CoM height zc, and
+    per-sample lever arm rf (N,3) in the object frame, return the
+    predicted contact force F(theta) in the object frame (N,3).
 
-    g           = 9.81
-    rf0         = np.array([-0.1, 0.0, 0.25])
-    rc0_known   = np.array([-0.05, 0.0,  0.0])
-    e_hat       = np.array([  0.0, 1.0,  0.0])
-    z_hat       = np.array([  0.0, 0.0,  1.0])
-    rc0         = rc0_known + np.array([0.0, 0.0, zc])
+    theta : array-like, shape (N,) or (N,1)
+    m     : mass
+    zc    : CoM height above rc0_known.z
+    rf    : lever arm from pivot to finger contact, shape (N,3)
+    """
+    theta = np.asarray(theta).reshape(-1)   # (N,)
+    rf    = np.asarray(rf)                  # (N,3)
+    N     = theta.shape[0]
+    assert rf.shape == (N, 3), "rf must have shape (N,3)"
 
-    # normalize push_dir
-    push_dirs = np.asarray(push_dirs).reshape(-1,3)  # ensure shape is (N,3)
-    d = push_dirs / np.linalg.norm(push_dirs, axis=1, keepdims=True) # (N,3)
+    g = 9.81
 
-    # precompute some pieces
-    e_cross_rf0  = np.cross(e_hat, rf0)        # (3,)
-    z_cross_ehat = np.cross(z_hat, e_hat)      # (3,)
+    # Geometry / axes in object frame
+    rc0_known = np.array([-0.05, 0.0, 0.0])   # base CoM in object frame
+    e_hat     = np.array([ 0.0, 1.0, 0.0])    # tipping axis (y)
+    z_hat     = np.array([ 0.0, 0.0, 1.0])    # world/object z
 
-    R_pos = axisangle2rot(e_hat, theta)   # (N,3,3)
-    R_neg = axisangle2rot(e_hat, -theta)  # (N,3,3)
+    # CoM at height zc above rc0_known in z-direction
+    rc0 = rc0_known + np.array([0.0, 0.0, zc])   # (3,)
 
-    # A(theta)
-    A = (R_pos @ e_cross_rf0.reshape(3,1)).reshape(-1,3)  # (N,3)
+    # 👉 Push direction in object frame (assumed constant)
+    # Change to +1.0 if you push in +x in the object frame.
+    d_hat = np.array([1.0, 0.0, 0.0])          # (3,)
 
-    # tmp(theta)
-    tmp = (R_neg @ z_cross_ehat.reshape(3,1)).reshape(-1,3)  # (N,3)
+    # Rotation matrices around e_hat by +theta and -theta
+    R_pos = axisangle2rot(e_hat,  theta)        # (N,3,3)
+    R_neg = axisangle2rot(e_hat, -theta)        # (N,3,3)
 
-    # B(theta)
-    # B = m g * rc0^T * tmp
-    B = m * g * (tmp @ rc0.reshape(3,1)).reshape(-1)  # (N,)
+    # A(theta) = R_pos * (e × r_f)
+    e_cross_rf = np.cross(e_hat, rf)            # (N,3)
+    A = np.einsum('nij,nj->ni', R_pos, e_cross_rf)   # (N,3)
 
-    # Now solve for alpha per theta:
-    # alpha = B / (A^T d)
-    denom = np.einsum('ij,ij->i', A, d)  # (N,), dot(A[i], d)
-    alpha = B / denom                   # (N,)
+    # tmp(theta) = R_neg * (z × e)
+    z_cross_ehat = np.cross(z_hat, e_hat)       # (3,)
+    tmp = np.einsum('nij,j->ni', R_neg, z_cross_ehat)  # (N,3)
 
-    # F(theta) = alpha * d
-    F_pred = alpha[:,None] * d # [None,:]  # (N,3)
+    # B(theta) = m g rc0ᵀ tmp  → (N,)
+    B = m * g * (tmp @ rc0)
 
-    print(a, b)
-    
+    # denom = Aᵀ d_hat = dot(A[i], d_hat), shape (N,)
+    denom = A @ d_hat
+
+    # alpha(theta) = B / (Aᵀ d_hat)
+    alpha = B / denom                          # (N,)
+
+    # F(theta) = alpha * d_hat  → (N,3)
+    F_pred = alpha[:, None] * d_hat            # (N,3)
+
     return F_pred
+
 
 ## Helper function to align y-axis limits of multiple axes to zero
 def align_zeros(axes):

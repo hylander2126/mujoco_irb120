@@ -2,7 +2,7 @@
     <!-- NOTE: geom size is the HALF-SIZE of the box in meters -->
     <!-- So the box's dimensions are: (w:x, l:y, h:z) = (0.1, 0.1, 0.3) -->
     <!-- And the box starts at z = 0.2 - 0.15 = 0.05 -->
-    <body name="payload" pos="1.15 0 0.2"> <!-- was 1 0 0.2 -->
+    <body name="payload" pos="0.62 0 0.2"> <!-- was 1 0 0.2 -->
         <joint type="free" damping="0.01"></joint>
 
         <inertial mass="0.663" pos="0 0 -0.01219" diaginertia="0.006083536 0.006083536 0.00185977"/>
