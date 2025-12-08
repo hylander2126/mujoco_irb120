@@ -1,6 +1,6 @@
 <mujoco>
     <!-- euler 0 0 0 yields space-aligned axes, but poor push config -->
-    <body name="heart" pos="1.1 -0.075 0.05" euler="0 0 1.571">
+    <body name="heart" pos="0.72 -0.045 0.05" euler="0 0 1.571">
         <joint type="free" damping="0.01"></joint>
         <geom name="heart" type="mesh" mesh="heart_exp" rgba="1 1 1 1" mass="0.236"/>
 
