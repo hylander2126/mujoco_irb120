@@ -83,8 +83,8 @@ def main(csv_path, com_gt, m_gt, topple=False):
         ax.plot(time, f_exp_raw[:, 0], "b", linewidth=3, label='X Force (raw)')
         ax.plot(time, f_exp_raw[:, 1], "r", linewidth=3, label='Y Force (raw)')
         ax.plot(time, f_exp_raw[:, 2], "m", linewidth=3, label='Z Force (raw)')
-        ax2.plot(time, np.rad2deg(tag_exp_raw[:, 0]), color='k', linestyle='-', linewidth=3, label='Object angle (raw)')
-        ax2.plot(time, np.rad2deg(tag_exp_raw[:, 1]), color='k', linestyle='-', linewidth=3, label='Object angle (raw)')
+        # ax2.plot(time, np.rad2deg(tag_exp_raw[:, 0]), color='k', linestyle='-', linewidth=3, label='Object angle (raw)')
+        # ax2.plot(time, np.rad2deg(tag_exp_raw[:, 1]), color='k', linestyle='-', linewidth=3, label='Object angle (raw)')
         ax2.plot(time, np.rad2deg(tag_exp_raw[:, 2]), color='k', linestyle='-', linewidth=3, label='Object angle (raw)')
         ax.tick_params(axis='x', labelsize=20)
         ax.tick_params(axis='y', labelsize=20)
@@ -101,6 +101,38 @@ def main(csv_path, com_gt, m_gt, topple=False):
 
         align_zeros([ax, ax2])
         plt.tight_layout()
+
+    
+    # PLOT FORCE vs EE POSE
+    PLOT_FORCE_VS_EE_POSE = True
+
+    if PLOT_FORCE_VS_EE_POSE:
+        fig, ax = plt.subplots(figsize=(8,4.5))
+        ax2 = plt.twinx()
+        # ax.plot(time, f_exp_raw[:, 0], "b", linewidth=3, label='X Force (raw)')
+        # ax.plot(time, f_exp_raw[:, 1], "r", linewidth=3, label='Y Force (raw)')
+        # ax.plot(time, f_exp_raw[:, 2], "m", linewidth=3, label='Z Force (raw)')
+        # ax2.plot(time, ee_exp[:, 0], color='k', linestyle='-', linewidth=3, label='Object angle (raw)')
+        # ax2.plot(time, ee_exp[:, 1], color='k', linestyle='-', linewidth=3, label='Object angle (raw)')
+        # ax2.plot(time, ee_exp[:, 2], color='k', linestyle='-', linewidth=3, label='Object angle (raw)')
+        ax.plot(ee_exp[:,0], f_exp_raw[:, 0], "b", linewidth=3, label='X Force (raw)')
+        ax.tick_params(axis='x', labelsize=20)
+        ax.tick_params(axis='y', labelsize=20)
+        ax2.tick_params(axis='y', labelcolor='g', labelsize=20)
+        ax.set_xlabel('Time (s)', fontsize=15)
+        ax.set_ylabel('Force (N)', color='b', fontsize=15)
+        ax2.set_ylabel('EE Pos', color='g', fontsize=15)
+        ax.legend(loc='upper left', fontsize=15)
+        ax2.legend(loc='upper right', fontsize=15)
+        ax.grid(True)
+
+        # FOR PAPER FIGURE, TRIM THE AXES LIMITS
+        # ax.set_xlim(1.6, 6)
+        # ax2.set_ylim(0, 30)
+
+        align_zeros([ax, ax2])
+        plt.tight_layout()
+
 
     # ================ Find contact, settling, and start Indexes ===================
     # Let's try to use the ANGLE to determine these (force was too noisy)
@@ -380,6 +412,6 @@ if __name__ == "__main__":
     m_gt.append(0.118)  # lshape
     
 
-    item = 2
+    item = 0
 
     main(paths[item], com_gt[item], m_gt[item], topple=False)
