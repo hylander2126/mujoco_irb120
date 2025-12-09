@@ -200,108 +200,110 @@ def main(csv_path, com_gt, m_gt, topple=False):
     # Ground truth from geometry
     theta_star_gt = np.rad2deg(np.arctan2(abs(np.linalg.norm(com_gt[:1])), com_gt[2]))
     print(f"Ground truth from geometry:\ntheta*: {theta_star_gt:.2f} deg, zc = {com_gt[2]:.3f} m")
-    
-    # Calculate theta* and zc from experiment
-    print("******* SUB-CRIT PUSH: ESTIMATE ZERO-CROSSING w/ LINEAR FIT **************")
-    # Fit straight line to force data to find zero crossing
-    lin_slope, lin_b, _, _, _ = linregress(th_trim[fmax_idx:], f_trim[fmax_idx:, 0])
-    ## ==================== CALCULATE THETA* AND ZC ====================
-    theta_star_calc = -lin_b / lin_slope
-    f0_idx = np.argmin(np.abs(th_trim - theta_star_calc))
-    zc_calc = abs(com_gt[0]) / np.tan(theta_star_calc)
-    print(f"Calculated from linear fit:\ntheta* = {np.rad2deg(theta_star_calc):.2f} deg, zc = {zc_calc:.3f} m")
-
-
-    # ================ Plot the data ===================
-    PLOT_RELATIONSHIP = False        
-
-    if PLOT_RELATIONSHIP:
-        # NOTE: This is plotting the primary pushing force, NOT the magnitude.
-        # Now plot force (in primary tipping axis) versus payload pitch
-        fig, ax = plt.subplots(figsize=(8,4.5))
-        ax.axhline(0, color='c') # Horizontal line at zero for reference
-        ax.plot(np.rad2deg(th_trim[:f0_idx+100]), f_trim[:f0_idx+100, 0], \
-                color='k', linewidth=5, label='Push force (x)')  # Plot the x-component of the force (up to 100 indices after zero-crossing)
-        ax.set_ylabel("X-Force (N)", color='b', fontsize=20)
-        ax.set_xlabel("Object Angle (deg)", color='g', fontsize=20)
-        ax.axvline(theta_star_gt, color='g', linestyle='--', linewidth=5, label=r'Ground truth $\theta^*$')
-        ax.scatter(np.rad2deg(theta_star_calc), 0, s=500, marker='*', color='r', label=r'Calculated $\theta^*$', zorder=2)
-        # Plot Linear fit
-        lin_plot_deg = np.linspace(0, theta_star_calc, 100)
-        ax.plot(np.rad2deg(lin_plot_deg), lin_slope * lin_plot_deg + lin_b, color='r', linestyle='--', linewidth=3, label='Linear fit')
-        
-        ax.grid(True)
-        ax.legend(loc='upper left', fontsize=15) # # Now also plot a * at zero-crossing
-
-        ax.tick_params(axis='y', labelcolor='b', labelsize=20)
-        ax.tick_params(axis='x', labelcolor='g', labelsize=20)
-        plt.tight_layout()
-
-        PLOT_INSERT = False
-
-        if PLOT_INSERT:
-            # ======= Same figure, add zoomed-in view around theta* ========
-            # Choose x-lims around theta*
-            x0 = np.rad2deg(max(th_trim.min(), theta_star_calc - np.deg2rad(0.25)))
-            x1 = np.rad2deg(min(th_trim.max(), theta_star_calc + np.deg2rad(0.25)))
-            # y-lims around bottom 10% of force
-            y0 = -0.05
-            y1 = 0.025
-
-            # axins = inset_axes(ax3, width="30%", height="30%", loc='upper left')#, borderpad=2.2)
-            axins = inset_axes(ax, width="30%", height="30%", loc='lower right', borderpad=2.2)
-            axins.plot(np.rad2deg(th_trim), f_trim[:,0], color='k', linewidth=5)  # Plot the x-component of the force
-            axins.scatter(np.rad2deg(theta_star_calc), f_trim[f0_idx,0], s=500, marker='*', color='r', label=r'Calculated $\theta^*$', zorder=3)
-            axins.axvline(theta_star_gt, color='g', linestyle='--', linewidth=5, label=r'Ground truth $\theta^*$')
-            axins.axhline(0, color='c', linewidth=2) # Horizontal line at zero for reference
-            axins.set_xlim(x0, x1)
-            axins.set_ylim(y0, y1)
-            axins.grid(True)
-            axins.tick_params(axis='y', labelsize=15)
-            axins.tick_params(axis='x', labelsize=15)
-            mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5", linewidth=3)
-            plt.tight_layout()
-
 
     ## =================== HACK: Modify experiment parameters to make better fitting ===================
     print("\n ************** SUB CRITICAL FIT CALCULATION ****************")
     # # Don't currently have exact measure for o_obj. HOWEVER, at theta_crit, the EE x-pos should be equal to o x-pos!
-    ee_at_theta_star = ee_trim[np.argmin(np.abs(th_trim - theta_star_calc)), :] + 0.04 # Small 4cm offset makes it match!! TODO: Investigate tiny error propagation
-    o_obj = np.array([ee_at_theta_star[0], 0, 0])
-
-    # o_obj = np.array([0.398, 0, 0]) # Experimentally determined for now
-
-    # o_obj = 0.47065 # Tool flange pos from tablet
-    # +81+114mm for FT and finger
+    # ee_at_theta_star = ee_trim[np.argmin(np.abs(th_trim - theta_star_calc)), :] + 0.04 # Small 4cm offset makes it match!! TODO: Investigate tiny error propagation
+    # o_obj = np.array([ee_at_theta_star[0], 0, 0])
+    tool_flange = 0.47065
+    ft_finger   = 0.081 + 0.114
+    o_obj = np.array([tool_flange + ft_finger, 0, 0]) # Tool flange pos (NEW from FlexPendent + FT + Finger)
     print(f"\nUsing o_obj = {o_obj} for analysis")
-
-
-    # ALSO, my mass is being estimated too low... Let's try artificially boosting the force to see if theres some factor there
-    # f_subcrit *= 1.12
-
     ## =================================================================================================
 
-    f_app_subcrit = -f_trim # NOTE: IMPORTANT NEGATE TO MATCH F OBJECT EXPERIENCES
+    f_app = -f_trim # NOTE: IMPORTANT NEGATE TO MATCH F OBJECT EXPERIENCES
     
-    m_guess = abs(lin_slope)*ee_trim[-1,2]/(9.81*zc_calc)
+    ## ================== CALCULATE THETA* AND ZC USING LINEAR FIT ==================
+    print("******* SUB-CRIT PUSH: ESTIMATE ZERO-CROSSING w/ LINEAR FIT **************")
+    # Fit straight line to force data to find zero crossing
+    lin_slope, lin_b, _, _, _ = linregress(th_trim[fmax_idx:], f_trim[fmax_idx:, 0])
+    theta_star_calc = -lin_b / lin_slope
+    zc_calc = abs(com_gt[0]) / np.tan(theta_star_calc)
+    m_calc = abs(lin_slope)*ee_trim[-1,2]/(9.81*zc_calc)
+
     print(f"\nRecall init guess from linear fit:")
-    print(f"mass: {m_guess:.3f} kg    zc: {zc_calc:.3f} m    theta*: {np.rad2deg(theta_star_calc):.3f} deg")
+    print(f"mass: {m_calc:.3f} kg (GT: {m_gt:.3f} kg)")
+    print(f"zc: {zc_calc:.3f} m (GT: {com_gt[2]:.3f} m)")
+    print(f"theta*: {np.rad2deg(theta_star_calc):.2f} deg (GT: {theta_star_gt:.2f} deg)")
     
-
     ## =============== Fit using TAU model ==================
-    # Before fitting, must pre-compute corresponding PUSH torque
-    tau_app_subcrit = tau_app_model(f_app_subcrit, (ee_trim - o_obj)).ravel()
+    rc0_known       = np.array([com_gt[0], com_gt[1], 0.0])
+    rf              = (ee_trim - o_obj)
 
-    [m_est, zc_est], pcov = curve_fit(tau_model, th_trim, tau_app_subcrit, p0=[m_guess, zc_calc])
+    # Before fitting, must pre-compute corresponding PUSH torque
+    tau_app_trim    = tau_app_model(f_app, rf)
+
+    # Try augmenting with a pseudo point at (theta*, tau=0) to help guide fit
+    # th_trim         = np.concatenate([th_trim, [theta_star_calc]])
+    # tau_app_trim    = np.concatenate([tau_app_trim,   [0.0]])
+    # # weights: small sigma => high weight
+    # w_theta         = 0.000001   # tune this: 0.1 = very soft, 1.0 = as strong as a real point
+    # sigma           = np.ones_like(tau_app_trim)  # real points: σ = 1
+    # sigma[-1]       = 1.0 / w_theta          # pseudo point: weight ≈ w_theta^2
+
+    # time_trim = np.concatenate([time_trim, [time_trim[-1]+1.5]]) # small time extension for pseudo point
+    # f_trim = np.concatenate([f_trim, [[0.0, 0.0, 0.0]]]) # pseudo zero force point
+    # rf = np.concatenate([rf, [[0.0, 0.0, 0.0]]]) # pseudo zero lever arm point
+
+    
+    model_wrapper = lambda th, m, zc: tau_model(th, m, zc, rc0_known=rc0_known)
+
+    print(f"Shapes of various vars: {th_trim.shape}, {tau_app_trim.shape}, {rf.shape}, {f_app.shape}")
+
+    [m_est, zc_est], pcov = curve_fit(
+        model_wrapper,
+        th_trim,
+        tau_app_trim,
+        p0=[m_calc, zc_calc],
+        # sigma=sigma,
+        # absolute_sigma=False,
+        bounds=([0, 0],
+                [np.inf, np.inf])
+        )
+
+    # Plot gravity torque
+    # PLOT_TORQUES = True
+    # if PLOT_TORQUES:
+    #     tau_grav = tau_model(th_trim, m_est, zc_est, rc0_known=com_gt).reshape(-1,3)
+    #     tau_app = tau_app_trim.reshape(-1,3)
+    #     # tau_grav = tau_model(theta_aug, m_est, zc_est, rc0_known=com_gt)
+    #     # tau_app  = tau_aug
+    #     # time_trim = np.concatenate([time_trim, [time_trim[-1]+1.5]]) # small time extension for pseudo point
+    #     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8,4.5))
+    #     ax1.plot(time_trim, tau_grav, 'b', linestyle='--', linewidth=5, label='Calculated Grav Torque (norm)')
+    #     # ax1.plot(time_trim, tau_grav[:,0], 'b', linestyle='--', linewidth=5, label='Calculated Grav Torque')
+    #     # ax1.plot(time_trim, tau_grav[:,1], 'r', linestyle='--', linewidth=5, label='Calculated Grav Torque')
+    #     # ax1.plot(time_trim, tau_grav[:,2], 'm', linestyle='--', linewidth=5, label='Calculated Grav Torque')
+    #     # ax1.plot(time_trim, np.linalg.norm(tau_grav, axis=1), 'k', linestyle='--', linewidth=5, label='Calculated Grav Torque')
+    #     ax1.set_ylabel("Calculated Grav Torque (Nm)", color='b', fontsize=20)
+    #     ax1.set_xlabel("Time (s)", color='g', fontsize=20)
+    #     ax1.grid(True)
+    #     ax1.tick_params(axis='y', labelcolor='b', labelsize=20)
+    #     ax1.tick_params(axis='x', labelcolor='g', labelsize=20)
+    #     ax1.legend(loc='upper left', fontsize=15)
+    #     ax2.plot(time_trim, tau_app, 'r', linewidth=5, label='Apparent Push Torque (norm)')
+    #     # ax2.plot(time_trim, tau_app[:,0], 'b', linewidth=5, label='Apparent Push Torque')
+    #     # ax2.plot(time_trim, tau_app[:,1], 'r', linewidth=5, label='Apparent Push Torque')
+    #     # ax2.plot(time_trim, tau_app[:,2], 'm', linewidth=5, label='Apparent Push Torque')
+    #     # ax2.plot(time_trim, np.linalg.norm(tau_app, axis=1), 'k', linewidth=5, label='Apparent Push Torque')
+    #     ax2.set_ylabel("Apparent Push Torque (Nm)", color='b', fontsize=20)
+    #     ax2.set_xlabel("Time (s)", color='g', fontsize=20)
+    #     ax2.grid(True)
+    #     ax2.tick_params(axis='y', labelcolor='b', labelsize=20)
+    #     ax2.tick_params(axis='x', labelcolor='g', labelsize=20)
+    #     ax2.legend(loc='upper left', fontsize=15)
+    #     plt.tight_layout()
+
     # Now use fitted parameters to estimate theta_star
     theta_star_est = np.arctan2(np.linalg.norm(com_gt[:1]), zc_est) # atan2( d (xy norm), z)
 
     # Extrapolate experienced data to mimic a full toppling experiment for plotting
-    th_full = np.linspace(th_trim[0], theta_star_calc, len(ee_trim))
-    f_app_full = F_model(th_full, m_est, zc_est, (ee_trim - o_obj))
+    th_extrap_est = np.linspace(0, theta_star_est, len(ee_trim))
+    f_app_full_est = F_model(th_extrap_est, m_est, zc_est, rf, rc0_known=rc0_known)
     # Plot the linear fit using y = mx + b
-    f_app_lin = lin_slope * th_full + lin_b
-    
+    th_extrap_calc = np.linspace(0, theta_star_calc, len(ee_trim))
+    f_plot_lin_calc = lin_slope * th_extrap_calc + lin_b    
 
     # Whether to use the primary tipping and push axes (for plotting too!)
     PLOT_X_ONLY = True
@@ -309,29 +311,23 @@ def main(csv_path, com_gt, m_gt, topple=False):
 
     if PLOT_X_ONLY:
         f_plot_exp = f_trim[:,0]
-        f_plot_sc = -f_app_subcrit[:,0]
-        f_plot_lin = f_app_lin
-        f_plot_full = -f_app_full[:,0]
         y_label = "X-Force (N)"
     else:
         f_plot_exp = np.linalg.norm(f_trim, axis=1)
-        f_plot_sc = -np.linalg.norm(f_app_subcrit, axis=1)
-        f_plot_lin = -f_app_lin
-        f_plot_full = np.linalg.norm(f_app_full, axis=1)
         y_label = "Force Norm (N)"
 
 
     ## ============================ PLOTTING ============================
-    ## Plot original data and sub-critical window
     fig, ax = plt.subplots(figsize=(8,4.5))
     # Plot the original data
     ax.plot(np.rad2deg(th_trim), f_plot_exp, 'k', linewidth=5, label='Original data')  # Plot F norm
-    # Plot the sub-critical data
-    # ax.scatter(np.rad2deg(th_subcrit), f_plot_sc, color='r', s=200, alpha=0.9, label='Sub-critical window')
-    # Plot the linear fit (already done in another plot above...)
-    # ax.plot(np.rad2deg(th_full), f_plot_lin, color='orange', linewidth=3, label='Sub-crit linear fit')
+
+    # Plot linear fit using theta_star_calc from prior linear fit
+    ax.plot(np.rad2deg(th_extrap_calc), f_plot_lin_calc, color='r', linestyle='--', linewidth=3, label='Linear fit')
+
     ## FOR FUN, plot ALL theta and force
-    ax.scatter(np.rad2deg(th_full), f_plot_full, color='g', label='Full fit')
+    ax.scatter(np.rad2deg(th_extrap_est), -np.linalg.norm(f_app_full_est, axis=1), color='m', label='Full fit (est)')
+
     ax.axhline(0, color='c', linewidth=2) # Horizontal line at zero for reference
     ax.axvline(theta_star_gt, color='g', linestyle='--', linewidth=5, label=r'Ground truth $\theta^*$')
     ax.scatter(np.rad2deg(theta_star_est), 0, s=500, marker='*', color='m', label=r'Estimated $\theta^*$', zorder=2)
@@ -351,13 +347,14 @@ def main(csv_path, com_gt, m_gt, topple=False):
 
     print(f"\nFrom estimated theta*, use geometry to back-check:")
     print(f"zc: {abs(com_gt[0])/np.tan(theta_star_est):.3f} m (GT: {com_gt[2]:.3f} m)")
-        
 
     plt.show()
 
 
 if __name__ == "__main__":
-    
+    # Close all previously open plots
+    plt.close('all')
+
     # ================ Load the data ===================
     # path = "experiments/run_2025-11-10_15-28-42_t001_SYNC.csv"
     # path = "experiments/run_2025-11-10_15-52-45_t002_SYNC.csv" # Best
@@ -385,6 +382,6 @@ if __name__ == "__main__":
     m_gt.append(0.118)  # lshape
     
 
-    item = 2
+    item = 0
 
     main(paths[item], com_gt[item], m_gt[item], topple=False)

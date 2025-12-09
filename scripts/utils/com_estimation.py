@@ -11,7 +11,10 @@ def tau_app_model(F, rf):
     rf must be same shape as F (N, 3) and must account for object rotation.
     """
     # return np.cross(F, rf)
-    return np.cross(rf, F)
+    tau = np.cross(rf, F)  # (N,3)
+    return tau.ravel()
+    # TEMP HACK: return the norm (magnitude) of torque only
+    # return np.linalg.norm(tau, axis=1)  # (n,)
 
 
 def theta_from_tau(tau, m, zc, use_branch='minus'):
@@ -57,12 +60,12 @@ def theta_from_tau(tau, m, zc, use_branch='minus'):
         return theta_minus
 
 
-def tau_model(theta, m, zc):
+def tau_model(theta, m, zc, rc0_known):
     """
     Compute the gravity torque given theta, mass, and z-height of CoM
     """
     W           = np.array([0, 0, -9.8067 * m]) # Weight in space frame
-    rc0_known   = np.array([-0.05, 0.0,  0.0]) # -0.05 , 0 , 0
+    # rc0_known   = np.array([-0.05, 0.0,  0.0]) # -0.05 , 0 , 0
     e_hat       = np.array([  0.0, 1.0,  0.0]) # 0 , 1 , 0
     rc0         = rc0_known + np.array([0.0, 0.0, zc])
     theta       = np.asarray(theta).flatten()  # ensure shape is (n,)
@@ -75,6 +78,8 @@ def tau_model(theta, m, zc):
     W_rotated = R @ W
     tau = -np.cross(rc0, W_rotated)  # (N,3)
     return tau.ravel()
+    # TEMP HACK: return the norm (magnitude) of torque only
+    # return np.linalg.norm(tau, axis=1)  # (n,)
 
 
 ## Theta model (input is force, output is theta)
@@ -89,7 +94,8 @@ def theta_model_working(x, a, b, ee_pos, o_obj):
     rc0_known   = np.array([-0.05, 0.0,  0.0]) # -0.05 , 0 , 0
     e_hat       = np.array([  0.0, 1.0,  0.0]) # 0 , 1 , 0
     z_hat       = np.array([  0.0, 0.0,  1.0]) # 0 , 0 , 1
-    rc0         = rc0_known + np.array([0.0, 0.0, zc])
+    rc0         = rc0_known.copy()
+    rc0[2]      = zc
 
     # o_obj       = # Object frame coords in world frame (WTF is the world frame??)
     temp = ee_pos - o_obj  # Vector from object frame to EE in world frame
@@ -130,7 +136,7 @@ def fit_mass_and_zc(theta_data, F_exp, m_guess=0.5, zc_guess=0.1):
 
 
 ## Force model (input is theta, output is force)
-def F_model(theta, m, zc, rf):
+def F_model(theta, m, zc, rf, rc0_known):
     """
     Force model: given angle(s) theta, mass m, CoM height zc, and
     per-sample lever arm rf (N,3) in the object frame, return the
@@ -149,12 +155,13 @@ def F_model(theta, m, zc, rf):
     g = 9.81
 
     # Geometry / axes in object frame
-    rc0_known = np.array([-0.05, 0.0, 0.0])   # base CoM in object frame
+    # rc0_known = np.array([-0.05, 0.0, 0.0])   # base CoM in object frame
     e_hat     = np.array([ 0.0, 1.0, 0.0])    # tipping axis (y)
     z_hat     = np.array([ 0.0, 0.0, 1.0])    # world/object z
 
     # CoM at height zc above rc0_known in z-direction
-    rc0 = rc0_known + np.array([0.0, 0.0, zc])   # (3,)
+    rc0 = rc0_known.copy()
+    rc0[2] = zc   # (3,)
 
     # 👉 Push direction in object frame (assumed constant)
     # Change to +1.0 if you push in +x in the object frame.
