@@ -67,7 +67,8 @@ def tau_model(theta, m, zc, rc0_known):
     W           = np.array([0, 0, -9.8067 * m]) # Weight in space frame
     # rc0_known   = np.array([-0.05, 0.0,  0.0]) # -0.05 , 0 , 0
     e_hat       = np.array([  0.0, 1.0,  0.0]) # 0 , 1 , 0
-    rc0         = rc0_known + np.array([0.0, 0.0, zc])
+    rc0         = rc0_known.copy()
+    rc0[2]      = zc
     theta       = np.asarray(theta).flatten()  # ensure shape is (n,)
 
     # TEMP testing new strategy
