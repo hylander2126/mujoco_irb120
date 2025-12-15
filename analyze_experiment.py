@@ -12,7 +12,8 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 OBJECTS = {
         # X and Y is distance from tipping edge (object frame!) to projected CoM on table plane
         "box": {
-            "path": "experiments/20251208_155739_box_t02.csv",
+            # "path": "experiments/20251208_155739_box_t02.csv",
+            "path": "experiments/20251215_170303_box_t01.csv",
             "com": [-0.0500, 0.0, 0.1500],
             "mass": 0.635,
             "height": 0.3, # 300 mm
@@ -62,6 +63,7 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
 
     csv_data = read_csv(csv_path, trim_rows=1)  # Discard headers
 
+    # TODO: Figure out the correct NEW columns now that we have quaternion for tag data
 
     ## ================ Extract time series data ===================
     time        = np.zeros(len(csv_data))
@@ -94,8 +96,12 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
 
     time -= time[0]  # Normalize time to start at zero
 
-    # Bias tag data to start at zero by subtracting the mean of the first 10 samples per column
-    tag_exp_raw = tag_exp_raw - np.mean(tag_exp_raw[:10, :], axis=0)
+    # Bias tag data to start at zero by subtracting the mean of the last 10 samples per column
+    tag_exp_raw = tag_exp_raw - np.mean(tag_exp_raw[-10:, :], axis=0)
+    # Throw away all values for tag angles that are above 60 degrees (clearly bad data)
+    for i in range(3):
+        bad_idx = np.where(np.abs(tag_exp_raw[:, i]) > np.deg2rad(60))[0]
+        tag_exp_raw[bad_idx, i] = 0.0
 
     # END EFFECTOR is offset +3.5cm in z-axis due to mounting of robot
     # ee_exp[:, 2] -= 0.035  # - 0.035 Adjust Z position of EE for offset
@@ -106,6 +112,10 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
     f_exp_raw[:, 1] = f_temp[:, 0]  # Y_force = X_sensor
     f_exp_raw[:, 2] = f_temp[:, 1]  # Z_force = Y_sensor
 
+    contact_idx_og  = np.where(cnt_exp == 1)[0][0]  # first index where contact boolean is true
+    settle_idx_og = np.where(trig_exp == 1)[0][0]
+    if shape == "box":
+        settle_idx_og = contact_idx_og + 2000  # TEMP HACK: assume settles 4 seconds after contact (500 Hz)
 
     ## ================ Process the data (specifically force) ===================
     # Butterworth filter
@@ -120,15 +130,28 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
 
     # Now we can also filter the tag data
     tag_exp_filt = filtfilt(b, a, tag_exp_raw, axis=0)
-    TIP_AXIS = np.argmax(np.abs(tag_exp_filt[-1, :] - tag_exp_filt[0, :])) # compare start and end values to get primary axis
+    # Find the tip axis by seeing which column has the max slope at ANY time (sometimes angle wrapping makes wrong column start huge)
+    # Let's only look at the analysis window between contact and settle
+    tag_exp_window = tag_exp_filt[contact_idx_og:settle_idx_og, :]
+    scores = np.zeros(3)
+    for k in range(3):
+        theta = tag_exp_window[:, k]
+
+        # Mask out wrap spikes / unphysical jumps
+        good = np.abs(theta) < np.deg2rad(60)  # only consider angles less than 60 degrees
+        if np.sum(good) < 10:
+            scores[k] = 0
+            continue
+        theta_good = theta[good]
+        scores[k] = np.max(theta_good) - np.min(theta_good)
+
+    TIP_AXIS = np.argmax(scores)
+    # TIP_AXIS = np.argmax(np.abs(tag_exp_filt[-1, :] - tag_exp_filt[0, :])) # compare start and end values to get primary axis
     print(f"\nPrimary tipping axis is {['roll', 'pitch', 'yaw'][TIP_AXIS]} (col {TIP_AXIS})")
     
     theta_exp = tag_exp_filt[:, TIP_AXIS]
 
     # ================ Find contact, settling, and start Indexes ===================
-    contact_idx_og  = np.where(cnt_exp == 1)[0][0]  # first index where contact boolean is true
-    settle_idx_og = np.where(trig_exp == 1)[0][0]
-    
     # TEMP HACK: add buffer before (not after!) contact to capture correct initial force as it drives mass estimate
     # contact_idx_og -= 50
 
@@ -153,9 +176,9 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
         ax.plot(time, f_exp_raw[:, 2], "m", linewidth=2, label='Z Force (raw)')
         ax.axvline(contact_time_og, color='k', linestyle='--', linewidth=2, label='Contact & Settle')
         ax.axvline(settle_time_og, color='k', linestyle='--', linewidth=2, label='_')
-        # ax2.plot(time, np.rad2deg(tag_exp_raw[:, 0]), color='g', linestyle='-', linewidth=3, label='Object angle (raw)')
-        # ax2.plot(time, np.rad2deg(tag_exp_raw[:, 1]), color='g', linestyle='-', linewidth=3, label='Object angle (raw)')
-        ax2.plot(time, np.rad2deg(tag_exp_raw[:, TIP_AXIS]), color='g', linestyle='-', linewidth=3, label='Object angle (raw)')
+        ax2.plot(time, np.rad2deg(tag_exp_raw[:, 0]), color='g', linestyle='-', linewidth=3, label='Object angle (raw)')
+        ax2.plot(time, np.rad2deg(tag_exp_raw[:, 1]), color='g', linestyle='-', linewidth=3, label='Object angle (raw)')
+        ax2.plot(time, np.rad2deg(tag_exp_raw[:, 2]), color='g', linestyle='-', linewidth=3, label='Object angle (raw)')
         ax.tick_params(axis='x', labelsize=20)
         ax.tick_params(axis='y', labelsize=20)
         ax2.tick_params(axis='y', labelcolor='g', labelsize=20)
@@ -229,6 +252,7 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
     tool_flange = 0.47065
     ft_finger   = 0.081 + 0.114
     o_obj = np.array([tool_flange + ft_finger, 0, 0]) # Tool flange pos (NEW from FlexPendent + FT + Finger)
+    # o_obj = np.array([0.66, 0, 0]) # NEW GROUND TRUTH BASED ON MEASUREMENT (this is really close to what we calced above)
     print(f"\nUsing o_obj = {o_obj} for analysis")
 
     # Amplify force a bit since we lose some due to friction in the FT sensor and robot
