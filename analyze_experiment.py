@@ -9,7 +9,45 @@ from scipy.signal import find_peaks
 from scipy.optimize import curve_fit
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 
-
+OBJECTS = {
+        # X and Y is distance from tipping edge (object frame!) to projected CoM on table plane
+        "box": {
+            "path": "experiments/20251208_155739_box_t02.csv",
+            "com": [-0.0500, 0.0, 0.1500],
+            "mass": 0.635,
+            "height": 0.3, # 300 mm
+            "est": [0,0,0],
+        },
+        "heart": {
+            "path": "experiments/20251208_155739_heart_t03.csv",
+            "com": [-0.0458, 0, 0.0800], # [-0.0458, 0, 0.1]
+            "mass": 0.269,
+            "height": 0.2, # 200 mm
+            "est": [0,0,0],
+        },
+        "flashlight": {
+            # "path": "experiments/20251208_143007_flashlight_t01.csv",  # older test
+            "path": "experiments/20251208_155739_flashlight_t04.csv",    # new force stop test
+            "com": [-0.0250, 0.0, 0.0950],
+            "mass": 0.386,
+            "height": 0.2, # 200 mm
+            "est": [0,0,0],
+        },
+        "lshape": {
+            "path": "experiments/20251208_155739_lshape_t05.csv",
+            "com": [-0.0250, 0.0, 0.0887],
+            "mass": 0.118,
+            "height": 0.15, # 150 mm
+            "est": [0,0,0],
+        },
+        "monitor": {
+            "path": "experiments/20251210_182429_monitor_t03.csv",
+            "com": [-0.1118, 0.0, 0.2362],
+            "mass": 5.37,
+            "height": 0.515, # 515 mm
+            "est": [0,0,0],
+        }
+    }
 
 def read_csv(file_path, trim_rows=0):
     with open(file_path, mode ='r')as file:
@@ -20,7 +58,7 @@ def read_csv(file_path, trim_rows=0):
         return csv_arr[trim_rows:]
 
 
-def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
+def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=False):
 
     csv_data = read_csv(csv_path, trim_rows=1)  # Discard headers
 
@@ -60,7 +98,7 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
     tag_exp_raw = tag_exp_raw - np.mean(tag_exp_raw[:10, :], axis=0)
 
     # END EFFECTOR is offset +3.5cm in z-axis due to mounting of robot
-    # ee_exp[:, 2] -= 0.035  # Adjust Z position of EE for offset
+    # ee_exp[:, 2] -= 0.035  # - 0.035 Adjust Z position of EE for offset
 
     # Apply static transform to get Force XYZ correctly oriented
     f_temp = f_exp_raw.copy()
@@ -107,9 +145,7 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
     print(f"Settles at index {settle_idx_og} ({settle_time_og:.2f} s)")
 
 ## ================ Plot raw data ===================
-    PLOT_RAW = True
-
-    if PLOT_RAW:
+    if plot_raw:
         fig, ax = plt.subplots(figsize=(8,4.5))
         ax2 = plt.twinx()
         ax.plot(time, f_exp_raw[:, 0], "b", linewidth=2, label='X Force (raw)')
@@ -142,9 +178,8 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
         align_zeros([ax, ax2])
         plt.tight_layout()
 
-    PLOT_EE = False
 
-    if PLOT_EE:
+    if plot_ee:
         fig, ax = plt.subplots(figsize=(8,4.5))
         ax2 = plt.twinx()
         ax.plot(time, ee_exp[:, 0], "b", linewidth=3, label='X Pos. (raw)')
@@ -188,7 +223,6 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
     print(f"F_max time: {time_trim[fmax_idx]:.2f} s, corresponding angle: {np.rad2deg(th_trim[fmax_idx]):.2f} degrees\n")
 
     ## =================== HACK: Modify experiment parameters to make better fitting ===================
-    print("\n ************** SUB CRITICAL FIT CALCULATION ****************")
     # # Don't currently have exact measure for o_obj. HOWEVER, at theta_crit, the EE x-pos should be equal to o x-pos!
     # ee_at_theta_star = ee_trim[np.argmin(np.abs(th_trim - theta_star_calc)), :] + 0.04 # Small 4cm offset makes it match!! TODO: Investigate tiny error propagation
     # o_obj = np.array([ee_at_theta_star[0], 0, 0])
@@ -196,11 +230,14 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
     ft_finger   = 0.081 + 0.114
     o_obj = np.array([tool_flange + ft_finger, 0, 0]) # Tool flange pos (NEW from FlexPendent + FT + Finger)
     print(f"\nUsing o_obj = {o_obj} for analysis")
+
+    # Amplify force a bit since we lose some due to friction in the FT sensor and robot
+    # FRICTION_LOSS_FACTOR = 1.5 # 1.15
+    # f_trim *= FRICTION_LOSS_FACTOR
     ## =================================================================================================
 
     
     ## ================== CALCULATE THETA* AND ZC USING LINEAR FIT ==================
-    print("******* SUB-CRIT PUSH: ESTIMATE ZERO-CROSSING w/ LINEAR FIT **************")
     # Fit straight line to force data to find zero crossing
     lin_slope, lin_b, _, _, _ = linregress(th_trim[fmax_idx:], f_trim[fmax_idx:, 0])
     theta_star_calc = -lin_b / lin_slope
@@ -222,13 +259,11 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
     
     # Before fitting, must pre-compute corresponding PUSH torque
     f_app = -f_trim # NOTE: IMPORTANT NEGATE TO MATCH F OBJECT EXPERIENCES
-    tau_app_trim    = tau_app_model(f_app, rf)
 
-    # TEMP: get rid of out-of-axis torque (only y)
-    # tau_app_trim    = tau_app_trim.reshape(-1, 3)
-    # tau_app_trim[:, 0] = 0.0
-    # tau_app_trim[:, 2] = 0.0
-    # tau_app_trim = tau_app_trim.ravel()
+    # TEMP HACK: FRICTION IN Z COMPONENT IS PARASITIC FOR TORQUE, SO ZERO IT OUT FOR NOW...
+    f_app[:, 1] = 0.0
+    f_app[:, 2] = 0.0
+    tau_app_trim    = tau_app_model(f_app, rf)
 
     # Try augmenting with a pseudo point at (theta*, tau=0) to help guide fit
     # th_trim         = np.concatenate([th_trim, [theta_star_calc]])
@@ -256,23 +291,76 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
     # Now use fitted parameters to estimate theta_star
     theta_star_est = np.arctan2(np.linalg.norm(com_gt[:1]), zc_est) # atan2( d (xy norm), z) 
 
+    ## ================== PLOTTING THE TORQUE DIRECTLY ===================
+    th_extrap_est = np.linspace(0, theta_star_est, len(ee_trim))
+
+    fig, ax = plt.subplots(figsize=(8,4.5))
+    # Plot the original data
+    tau_app_trim = tau_app_trim.reshape(-1,3)
+    # ax.plot(np.rad2deg(th_trim), tau_app_trim[:,0], 'gray', linewidth=5, label='Original tau x')  # Plot tau
+    ax.plot(np.rad2deg(th_trim), tau_app_trim[:,1], 'k', linewidth=5, label='Original tau y')  # Plot tau
+    # ax.plot(np.rad2deg(th_trim), tau_app_trim[:,2], 'gray', linewidth=5, label='Original tau z')  # Plot tau
+    # Plot our model using fitted params
+    tau_model_est = tau_model(th_trim, m_est, zc_est, rc0_known=rc0_known).reshape(-1,3)
+    # ax.plot(np.rad2deg(th_trim), tau_model_est[:,0], color='b', linestyle='-', linewidth=3, label='Model fit (experienced) X')
+    ax.plot(np.rad2deg(th_trim), tau_model_est[:,1], color='b', linestyle='-', linewidth=3, label='Model fit (experienced) Y')
+    # ax.plot(np.rad2deg(th_trim), tau_model_est[:,2], color='b', linestyle='-', linewidth=3, label='Model fit (experienced) Z')
+    # Plot our model but to extrapolated full theta range
+    tau_model_full_est = tau_model(th_extrap_est, m_est, zc_est, rc0_known=rc0_known).reshape(-1,3)
+    # ax.scatter(np.rad2deg(th_extrap_est), tau_model_full_est[:,0], color='m', label='Full fit (est) X')
+    ax.scatter(np.rad2deg(th_extrap_est), tau_model_full_est[:,1], color='m', label='Full fit (est) Y')
+    # ax.scatter(np.rad2deg(th_extrap_est), tau_model_full_est[:,2], color='m', label='Full fit (est) Z')
+    # Plot using the ground truth params for reference
+    tau_model_full_gt = tau_model(th_extrap_est, m_gt, com_gt[2], rc0_known=rc0_known).reshape(-1,3)
+    ax.scatter(np.rad2deg(th_extrap_est), tau_model_full_gt[:,1], color='c', label='Full fit (gt) X')
+    # Let's also plot the 'rf' to see the lever arm change as the object rotates/tips
+    # ax2 = plt.twinx()
+    # ax2.plot(np.rad2deg(th_trim), np.linalg.norm(rf, axis=1), color='orange', linestyle='-', linewidth=2, label='Lever arm norm')
+
+    # Scatter the Estimated and Ground Truth theta*
+    ax.axvline(theta_star_gt, color='g', linestyle='--', linewidth=5, label=r'Ground truth $\theta^*$')
+    ax.scatter(np.rad2deg(theta_star_est), 0, s=500, marker='*', color='m', label=r'Estimated $\theta^*$', zorder=2)
+
+    ax.axhline(0, color='c', linewidth=2) # Horizontal line at zero for reference
+    ax.set_ylabel("Applied Torque (N-m)", color='b', fontsize=20)
+    ax.set_xlabel("Object Angle (degrees)", color='g', fontsize=20)
+    ax.legend(loc='upper right', fontsize=15)
+    ax.grid(True)
+    ax.tick_params(axis='y', labelcolor='b', labelsize=20)
+    ax.tick_params(axis='x', labelcolor='g', labelsize=20)
+    plt.tight_layout()
+
+
+    ## ================== PLOTTING THE FIT RESULTS ===================
+    # Plot our model using fitted params ONLY for the experienced data range
+    f_app_model_est = F_model(th_trim, m_est, zc_est, rf, rc0_known=rc0_known)
+    # Extrapolate experienced data to mimic a full toppling experiment for plotting
+    f_app_full_est = F_model(th_extrap_est, m_est, zc_est, rf, rc0_known=rc0_known)
+    f_app_full_gt  = F_model(th_extrap_est, m_gt, com_gt[2], rf, rc0_known=rc0_known)
+
     # Whether to use the primary tipping and push axes (for plotting too!)
-    PLOT_X_ONLY = True
-    # PLOT_X_ONLY = False # THIS LOOKS BAD!!!
+    PLOT_X_ONLY = True # False # NORM LOOKS BAD!!!
+
+    ## IMPORTANT: must negate the 'experienced force' back again!
+    f_app_model_est *= -1
+    f_app_full_est  *= -1
+    f_app_full_gt   *= -1
 
     if PLOT_X_ONLY:
         f_plot_exp = f_trim[:,0]
         y_label = "X-Force (N)"
+        f_plot_model_est = f_app_model_est[:,0]
+        f_plot_full_est = f_app_full_est[:,0]
+        f_plot_full_gt = f_app_full_gt[:,0]
     else:
         f_plot_exp = -np.linalg.norm(f_trim, axis=1)
         lin_slope, lin_b, _, _, _ = linregress(th_trim[fmax_idx:], -np.linalg.norm(f_trim[fmax_idx:], axis=1))
         theta_star_calc = -lin_b / lin_slope
         y_label = "Force Norm (N)"
+        f_plot_model_est = -np.linalg.norm(f_app_model_est, axis=1)
+        f_plot_full_est = -np.linalg.norm(f_app_full_est, axis=1)
+        f_plot_full_gt = -np.linalg.norm(f_app_full_gt, axis=1)
 
-    # Extrapolate experienced data to mimic a full toppling experiment for plotting
-    th_extrap_est = np.linspace(0, theta_star_est, len(ee_trim))
-    f_app_full_est = F_model(th_extrap_est, m_est, zc_est, rf, rc0_known=rc0_known)
-    f_app_full_gt  = F_model(th_extrap_est, m_gt, com_gt[2], rf, rc0_known=rc0_known)
     # Plot the linear fit using y = mx + b
     th_extrap_calc = np.linspace(0, theta_star_calc, len(ee_trim))
     f_plot_lin_calc = lin_slope * th_extrap_calc + lin_b
@@ -286,14 +374,21 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
     # Plot linear fit using theta_star_calc from prior linear fit
     ax.plot(np.rad2deg(th_extrap_calc), f_plot_lin_calc, color='r', linestyle='--', linewidth=3, label='Linear fit')
 
+    # Plot our model using fitted params for the experienced data range
+    ax.plot(np.rad2deg(th_trim), f_plot_model_est, color='b', linestyle='-', linewidth=3, label='Model fit (experienced)')
+
     ## FOR FUN, plot ALL theta and force
-    ax.scatter(np.rad2deg(th_extrap_est), -np.linalg.norm(f_app_full_est, axis=1), color='m', label='Full fit (est)')
-    ax.scatter(np.rad2deg(th_extrap_est), -np.linalg.norm(f_app_full_gt, axis=1), color='c', label='Full fit (gt)')
+    ax.scatter(np.rad2deg(th_extrap_est), f_plot_full_est, color='m', label='Full fit (est)')
+    ax.scatter(np.rad2deg(th_extrap_est), f_plot_full_gt, color='c', label='Full fit (gt)')
 
     # Scatter the Estimated, Linear (calc), and Ground Truth theta*
     ax.axvline(theta_star_gt, color='g', linestyle='--', linewidth=5, label=r'Ground truth $\theta^*$')
     ax.scatter(np.rad2deg(theta_star_calc), 0, s=500, marker='*', color='r', label=r'Linear Guess $\theta^*$', zorder=2)
     ax.scatter(np.rad2deg(theta_star_est), 0, s=500, marker='*', color='m', label=r'Estimated $\theta^*$', zorder=2)
+
+    # TEMP HACK: Plot all 3 force axes for reference
+    ax.plot(np.rad2deg(th_trim), f_app_full_est[:,1], 'r', linewidth=1, label='Y Force (trimmed)')
+    ax.plot(np.rad2deg(th_trim), f_app_full_est[:,2], 'm', linewidth=1, label='Z Force (trimmed)')
 
     ax.axhline(0, color='c', linewidth=2) # Horizontal line at zero for reference
     ax.set_ylabel(y_label, color='b', fontsize=20)
@@ -310,7 +405,7 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt):
     print(f"zc: {zc_est:.3f} m (GT: {com_gt[2]:.3f} m)")
     print(f"theta*: {np.rad2deg(theta_star_est):.2f} deg (GT: {theta_star_gt:.2f} deg)")
 
-    print(f"\n\n****Shape for this analysis: {shape.upper()}****")
+    print(f"\n^^^^^^^^ END Analysis on Shape: {shape.upper()}^^^^^^^^\n")
 
     # plt.show(block=False)
     # input("Press Enter to continue...")
@@ -327,53 +422,39 @@ if __name__ == "__main__":
     # path = "experiments/run_2025-11-10_15-52-45_t002_SYNC.csv" # Best
     # path = "experiments/run_2025-11-10_20-00-09_t002_SYNC.csv" # Best
 
-    paths = []
-    paths.append("experiments/20251208_155739_box_t02.csv") # Testing new force stop
-    paths.append("experiments/20251208_155739_heart_t03.csv") # Testing new force stop
-    # paths.append("experiments/20251208_143007_flashlight_t01.csv") # Just testing the weird force curve...
-    paths.append("experiments/20251208_155739_flashlight_t04.csv") # Testing new force stop
-    paths.append("experiments/20251208_155739_lshape_t05.csv") # Testing new force stop
-    
-    OBJECTS = {
-        # X and Y is distance from tipping edge (object frame!) to projected CoM on table plane
-        "box": {
-            "path": "experiments/20251208_155739_box_t02.csv",
-            "com": [-0.0500, 0.0, 0.1500],
-            "mass": 0.635,
-            "est": [0,0,0],
-        },
-        "heart": {
-            "path": "experiments/20251208_155739_heart_t03.csv",
-            "com": [-0.0458, 0.0, 0.1000],
-            "mass": 0.269,
-            "est": [0,0,0],
-        },
-        "flashlight": {
-            # "path": "experiments/20251208_143007_flashlight_t01.csv",  # older test
-            "path": "experiments/20251208_155739_flashlight_t04.csv",    # new force stop test
-            "com": [-0.0250, 0.0, 0.0950],
-            "mass": 0.386,
-            "est": [0,0,0],
-        },
-        "lshape": {
-            "path": "experiments/20251208_155739_lshape_t05.csv",
-            "com": [-0.0250, 0.0, 0.0887],
-            "mass": 0.118,
-            "est": [0,0,0],
-        }
-    }
-    
+    shapes_to_run = ["box", "heart", "flashlight"] #, "lshape"]#, "monitor"]
 
-    for shape in OBJECTS.keys():
+    for shape in shapes_to_run:
         obj     = OBJECTS[shape]
-
         path    = obj["path"]
         com     = obj["com"]
-        m       = obj["mass"]
+        m_gt       = obj["mass"]
         # Ground truth from geometry
-        theta_star_gt = np.rad2deg(np.arctan2(abs(np.linalg.norm(com[:1])), com[2]))
+        theta_star_gt = np.rad2deg(np.arctan2(abs(np.linalg.norm(com[0:1])), com[2]))
+
+        print(f"\n========= Analyzing object: {shape.upper()} =========")
         print(f"Ground truth from geometry:\ntheta*: {theta_star_gt:.2f} deg, zc = {com[2]:.3f} m")
 
-        m_est, zc_est, theta_star_est = main(shape, path, com, m, theta_star_gt)
+        m_est, zc_est, theta_star_est = main(shape, path, com, m_gt, theta_star_gt, plot_raw=True, plot_ee=False)
 
         obj["est"] = [m_est, zc_est, theta_star_est]
+
+
+    print("\n\n========= FINAL ESTIMATES ========= ")
+    for shape in shapes_to_run:
+        obj = OBJECTS[shape]
+        com = obj["com"]
+        m_gt   = obj["mass"]
+        height = obj["height"]
+        m_est, zc_est, theta_star_est = obj["est"]
+        print(f"{shape.upper()}:")
+        print(f"Estimated: mass = {m_est:.3f} kg, zc = {zc_est:.3f} m, theta* = {np.rad2deg(theta_star_est):.2f} deg")
+        print(f"Gnd Truth: mass = {m_gt:.3f} kg, zc = {com[2]:.3f} m, theta* = {theta_star_gt:.2f} deg")
+        # Error as a percentage of mass and object height
+        m_err = m_est - m_gt
+        m_err_pct = abs(m_err)/m_gt * 100
+        zc_err = zc_est - com[2]
+        zc_err_pct = abs(zc_err)/height * 100
+        print(f"   Errors: mass = {m_err:.3f} kg, {m_err_pct:.2f} %, zc = {zc_err:.3f} m, {zc_err_pct:.2f} %")
+
+    plt.show()
