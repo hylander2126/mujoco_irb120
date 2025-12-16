@@ -13,8 +13,6 @@ def tau_app_model(F, rf):
     # return np.cross(F, rf)
     tau = np.cross(rf, F)  # (N,3)
     return tau.ravel()
-    # TEMP HACK: return the norm (magnitude) of torque only
-    # return np.linalg.norm(tau, axis=1)  # (n,)
 
 
 def tau_model(theta, m, zc, rc0_known, e_hat=[0,1,0]):
@@ -36,8 +34,6 @@ def tau_model(theta, m, zc, rc0_known, e_hat=[0,1,0]):
     W_rotated = R @ W
     tau = -np.cross(rc0, W_rotated)  # (N,3)
     return tau.ravel()
-    # TEMP HACK: return the norm (magnitude) of torque only
-    # return np.linalg.norm(tau, axis=1)  # (n,)
 
 ## Force model (input is theta, output is force)
 def F_model(theta, m, zc, rf, rc0_known, e_hat=[0,1,0]):
