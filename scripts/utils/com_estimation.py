@@ -17,13 +17,13 @@ def tau_app_model(F, rf):
     # return np.linalg.norm(tau, axis=1)  # (n,)
 
 
-def tau_model(theta, m, zc, rc0_known):
+def tau_model(theta, m, zc, rc0_known, e_hat=[0,1,0]):
     """
     Compute the gravity torque given theta, mass, and z-height of CoM
     """
     W           = np.array([0, 0, -9.8067 * m]) # Weight in space frame
     # rc0_known   = np.array([-0.05, 0.0,  0.0]) # -0.05 , 0 , 0
-    e_hat       = np.array([  0.0, 1.0,  0.0]) # 0 , 1 , 0
+    e_hat       = np.asarray(e_hat).flatten()  # ensure shape is (3,)
     rc0         = rc0_known.copy()
     rc0[2]      = zc
     theta       = np.asarray(theta).flatten()  # ensure shape is (n,)
@@ -40,7 +40,7 @@ def tau_model(theta, m, zc, rc0_known):
     # return np.linalg.norm(tau, axis=1)  # (n,)
 
 ## Force model (input is theta, output is force)
-def F_model(theta, m, zc, rf, rc0_known):
+def F_model(theta, m, zc, rf, rc0_known, e_hat=[0,1,0]):
     """
     Force model: given angle(s) theta, mass m, CoM height zc, and
     per-sample lever arm rf (N,3) in the object frame, return the
@@ -57,10 +57,8 @@ def F_model(theta, m, zc, rf, rc0_known):
     assert rf.shape == (N, 3), "rf must have shape (N,3)"
 
     g = 9.81
-
     # Geometry / axes in object frame
-    # rc0_known = np.array([-0.05, 0.0, 0.0])   # base CoM in object frame
-    e_hat     = np.array([ 0.0, 1.0, 0.0])    # tipping axis (y)
+    e_hat     = np.asarray(e_hat).flatten()  # ensure shape is (3,)
     z_hat     = np.array([ 0.0, 0.0, 1.0])    # world/object z
 
     # CoM at height zc above rc0_known in z-direction

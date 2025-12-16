@@ -24,6 +24,81 @@ import numpy as np
 '''
 *** HYLAND ADDED FUNCTIONS ***
 '''
+def enforce_quat_continuity(Q):
+    Q = Q.copy()
+    for i in range(1, len(Q)):
+        if np.dot(Q[i], Q[i-1]) < 0:
+            Q[i] *= -1
+    return Q
+
+def quat_to_axis_angle(Q):
+    """
+    Q: (N,4) array of quaternions [qx, qy, qz, qw]
+    Returns:
+        axis  : (N,3)
+        angle : (N,)
+    """
+    Q = np.asarray(Q, dtype=float)
+
+    # normalize
+    Q = Q / np.linalg.norm(Q, axis=1, keepdims=True)
+
+    x = Q[:, 0]
+    y = Q[:, 1]
+    z = Q[:, 2]
+    w = np.clip(Q[:, 3], -1.0, 1.0)
+
+    angle = 2.0 * np.arccos(w)
+
+    s = np.sqrt(1.0 - w*w)  # = |sin(angle/2)|
+
+    axis = np.zeros((len(Q), 3))
+    mask = s > 1e-8
+    axis[mask, 0] = x[mask] / s[mask]
+    axis[mask, 1] = y[mask] / s[mask]
+    axis[mask, 2] = z[mask] / s[mask]
+
+    return axis, angle
+
+
+def quat_normalize(q):
+    q = np.asarray(q, dtype=float)
+    n = np.linalg.norm(q)
+    if not np.isfinite(n) or n < 1e-12:
+        return np.array([np.nan, np.nan, np.nan, np.nan])
+    return q / n
+
+def quat_conj(q):  # [x,y,z,w]
+    return np.array([-q[0], -q[1], -q[2], q[3]], dtype=float)
+
+def quat_mul(q1, q2):  # Hamilton product, [x,y,z,w]
+    x1,y1,z1,w1 = q1
+    x2,y2,z2,w2 = q2
+    return np.array([
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,
+        w1*z2 + x1*y2 - y1*x2 + z1*w2,
+        w1*w2 - x1*x2 - y1*y2 - z1*z2
+    ], dtype=float)
+
+def quat_to_rotvec(q):  # returns rotation vector (axis * angle), radians
+    # assumes q is unit and represents rotation from reference to current
+    q = quat_normalize(q)
+    if np.any(~np.isfinite(q)):
+        return np.array([np.nan, np.nan, np.nan])
+
+    x,y,z,w = q
+    w = np.clip(w, -1.0, 1.0)
+    angle = 2.0 * np.arccos(w)
+    s = np.sqrt(max(0.0, 1.0 - w*w))  # = sin(angle/2)
+
+    if s < 1e-8 or angle < 1e-8:
+        return np.array([0.0, 0.0, 0.0])
+
+    axis = np.array([x, y, z]) / s
+    return axis * angle
+
+
 # ---------- Rotation: vectorized Rodrigues (returns (n,3,3)) ----------
 def axisangle2rot_vec(axis: np.ndarray, theta: np.ndarray) -> np.ndarray:
     axis  = np.asarray(axis, dtype=float).reshape(3,)
