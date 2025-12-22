@@ -10,67 +10,108 @@ from scipy.optimize import curve_fit
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 from scripts.utils.helper_fns import quat_to_axis_angle, enforce_quat_continuity
 
-PATH_ROOT = "experiments/20251218_"
+Tested: shapes and their ground truth parameters
+
+BOX:
+xc = 45.15 mm
+zc = 146.24 mm
+mass = 0.664 kg 
+height = lshape  + 150.65
+
+HEART:
+xc = 43.54 mm
+zc = 98 mm
+mass = 0.236 kg
+height = lshape + 50.17
+
+FLASHLIGHT:
+xc = 23 mm
+zc = 96.56 mm
+mass = 0.387 kg
+height = exactly same as heart
+
+LSHAPE:
+xc = 8.81 mm
+zc = 57.63
+mass = 0.106 kg
+height = 149.2 mm
+
+MONITOR:
+xc = 62.07 mm
+zc = 149.2+102.4 mm
+mass = 3.002 + 2.006 = 5.008 kg
+height = lshape + box + 49.23 mm
+
+SODA:
+xc = ~ 31.6 mm (hard to measure due to feet shape. Use CAD model...) base radius is ~72.5 mm. Eyeball xc = 33.27. Avg of all three methods?
+zc = 149.2+81 height of liquid +153 for obj height
+mass = 2.071 kg
+height = lshape + 153
+
+
 OBJECTS = {
         # X and Y is distance from tipping edge (object frame!) to projected CoM on table plane
         "box": {
             # "path": "experiments/20251208_155739_box_t02.csv",
-            "path": PATH_ROOT + "163333_box_t01.csv",
-            "com": [-0.04515, 0.0, 0.14624], # -0.0500, 0, 0.1500]
-            "mass": 0.664, # 635
+            "path": "experiments/20251215_180505_box_t01.csv",
+            # "path": "experiments/20251215_180505_box_t02.csv",
+            "com": [-0.0500, 0.0, 0.1500], # -0.0500, 0, 0.1500]
+            "mass": 0.635,
             "theta_star": 0.0, # placeholder
-            "height": 0.3,
+            "height": 0.3, # 300 mm
             "est": [0,0,0],
         },
         "heart": {
             # "path": "experiments/20251208_155739_heart_t03.csv",
-            # "path": "experiments/20251215_182022_heart_t01.csv",
-            "path": PATH_ROOT + "163508_heart_t01.csv",
-            "com": [-0.04354, 0, 0.098],
-            "mass": 0.236, # 0.269
+            "path": "experiments/20251215_182022_heart_t01.csv",
+            # "path": "experiments/20251215_182022_heart_t02.csv",
+            # "path": "experiments/20251215_182022_heart_t03.csv",
+            "com": [-0.0458, 0, 0.1], # [-0.0458, 0, 0.1] # TODO: 
+            "mass": 0.269,
             "theta_star": 0.0, # placeholder
-            "height": 0.2,
+            "height": 0.2, # 200 mm
             "est": [0,0,0],
         },
         "flashlight": {
             # "path": "experiments/20251208_143007_flashlight_t01.csv",  # older test
             # "path": "experiments/20251208_155739_flashlight_t04.csv",    # new force stop test
-            # "path": "experiments/20251215_182909_flashlight_t03.csv",
-            "path": PATH_ROOT + "163955_flashlight_t01.csv",
-            "com": [-0.0230, 0.0, 0.09656], # [-0.0250, 0, 0.0950]
-            "mass": 0.387,
+            # "path": "experiments/20251215_182909_flashlight_t01.csv",
+            # "path": "experiments/20251215_182909_flashlight_t02.csv",
+            "path": "experiments/20251215_182909_flashlight_t03.csv",
+            "com": [-0.0250, 0.0, 0.0950], # [-0.0250, 0, 0.0950] # TODO: VERFIY MASS AND Z_C
+            "mass": 0.386,
             "theta_star": 0.0, # placeholder
-            "height": 0.2,
+            "height": 0.2, # 200 mm
             "est": [0,0,0],
         },
         "lshape": {
             # "path": "experiments/20251208_155739_lshape_t05.csv",
-            # "path": "experiments/20251215_182315_lshape_t01.csv",
-            "path": PATH_ROOT + "163653_lshape_t01.csv",
-            "com": [-0.00881, 0.0, 0.05763], # [-0.0250, 0, 0.0887]
-            "mass": 0.106, # 0.118
+            "path": "experiments/20251215_182315_lshape_t01.csv",
+            # "path": "experiments/20251215_182315_lshape_t02.csv",
+            # "path": "experiments/20251215_182315_lshape_t03.csv",
+            "com": [-0.0250, 0.0, 0.0887], # [-0.0250, 0, 0.0887]
+            "mass": 0.118,
             "theta_star": 0.0, # placeholder
-            "height": 0.1492,
+            "height": 0.1492, # 149.2 mm
             "est": [0,0,0],
         },
         "monitor": {
             # "path": "experiments/20251210_182429_monitor_t03.csv",
             # "path": "experiments/20251215_183134_monitor_t01.csv",
-            # "path": "experiments/20251215_183134_monitor_t02.csv",
-            "path": PATH_ROOT + "164236_monitor_t01.csv",
-            "com": [-0.06207, 0.0, 0.2516], # [-0.0781, 0, 0.2362]
-            "mass": 5.008,
+            "path": "experiments/20251215_183134_monitor_t02.csv",
+            "com": [-0.0781, 0.0, 0.2362], # [-0.0781, 0, 0.2362] # TODO: VERIFY THIS ONE
+            "mass": 5.37,
             "theta_star": 0.0, # placeholder
-            "height": 0.49828,
+            "height": 0.515, # 515 mm
             "est": [0,0,0],
         },
         "soda": {
             "path": "experiments/20251215_184521_soda_t01.csv",
-            "path": PATH_ROOT + "164541_soda_t01.csv",
-            "com": [-0.0316, 0.0, 0.1151], # [-0.0431, 0, 0.133]
-            "mass": 2.071,
+            # "path": "experiments/20251215_184521_soda_t02.csv",
+            "com": [-0.0431, 0.0, 0.080], # [-0.0431, 0, 0.133] # TODO: THIS ONE FULLY (MASS TOO)
+            "mass": 2.10,
             "theta_star": 0.0, # placeholder
-            "height": 0.3022,
+            "height": 0.303, # 303 mm
             "est": [0,0,0],
         },
     }
@@ -262,7 +303,7 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
 
     # TEMP HACK: Amplify rf a bit to account for friction losses in torque fitting
     # rf *= 2
-    # print(f"Lever arms: {rf[:10]} (first 10 samples)")
+    print(f"Lever arms: {rf[:10]} (first 10 samples)")
 
     # Before fitting, must pre-compute corresponding PUSH torque
     f_app = -f_trim # NOTE: IMPORTANT NEGATE TO MATCH F OBJECT EXPERIENCES
@@ -272,19 +313,16 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
     # f_app[:, 2] = 0.0
     tau_app_trim    = tau_app_model(f_app, rf)
 
-    try:
-        [m_est, zc_est], pcov = curve_fit(
-            lambda th, m, zc: tau_model(th, m, zc, rc0_known=rc0_known, e_hat=TIP_AXIS),
-            th_trim,
-            tau_app_trim,
-            p0=[m_calc, zc_calc],
-            bounds=([0, 0],
-                    [np.inf, np.inf])
-            )
-    except:
-        print("Curve fitting failed, using calculated values from linear fit.")
-        m_est = m_calc
-        zc_est = zc_calc
+    [m_est, zc_est], pcov = curve_fit(
+        lambda th, m, zc: tau_model(th, m, zc, rc0_known=rc0_known, e_hat=TIP_AXIS),
+        th_trim,
+        tau_app_trim,
+        p0=[m_calc, zc_calc],
+        bounds=([0, 0],
+                [np.inf, np.inf])
+        )
+    
+    print(pcov)
 
     
     # TESTING: Fit only for zc, assume known mass
@@ -414,7 +452,7 @@ if __name__ == "__main__":
     for i, shape in enumerate(shapes_to_run):
         obj     = OBJECTS[shape]
         path    = obj["path"]
-        com_gt  = obj["com"]
+        com_gt     = obj["com"]
         m_gt    = obj["mass"]
         # Ground truth from geometry
         theta_star_gt = np.arctan2(abs(np.linalg.norm(com_gt[0:1])), com_gt[2])
@@ -435,6 +473,32 @@ if __name__ == "__main__":
         obj["est"] = [m_est, zc_est, theta_star_est]
 
         plt.tight_layout()
+
+
+    # print("\n\n========= FINAL ESTIMATES ========= ")
+    # for shape in shapes_to_run:
+    #     obj             = OBJECTS[shape]
+    #     com_gt          = obj["com"]
+    #     m_gt            = obj["mass"]
+    #     theta_star_gt   = obj["theta_star_gt"]
+    #     height          = obj["height"]
+    #     m_est, zc_est, theta_star_est = obj["est"]
+    #     print(f"{shape.upper()}:")
+    #     print(f"Estimated: mass = {m_est:.3f} kg, zc = {zc_est:.3f} m, theta* = {np.rad2deg(theta_star_est):.2f} deg")
+    #     print(f"Gnd Truth: mass = {m_gt:.3f} kg, zc = {com_gt[2]:.3f} m, theta* = {np.rad2deg(theta_star_gt):.2f} deg")
+        
+    #     # Error as a percentage of mass, object height, and theta*
+    #     m_err = m_est - m_gt
+    #     m_err_pct = abs(m_err)/m_gt * 100
+    #     zc_err = zc_est - com_gt[2]
+    #     zc_err_pct = abs(zc_err)/height * 100
+    #     theta_star_err = np.rad2deg(theta_star_est) - np.rad2deg(theta_star_gt)
+    #     theta_star_pct = abs(theta_star_err)/np.rad2deg(theta_star_gt) * 100
+
+    #     print(f"   Errors: mass = {m_err:.3f} kg, zc = {zc_err:.3f} m, theta* = {theta_star_err:.2f} deg")
+    #     print(f"  Percent: mass = {m_err_pct:.3f} %,  zc = {zc_err_pct:.3f} %,  theta* = {theta_star_pct:.3f} %\n")
+
+    # plt.show()
 
     print("\n\n========= FINAL ESTIMATES ========= ")
     for shape in shapes_to_run:
@@ -488,7 +552,7 @@ if __name__ == "__main__":
     
     ax1.bar(x - width, summary_data["mass_err_pct"], width, label='Mass Error %', color='#1f77b4')
     ax1.bar(x, summary_data["zc_err_pct"], width, label='Zc Error %', color='#ff7f0e')
-    # ax1.bar(x + width, summary_data["th_err_pct"], width, label='Theta* Error %', color='#2ca02c')
+    ax1.bar(x + width, summary_data["th_err_pct"], width, label='Theta* Error %', color='#2ca02c')
 
     ax1.set_ylabel('Absolute Error (%)', fontsize=14)
     ax1.set_title('Accuracy by Object', fontsize=16)
@@ -496,7 +560,7 @@ if __name__ == "__main__":
     ax1.set_xticklabels(summary_data["names"], fontsize=12, fontweight='bold')
     ax1.legend(fontsize=12)
     ax1.grid(axis='y', linestyle='--', alpha=0.7)
-    # ax1.set_ylim(0, np.inf)  # Cap at 50% for readability
+    ax1.set_ylim(0, 50)  # Cap at 50% for readability
 
     # --- 2. Mass Correlation Scatter ---
     ax2 = fig_sum.add_subplot(gs[1, 0])
@@ -516,95 +580,20 @@ if __name__ == "__main__":
     ax2.grid(True)
     ax2.legend()
 
-    
-    from matplotlib.gridspec import GridSpecFromSubplotSpec
-
-    # --- 3. Results Tables (bottom-right) ---
-    # Create a nested gridspec inside the bottom-right cell
-    sub = GridSpecFromSubplotSpec(
-        2, 1, subplot_spec=gs[1, 1],
-        height_ratios=[1, 1], hspace=0.25
-    )
-
-    ax3a = fig_sum.add_subplot(sub[0, 0])
-    ax3b = fig_sum.add_subplot(sub[1, 0])
-    for ax in (ax3a, ax3b):
-        ax.axis("off")
-
-    ax3a.set_title("Mass Results", fontsize=14)
-    ax3b.set_title("Zc Results", fontsize=14)
-
-    # ---- compute absolute errors (signed and absolute if you want) ----
-    mass_err_kg = [summary_data["mass_est"][i] - summary_data["mass_gt"][i] for i in range(len(summary_data["names"]))]
-    zc_err_m    = [summary_data["zc_est"][i]   - summary_data["zc_gt"][i]   for i in range(len(summary_data["names"]))]
-
-    # ===================== MASS TABLE =====================
-    mass_col_labels = ["Object", "mass gt (g)", "mass est (g)", "error (g)", "error (%)"]
-    mass_cell_text = []
-    for i, name in enumerate(summary_data["names"]):
-        mass_cell_text.append([
-            name,
-            f'{summary_data["mass_gt"][i]*1000:.2f}',
-            f'{summary_data["mass_est"][i]*1000:.2f}',
-            f'{mass_err_kg[i]*1000:.2f}',
-            f'{summary_data["mass_err_pct"][i]:.1f}',
-        ])
-
-    tbl_m = ax3a.table(
-        cellText=mass_cell_text,
-        colLabels=mass_col_labels,
-        loc="center",
-        cellLoc="center",
-        colLoc="center"
-    )
-    tbl_m.auto_set_font_size(False)
-    tbl_m.set_fontsize(10.5)
-    tbl_m.scale(1.15, 1.35)
-
-    # ===================== ZC TABLE =====================
-    zc_col_labels = ["Object", "CoM Z gt (mm)", "CoM Z est (mm)", "error (mm)", "error (%)"]
-    zc_cell_text = []
-    for i, name in enumerate(summary_data["names"]):
-        zc_cell_text.append([
-            name,
-            f'{summary_data["zc_gt"][i]*1000:.2f}',
-            f'{summary_data["zc_est"][i]*1000:.2f}',
-            f'{zc_err_m[i]*1000:.2f}',
-            f'{summary_data["zc_err_pct"][i]:.1f}',
-        ])
-
-    tbl_z = ax3b.table(
-        cellText=zc_cell_text,
-        colLabels=zc_col_labels,
-        loc="center",
-        cellLoc="center",
-        colLoc="center"
-    )
-    tbl_z.auto_set_font_size(False)
-    tbl_z.set_fontsize(10.5)
-    tbl_z.scale(1.15, 1.35)
-
-    # Bold header rows (both tables)
-    for tbl in (tbl_m, tbl_z):
-        for (r, c), cell in tbl.get_celld().items():
-            if r == 0:
-                cell.set_text_props(weight="bold")
-
-
     # --- 3. Angle Correlation Scatter ---
-    # ax3 = fig_sum.add_subplot(gs[1, 1])
-    # sc2 = ax3.scatter(summary_data["th_gt"], summary_data["th_est"], s=200, c=x, cmap='viridis', zorder=3)
-    # max_th = max(max(summary_data["th_gt"]), max(summary_data["th_est"])) * 1.1
-    # ax3.plot([0, max_th], [0, max_th], 'k--', alpha=0.5, label='Perfect Fit')
+    ax3 = fig_sum.add_subplot(gs[1, 1])
+    sc2 = ax3.scatter(summary_data["th_gt"], summary_data["th_est"], s=200, c=x, cmap='viridis', zorder=3)
+    max_th = max(max(summary_data["th_gt"]), max(summary_data["th_est"])) * 1.1
+    ax3.plot([0, max_th], [0, max_th], 'k--', alpha=0.5, label='Perfect Fit')
 
-    # for i, txt in enumerate(summary_data["names"]):
-    #     ax3.annotate(txt, (summary_data["th_gt"][i], summary_data["th_est"][i]), 
-    #                  xytext=(5, -10), textcoords='offset points')
+    for i, txt in enumerate(summary_data["names"]):
+        ax3.annotate(txt, (summary_data["th_gt"][i], summary_data["th_est"][i]), 
+                     xytext=(5, -10), textcoords='offset points')
 
-    # ax3.set_xlabel('Ground Truth Theta* (deg)', fontsize=14)
-    # ax3.set_ylabel('Estimated Theta* (deg)', fontsize=14)
-    # ax3.set_title('Tipping Angle Consistency', fontsize=16)
-    # ax3.grid(True)
+    ax3.set_xlabel('Ground Truth Theta* (deg)', fontsize=14)
+    ax3.set_ylabel('Estimated Theta* (deg)', fontsize=14)
+    ax3.set_title('Tipping Angle Consistency', fontsize=16)
+    ax3.grid(True)
 
     plt.tight_layout(rect=[0, 0.0, 1, 0.96])
     plt.show()

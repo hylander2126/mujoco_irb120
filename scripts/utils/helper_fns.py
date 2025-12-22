@@ -24,12 +24,71 @@ import numpy as np
 '''
 *** HYLAND ADDED FUNCTIONS ***
 '''
-def enforce_quat_continuity(Q):
-    Q = Q.copy()
+def enforce_quat_continuity(Q, eps=1e-12, normalize=True):
+    """
+    Enforces quaternion sign continuity AND forward-fills missing/invalid quaternions.
+
+    - Any quaternion with norm < eps is treated as invalid (e.g., [0,0,0,0] when tag not detected)
+      and is replaced via forward-fill from the last valid quaternion.
+    - If the first samples are invalid, they are back-filled with the first valid quaternion.
+    - After filling, enforces sign continuity so consecutive quaternions have non-negative dot product.
+    - Optionally normalizes to unit quaternions (recommended for scipy Rotation).
+
+    Parameters
+    ----------
+    Q : (N,4) array-like
+        Quaternion sequence (assumed xyzw for scipy).
+    eps : float
+        Threshold below which a quaternion is considered invalid.
+    normalize : bool
+        If True, normalize quaternions to unit length after filling.
+
+    Returns
+    -------
+    Q_out : (N,4) ndarray
+        Cleaned quaternion sequence.
+    """
+    Q = np.asarray(Q, dtype=float).copy()
+
+    if Q.ndim != 2 or Q.shape[1] != 4:
+        raise ValueError(f"Expected Q shape (N,4), got {Q.shape}")
+
+    norms = np.linalg.norm(Q, axis=1)
+    valid = norms >= eps
+
+    if not np.any(valid):
+        raise ValueError("No valid quaternions found (all norms are ~0). Check your CSV columns/logging.")
+
+    # --- Back-fill leading invalid rows with first valid quaternion ---
+    first_valid = np.argmax(valid)  # index of first True
+    if first_valid > 0:
+        Q[:first_valid] = Q[first_valid]
+
+    # --- Forward-fill invalid rows ---
+    for i in range(first_valid + 1, len(Q)):
+        if not valid[i]:
+            Q[i] = Q[i - 1]
+
+    # --- Normalize (good hygiene for scipy Rotation) ---
+    if normalize:
+        norms = np.linalg.norm(Q, axis=1)
+        # After fill, norms should be nonzero, but guard anyway
+        bad2 = norms < eps
+        if np.any(bad2):
+            # Shouldn't happen unless numeric weirdness; fall back to previous again
+            for i in range(1, len(Q)):
+                if bad2[i]:
+                    Q[i] = Q[i - 1]
+            norms = np.linalg.norm(Q, axis=1)
+        Q /= norms[:, None]
+
+    # --- Enforce sign continuity (avoid sudden flips) ---
     for i in range(1, len(Q)):
-        if np.dot(Q[i], Q[i-1]) < 0:
+        if np.dot(Q[i], Q[i - 1]) < 0:
             Q[i] *= -1
+
     return Q
+
 
 def quat_to_axis_angle(Q):
     """
