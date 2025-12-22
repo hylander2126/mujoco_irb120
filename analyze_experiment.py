@@ -10,69 +10,67 @@ from scipy.optimize import curve_fit
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 from scripts.utils.helper_fns import quat_to_axis_angle, enforce_quat_continuity
 
+PATH_ROOT = "experiments/20251218_"
 OBJECTS = {
         # X and Y is distance from tipping edge (object frame!) to projected CoM on table plane
         "box": {
             # "path": "experiments/20251208_155739_box_t02.csv",
-            "path": "experiments/20251215_180505_box_t01.csv",
-            # "path": "experiments/20251215_180505_box_t02.csv",
-            "com": [-0.0500, 0.0, 0.1500],
-            "mass": 0.635,
+            "path": PATH_ROOT + "163333_box_t01.csv",
+            "com": [-0.04515, 0.0, 0.14624], # -0.0500, 0, 0.1500]
+            "mass": 0.664, # 635
             "theta_star": 0.0, # placeholder
-            "height": 0.3, # 300 mm
+            "height": 0.3,
             "est": [0,0,0],
         },
         "heart": {
             # "path": "experiments/20251208_155739_heart_t03.csv",
-            "path": "experiments/20251215_182022_heart_t01.csv",
-            # "path": "experiments/20251215_182022_heart_t02.csv",
-            # "path": "experiments/20251215_182022_heart_t03.csv",
-            "com": [-0.0458, 0, 0.0800], # [-0.0458, 0, 0.1]
-            "mass": 0.269,
+            # "path": "experiments/20251215_182022_heart_t01.csv",
+            "path": PATH_ROOT + "163508_heart_t01.csv",
+            "com": [-0.04354, 0, 0.098],
+            "mass": 0.236, # 0.269
             "theta_star": 0.0, # placeholder
-            "height": 0.2, # 200 mm
+            "height": 0.2,
             "est": [0,0,0],
         },
         "flashlight": {
             # "path": "experiments/20251208_143007_flashlight_t01.csv",  # older test
             # "path": "experiments/20251208_155739_flashlight_t04.csv",    # new force stop test
-            "path": "experiments/20251215_182909_flashlight_t01.csv",
-            # "path": "experiments/20251215_182909_flashlight_t02.csv",
             # "path": "experiments/20251215_182909_flashlight_t03.csv",
-            "com": [-0.0250, 0.0, 0.0950],
-            "mass": 0.386,
+            "path": PATH_ROOT + "163955_flashlight_t01.csv",
+            "com": [-0.0230, 0.0, 0.09656], # [-0.0250, 0, 0.0950]
+            "mass": 0.387,
             "theta_star": 0.0, # placeholder
-            "height": 0.2, # 200 mm
+            "height": 0.2,
             "est": [0,0,0],
         },
         "lshape": {
             # "path": "experiments/20251208_155739_lshape_t05.csv",
-            "path": "experiments/20251215_182315_lshape_t01.csv",
-            # "path": "experiments/20251215_182315_lshape_t02.csv",
-            # "path": "experiments/20251215_182315_lshape_t03.csv",
-            "com": [-0.0250, 0.0, 0.0887],
-            "mass": 0.118,
+            # "path": "experiments/20251215_182315_lshape_t01.csv",
+            "path": PATH_ROOT + "163653_lshape_t01.csv",
+            "com": [-0.00881, 0.0, 0.05763], # [-0.0250, 0, 0.0887]
+            "mass": 0.106, # 0.118
             "theta_star": 0.0, # placeholder
-            "height": 0.15, # 150 mm
+            "height": 0.1492,
             "est": [0,0,0],
         },
         "monitor": {
             # "path": "experiments/20251210_182429_monitor_t03.csv",
             # "path": "experiments/20251215_183134_monitor_t01.csv",
-            "path": "experiments/20251215_183134_monitor_t02.csv",
-            "com": [-0.0781, 0.0, 0.2362], # -0.0781
-            "mass": 5.37,
+            # "path": "experiments/20251215_183134_monitor_t02.csv",
+            "path": PATH_ROOT + "164236_monitor_t01.csv",
+            "com": [-0.06207, 0.0, 0.2516], # [-0.0781, 0, 0.2362]
+            "mass": 5.008,
             "theta_star": 0.0, # placeholder
-            "height": 0.515, # 515 mm
+            "height": 0.49828,
             "est": [0,0,0],
         },
         "soda": {
             "path": "experiments/20251215_184521_soda_t01.csv",
-            # "path": "experiments/20251215_184521_soda_t02.csv",
-            "com": [-0.0431, 0.0, 0.133],
-            "mass": 2.10,
+            "path": PATH_ROOT + "164541_soda_t01.csv",
+            "com": [-0.0316, 0.0, 0.1151], # [-0.0431, 0, 0.133]
+            "mass": 2.071,
             "theta_star": 0.0, # placeholder
-            "height": 0.515, # 515 mm
+            "height": 0.3022,
             "est": [0,0,0],
         },
     }
@@ -106,14 +104,11 @@ def set_fig_opts(ax, xlabel, ylabel, ax2=None, ylabel2=None):
         ax2.tick_params(axis='y', labelsize=20, labelcolor='k')
         ax2.set_ylabel(ylabel2, fontsize=20, color='k')
         align_zeros([ax, ax2])
-        plt.tight_layout()
         return ax, ax2
-    
-    plt.tight_layout()
     return ax
 
 
-def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=False):
+def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=False, ax_raw=None, ax_tau=None):
     ## ================ Extract time series data ===================
     csv_data = read_csv(csv_path, trim_rows=1)  # Discard headers
     time         = csv_data[:, 0]
@@ -199,10 +194,14 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
     print(f"Settles at index {settle_idx_og} ({settle_time_og:.2f} s)")
     print(f"Primary tipping axis is {TIP_AXIS.round(3)} (avg over window)")
 
+    print("\nUSING HARDCODED TIPPING AXIS INSTEAD: [0, 1, 0]\n")
+    TIP_AXIS = np.array([0, 1, 0])
+
 ## ================ Plot raw data ===================
     if plot_raw:
-        fig, ax = plt.subplots(figsize=(8,4.5))
-        ax = plot_3vec(ax, time, f_exp_raw, label='Force (raw)', linewidth=2)
+        # fig, ax = plt.subplots(figsize=(8,4.5))
+        ax = ax_raw
+        ax = plot_3vec(ax, time, f_exp_raw, label='Force (raw)', linewidth=2, draw_axes=[0,2])
         ax = plot_3vec(ax, time, f_exp_filt, label=None, linewidth=2, color_order=['k', 'k', 'k'])
         ax.axvline(contact_time_og, color='k', linestyle='--', linewidth=2, label='Contact & Settle')
         ax.axvline(settle_time_og, color='k', linestyle='--', linewidth=2, label='_')
@@ -211,25 +210,27 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
         tau_grav = tau_model(theta_exp, m_gt, com_gt[2], rc0_known=np.array([com_gt[0], com_gt[1], 0.0]), e_hat=TIP_AXIS).reshape(-1,3)
         ax = plot_3vec(ax, time, tau_grav, label='Grav Torque (gt)', linewidth=2, linestyle='--', color_order=['orange', 'orange', 'orange'], draw_axes=[1])
 
-        ax2 = plt.twinx()
+        ax2 = ax.twinx()
         # ax2 = plot_3vec(ax2, time, axes_exp_raw, label='Tip Axis', linewidth=3)
         ax2.plot(time, np.rad2deg(theta_exp), color='g', linestyle='-', linewidth=3, label='Object angle (raw)')
-        ax, ax2 = set_fig_opts(ax, 'Time (s)', 'Force (N)', ax2, 'Angle (deg)')
-        plt.title(f"Raw Force Data for {shape.upper()} Object", fontsize=15)
+        # ax.set_title(f"{shape.upper()}", fontsize=15)
         fig.legend(loc='upper left', fontsize=15)
         # FOR PAPER FIGURE, TRIM THE AXES LIMITS
         # ax.set_xlim(1.6, 6)
-        # ax2.set_ylim(0, 30)
+        f_max = abs(f_trim[0,0])
+        ax.set_ylim(-f_max*1.1, f_max*1.1)
+        ax, ax2 = set_fig_opts(ax, 'Time (s)', 'Force (N)', ax2, 'Angle (deg)')
 
     if plot_ee:
-        fig, ax = plt.subplots(figsize=(8,4.5))
+        # fig, ax = plt.subplots(figsize=(8,4.5))
+        ax = ax_raw
         ax = plot_3vec(ax, time, ee_exp, label='EE Pos. (raw)', linewidth=3)
         ax.axvline(contact_time_og, color='k', linestyle='--', linewidth=2, label='_')
         ax.axvline(settle_time_og, color='k', linestyle='--', linewidth=2, label='_')
         ax2 = plt.twinx()
         ax2.plot(time, np.rad2deg(theta_exp), color='g', linestyle='-', linewidth=3, label='Object angle (raw)')
         ax, ax2 = set_fig_opts(ax, 'Time (s)', 'EE Position (m)', ax2, 'Angle (deg)')
-        fig.legend(loc='upper left', fontsize=15)
+        # fig.legend(loc='upper left', fontsize=15)
         # FOR PAPER FIGURE, TRIM THE AXES LIMITS
         # ax.set_xlim(1.6, 6)
         # ax2.set_ylim(0, 30)
@@ -261,7 +262,7 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
 
     # TEMP HACK: Amplify rf a bit to account for friction losses in torque fitting
     # rf *= 2
-    print(f"Lever arms: {rf[:10]} (first 10 samples)")
+    # print(f"Lever arms: {rf[:10]} (first 10 samples)")
 
     # Before fitting, must pre-compute corresponding PUSH torque
     f_app = -f_trim # NOTE: IMPORTANT NEGATE TO MATCH F OBJECT EXPERIENCES
@@ -271,14 +272,42 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
     # f_app[:, 2] = 0.0
     tau_app_trim    = tau_app_model(f_app, rf)
 
-    [m_est, zc_est], pcov = curve_fit(
-        lambda th, m, zc: tau_model(th, m, zc, rc0_known=rc0_known, e_hat=TIP_AXIS),
-        th_trim,
-        tau_app_trim,
-        p0=[m_calc, zc_calc],
-        bounds=([0, 0],
-                [np.inf, np.inf])
-        )
+    try:
+        [m_est, zc_est], pcov = curve_fit(
+            lambda th, m, zc: tau_model(th, m, zc, rc0_known=rc0_known, e_hat=TIP_AXIS),
+            th_trim,
+            tau_app_trim,
+            p0=[m_calc, zc_calc],
+            bounds=([0, 0],
+                    [np.inf, np.inf])
+            )
+    except:
+        print("Curve fitting failed, using calculated values from linear fit.")
+        m_est = m_calc
+        zc_est = zc_calc
+
+    
+    # TESTING: Fit only for zc, assume known mass
+    # zc_est, _ = curve_fit(
+    #     lambda th, zc: tau_model(th, m_gt, zc, rc0_known=rc0_known, e_hat=TIP_AXIS),
+    #     th_trim,
+    #     tau_app_trim,
+    #     p0=zc_calc,
+    #     bounds=(0, np.inf)
+    #     )
+    # zc_est = zc_est[0]
+    # m_est = m_gt  # Use known mass for now
+
+    # TESTING: Fit only for mass, assume known zc
+    # m_est, _ = curve_fit(
+    #     lambda th, m: tau_model(th, m, com_gt[2], rc0_known=rc0_known, e_hat=TIP_AXIS),
+    #     th_trim,
+    #     tau_app_trim,
+    #     p0=m_calc,
+    #     bounds=(0, np.inf)
+    #     )
+    # zc_est = com_gt[2] # Use known zc for now
+    # m_est = m_est[0]
 
     # TEMP Print the lever or moment arms to see why our torque is off
     # rf_norms = np.linalg.norm(rf, axis=1)
@@ -288,13 +317,15 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
     theta_star_est = np.arctan2(np.linalg.norm(com_gt[0:1]), zc_est) # atan2( d (xy norm), z) 
 
     ## ================== PLOTTING THE TORQUE DIRECTLY ===================
-    th_extrap_est = np.linspace(0, theta_star_est, len(ee_trim))
+    # th_extrap_est = np.linspace(0, theta_star_est, len(ee_trim))
+    th_extrap_est = np.linspace(0, theta_star_gt*1.1, len(ee_trim))
 
-    fig, ax = plt.subplots(figsize=(8,4.5))
+    # fig, ax = plt.subplots(figsize=(8,4.5))
+    ax = ax_tau
     # Plot the original data
     ax = plot_3vec(ax, np.rad2deg(th_trim), tau_app_trim.reshape(-1,3), label='Applied Torque', linewidth=3, color_order=['gray', 'k', 'gray'], draw_axes=[1])
     # Plot using the ground truth params for reference
-    tau_model_full_gt = tau_model(th_extrap_est, m_gt, com_gt[2], rc0_known=rc0_known, e_hat=TIP_AXIS).reshape(-1,3)
+    tau_model_full_gt = tau_model(th_extrap_est, m_gt, com_gt[2], rc0_known=rc0_known, e_hat=[0, 1, 0]).reshape(-1,3)
     ax = plot_3vec(ax, np.rad2deg(th_extrap_est), tau_model_full_gt, label='Full T Fit (gt)', linewidth=3, draw_axes=[1])
     # Plot our model to full extrapolated theta range
     tau_model_full_est = tau_model(th_extrap_est, m_est, zc_est, rc0_known=rc0_known, e_hat=TIP_AXIS).reshape(-1,3)
@@ -336,7 +367,8 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
 
 
         ## ============================ PLOTTING ============================
-        fig, ax = plt.subplots(figsize=(8,4.5))
+        # fig, ax = plt.subplots(figsize=(8,4.5))
+        ax = ax_tau
         # Plot the original data
         ax.plot(np.rad2deg(th_trim), f_plot_exp, 'k', linewidth=5, label='Original data')  # Plot F norm
         # Plot linear fit using theta_star_calc from prior linear fit
@@ -362,7 +394,7 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
     print(f"\nFitted results:")
     print(f"mass: {m_est:.3f} kg (GT: {m_gt:.3f} kg)")
     print(f"zc: {zc_est:.3f} m (GT: {com_gt[2]:.3f} m)")
-    print(f"theta*: {np.rad2deg(theta_star_est):.2f} deg (GT: {theta_star_gt:.2f} deg)")
+    print(f"theta*: {np.rad2deg(theta_star_est):.2f} deg (GT: {np.rad2deg(theta_star_gt):.2f} deg)")
     print(f"\n^^^^^^^^ END Analysis on Shape: {shape.upper()}^^^^^^^^\n")
 
     return m_est, zc_est, theta_star_est
@@ -371,22 +403,38 @@ def main(shape, csv_path, com_gt, m_gt, theta_star_gt, plot_raw=True, plot_ee=Fa
 if __name__ == "__main__":
     shapes_to_run = ["box", "heart", "flashlight", "monitor", "soda"]#, "lshape"]
 
-    for shape in shapes_to_run:
+    # --- Storage for Summary Plot ---
+    summary_data = {
+        "names": [],
+        "mass_gt": [], "mass_est": [], "mass_err_pct": [],
+        "zc_gt": [], "zc_est": [], "zc_err_pct": [],
+        "th_gt": [], "th_est": [], "th_err_pct": []
+    }
+    
+    for i, shape in enumerate(shapes_to_run):
         obj     = OBJECTS[shape]
         path    = obj["path"]
-        com     = obj["com"]
+        com_gt  = obj["com"]
         m_gt    = obj["mass"]
         # Ground truth from geometry
-        theta_star_gt = np.arctan2(abs(np.linalg.norm(com[0:1])), com[2])
+        theta_star_gt = np.arctan2(abs(np.linalg.norm(com_gt[0:1])), com_gt[2])
         OBJECTS[shape]["theta_star_gt"] = theta_star_gt
 
         print(f"\n========= Analyzing object: {shape.upper()} =========")
-        print(f"Ground truth from geometry:\ntheta*: {np.rad2deg(theta_star_gt):.2f} deg, zc = {com[2]:.3f} m")
+        print(f"Ground truth from geometry:\ntheta*: {np.rad2deg(theta_star_gt):.2f} deg, zc = {com_gt[2]:.3f} m")
 
-        m_est, zc_est, theta_star_est = main(shape, path, com, m_gt, theta_star_gt, plot_raw=True, plot_ee=False)
+        fig, axs = plt.subplots(2, 1, figsize=(10, 12))
+        fig.suptitle(f"Analysis Result: {shape.upper()}", fontsize=20)
+        ax_raw, ax_tau = axs[0], axs[1]
+
+        m_est, zc_est, theta_star_est = main(
+            shape, path, com_gt, m_gt, theta_star_gt, 
+            plot_raw=True, plot_ee=False, ax_raw=ax_raw, ax_tau=ax_tau
+        )
 
         obj["est"] = [m_est, zc_est, theta_star_est]
 
+        plt.tight_layout()
 
     print("\n\n========= FINAL ESTIMATES ========= ")
     for shape in shapes_to_run:
@@ -396,20 +444,167 @@ if __name__ == "__main__":
         theta_star_gt   = obj["theta_star_gt"]
         height          = obj["height"]
         m_est, zc_est, theta_star_est = obj["est"]
-        print(f"{shape.upper()}:")
-        print(f"Estimated: mass = {m_est:.3f} kg, zc = {zc_est:.3f} m, theta* = {np.rad2deg(theta_star_est):.2f} deg")
-        print(f"Gnd Truth: mass = {m_gt:.3f} kg, zc = {com[2]:.3f} m, theta* = {np.rad2deg(theta_star_gt):.2f} deg")
         
-        # Error as a percentage of mass, object height, and theta*
+        # Error metrics
         m_err = m_est - m_gt
         m_err_pct = abs(m_err)/m_gt * 100
-        zc_err = zc_est - com[2]
+        zc_err = zc_est - com_gt[2]
         zc_err_pct = abs(zc_err)/height * 100
-        theta_star_err = np.rad2deg(theta_star_est) - np.rad2deg(theta_star_gt)
-        theta_star_pct = abs(theta_star_err)/np.rad2deg(theta_star_gt) * 100
+        
+        th_deg_est = np.rad2deg(theta_star_est)
+        th_deg_gt  = np.rad2deg(theta_star_gt)
+        theta_star_err = th_deg_est - th_deg_gt
+        theta_star_pct = abs(theta_star_err)/th_deg_gt * 100
 
+        print(f"{shape.upper()}:")
+        print(f"Estimated: mass = {m_est:.3f} kg, zc = {zc_est:.3f} m, theta* = {th_deg_est:.2f} deg")
+        print(f"Gnd Truth: mass = {m_gt:.3f} kg, zc = {com_gt[2]:.3f} m, theta* = {th_deg_gt:.2f} deg")
         print(f"   Errors: mass = {m_err:.3f} kg, zc = {zc_err:.3f} m, theta* = {theta_star_err:.2f} deg")
         print(f"  Percent: mass = {m_err_pct:.3f} %,  zc = {zc_err_pct:.3f} %,  theta* = {theta_star_pct:.3f} %\n")
 
-    plt.tight_layout()
+        # --- Collect Data for Summary ---
+        summary_data["names"].append(shape.upper())
+        summary_data["mass_gt"].append(m_gt)
+        summary_data["mass_est"].append(m_est)
+        summary_data["mass_err_pct"].append(m_err_pct)
+        summary_data["zc_gt"].append(com_gt[2])
+        summary_data["zc_est"].append(zc_est)
+        summary_data["zc_err_pct"].append(zc_err_pct)
+        summary_data["th_gt"].append(th_deg_gt)
+        summary_data["th_est"].append(th_deg_est)
+        summary_data["th_err_pct"].append(theta_star_pct)
+
+    # =========================================================================
+    # ========================== SUMMARY DASHBOARD ============================
+    # =========================================================================
+    fig_sum = plt.figure(figsize=(14, 10))
+    gs = fig_sum.add_gridspec(2, 2)
+    fig_sum.suptitle("Estimation Performance Summary", fontsize=20, fontweight='bold')
+
+    # --- 1. Grouped Bar Chart of Errors ---
+    ax1 = fig_sum.add_subplot(gs[0, :])
+    x = np.arange(len(summary_data["names"]))
+    width = 0.25
+    
+    ax1.bar(x - width, summary_data["mass_err_pct"], width, label='Mass Error %', color='#1f77b4')
+    ax1.bar(x, summary_data["zc_err_pct"], width, label='Zc Error %', color='#ff7f0e')
+    # ax1.bar(x + width, summary_data["th_err_pct"], width, label='Theta* Error %', color='#2ca02c')
+
+    ax1.set_ylabel('Absolute Error (%)', fontsize=14)
+    ax1.set_title('Accuracy by Object', fontsize=16)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(summary_data["names"], fontsize=12, fontweight='bold')
+    ax1.legend(fontsize=12)
+    ax1.grid(axis='y', linestyle='--', alpha=0.7)
+    # ax1.set_ylim(0, np.inf)  # Cap at 50% for readability
+
+    # --- 2. Mass Correlation Scatter ---
+    ax2 = fig_sum.add_subplot(gs[1, 0])
+    sc1 = ax2.scatter(summary_data["mass_gt"], summary_data["mass_est"], s=200, c=x, cmap='viridis', zorder=3)
+    # Identity line
+    max_mass = max(max(summary_data["mass_gt"]), max(summary_data["mass_est"])) * 1.1
+    ax2.plot([0, max_mass], [0, max_mass], 'k--', alpha=0.5, label='Perfect Fit')
+    
+    # Annotate points
+    for i, txt in enumerate(summary_data["names"]):
+        ax2.annotate(txt, (summary_data["mass_gt"][i], summary_data["mass_est"][i]), 
+                     xytext=(5, 5), textcoords='offset points')
+    
+    ax2.set_xlabel('Ground Truth Mass (kg)', fontsize=14)
+    ax2.set_ylabel('Estimated Mass (kg)', fontsize=14)
+    ax2.set_title('Mass Estimation Consistency', fontsize=16)
+    ax2.grid(True)
+    ax2.legend()
+
+    
+    from matplotlib.gridspec import GridSpecFromSubplotSpec
+
+    # --- 3. Results Tables (bottom-right) ---
+    # Create a nested gridspec inside the bottom-right cell
+    sub = GridSpecFromSubplotSpec(
+        2, 1, subplot_spec=gs[1, 1],
+        height_ratios=[1, 1], hspace=0.25
+    )
+
+    ax3a = fig_sum.add_subplot(sub[0, 0])
+    ax3b = fig_sum.add_subplot(sub[1, 0])
+    for ax in (ax3a, ax3b):
+        ax.axis("off")
+
+    ax3a.set_title("Mass Results", fontsize=14)
+    ax3b.set_title("Zc Results", fontsize=14)
+
+    # ---- compute absolute errors (signed and absolute if you want) ----
+    mass_err_kg = [summary_data["mass_est"][i] - summary_data["mass_gt"][i] for i in range(len(summary_data["names"]))]
+    zc_err_m    = [summary_data["zc_est"][i]   - summary_data["zc_gt"][i]   for i in range(len(summary_data["names"]))]
+
+    # ===================== MASS TABLE =====================
+    mass_col_labels = ["Object", "mass gt (g)", "mass est (g)", "error (g)", "error (%)"]
+    mass_cell_text = []
+    for i, name in enumerate(summary_data["names"]):
+        mass_cell_text.append([
+            name,
+            f'{summary_data["mass_gt"][i]*1000:.2f}',
+            f'{summary_data["mass_est"][i]*1000:.2f}',
+            f'{mass_err_kg[i]*1000:.2f}',
+            f'{summary_data["mass_err_pct"][i]:.1f}',
+        ])
+
+    tbl_m = ax3a.table(
+        cellText=mass_cell_text,
+        colLabels=mass_col_labels,
+        loc="center",
+        cellLoc="center",
+        colLoc="center"
+    )
+    tbl_m.auto_set_font_size(False)
+    tbl_m.set_fontsize(10.5)
+    tbl_m.scale(1.15, 1.35)
+
+    # ===================== ZC TABLE =====================
+    zc_col_labels = ["Object", "CoM Z gt (mm)", "CoM Z est (mm)", "error (mm)", "error (%)"]
+    zc_cell_text = []
+    for i, name in enumerate(summary_data["names"]):
+        zc_cell_text.append([
+            name,
+            f'{summary_data["zc_gt"][i]*1000:.2f}',
+            f'{summary_data["zc_est"][i]*1000:.2f}',
+            f'{zc_err_m[i]*1000:.2f}',
+            f'{summary_data["zc_err_pct"][i]:.1f}',
+        ])
+
+    tbl_z = ax3b.table(
+        cellText=zc_cell_text,
+        colLabels=zc_col_labels,
+        loc="center",
+        cellLoc="center",
+        colLoc="center"
+    )
+    tbl_z.auto_set_font_size(False)
+    tbl_z.set_fontsize(10.5)
+    tbl_z.scale(1.15, 1.35)
+
+    # Bold header rows (both tables)
+    for tbl in (tbl_m, tbl_z):
+        for (r, c), cell in tbl.get_celld().items():
+            if r == 0:
+                cell.set_text_props(weight="bold")
+
+
+    # --- 3. Angle Correlation Scatter ---
+    # ax3 = fig_sum.add_subplot(gs[1, 1])
+    # sc2 = ax3.scatter(summary_data["th_gt"], summary_data["th_est"], s=200, c=x, cmap='viridis', zorder=3)
+    # max_th = max(max(summary_data["th_gt"]), max(summary_data["th_est"])) * 1.1
+    # ax3.plot([0, max_th], [0, max_th], 'k--', alpha=0.5, label='Perfect Fit')
+
+    # for i, txt in enumerate(summary_data["names"]):
+    #     ax3.annotate(txt, (summary_data["th_gt"][i], summary_data["th_est"][i]), 
+    #                  xytext=(5, -10), textcoords='offset points')
+
+    # ax3.set_xlabel('Ground Truth Theta* (deg)', fontsize=14)
+    # ax3.set_ylabel('Estimated Theta* (deg)', fontsize=14)
+    # ax3.set_title('Tipping Angle Consistency', fontsize=16)
+    # ax3.grid(True)
+
+    plt.tight_layout(rect=[0, 0.0, 1, 0.96])
     plt.show()
