@@ -449,7 +449,8 @@ if __name__ == "__main__":
         m_err = m_est - m_gt
         m_err_pct = abs(m_err)/m_gt * 100
         zc_err = zc_est - com_gt[2]
-        zc_err_pct = abs(zc_err)/height * 100
+        # zc_err_pct = abs(zc_err)/height * 100
+        zc_err_pct = abs(zc_err)/com_gt[2] * 100
         
         th_deg_est = np.rad2deg(theta_star_est)
         th_deg_gt  = np.rad2deg(theta_star_gt)
