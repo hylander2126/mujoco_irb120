@@ -15,7 +15,6 @@ Dependencies: trimesh, numpy, scipy
 
 import trimesh
 import numpy as np
-from pathlib import Path
 from dataclasses import dataclass, field
 from typing import List, Tuple, Optional
 
@@ -142,12 +141,11 @@ def compute_tip_edges(hull_vertices_2d: np.ndarray,
         else:
             inward_normal = outward_normal_2d
 
-        # Perpendicular distance from CoM to edge line (2D scalar cross product).
-        # Avoid np.cross on 2D vectors (deprecated in newer NumPy).
+        # Perpendicular distance from CoM to edge line
+        # Using 2D signed distance: |(v1-v0) x (v0-com)| / |v1-v0|
         edge_2d = v1_2d - v0_2d
         v0_to_com = com_2d - v0_2d
-        cross_2d = edge_2d[0] * v0_to_com[1] - edge_2d[1] * v0_to_com[0]
-        d_perp = abs(cross_2d) / length
+        d_perp = abs(np.cross(edge_2d, v0_to_com)) / length
 
         edges.append(TipEdge(
             v0=v0, v1=v1,
@@ -167,20 +165,16 @@ def compute_tip_edges(hull_vertices_2d: np.ndarray,
 
 def find_push_candidates(mesh: trimesh.Trimesh,
                          tip_edge: TipEdge,
-                         top_band_frac: float = 0.20,
+                         min_height: float = 0.02,
                          normal_alignment_thresh: float = 0.5,
                          n_samples: int = 50) -> List[PushCandidate]:
     """
-    For a given tip edge, find candidate push contact points near the TOP
-    of the object on the opposing side.
+    For a given tip edge, find candidate push contact points on the
+    opposing side of the object.
 
-    Only faces whose centroid falls within the uppermost `top_band_frac`
-    of the object's height range are considered.  This mirrors the bottom
-    support-polygon approach but for the push surface: we want to push near
-    the top to maximise torque about the tipping edge, and we rely on the
-    2nd-order surface curvature (already computed per-face) rather than a
-    simple height threshold, so the full curvature-based scoring still applies
-    within this top band.
+    The push direction is along the tip edge's inward normal.
+    We look for mesh faces on the opposite side whose outward normal
+    is roughly anti-parallel to the push direction.
 
     Parameters
     ----------
@@ -188,47 +182,38 @@ def find_push_candidates(mesh: trimesh.Trimesh,
         Object mesh.
     tip_edge : TipEdge
         The candidate tipping edge.
-    top_band_frac : float
-        Fraction of total object height defining the "top band".
-        0.20 = top 20 % of the object height (default).
+    min_height : float
+        Minimum push height (m) above support plane.
     normal_alignment_thresh : float
         Minimum |cos(angle)| between push direction and face outward normal.
         0.5 = 60° tolerance. 0.7 = 45° tolerance.
     n_samples : int
-        Maximum number of candidate points to return.
+        Number of candidate points to evaluate.
 
     Returns
     -------
     candidates : list of PushCandidate
-        Viable push contact points within the top band, sorted by height (descending).
+        Viable push contact points, sorted by height (descending).
     """
-    push_dir = tip_edge.inward_normal  # direction robot pushes (toward tip edge)
+    push_dir = tip_edge.inward_normal  # direction robot pushes
+    # We want faces whose outward normal opposes push_dir
+    # i.e., face_normal · push_dir < -threshold (face faces the robot)
 
     face_normals = mesh.face_normals
     face_centroids = mesh.triangles_center
 
-    z_min = mesh.bounds[0, 2]
-    z_max = mesh.bounds[1, 2]
-    z_band_floor = z_max - top_band_frac * (z_max - z_min)
-
     # Filter faces:
-    # 1. Normal opposes push direction (face confronts the approaching robot)
+    # 1. Normal opposes push direction
     alignment = np.dot(face_normals, push_dir)
     opposing_mask = alignment < -normal_alignment_thresh
 
-    # 2. Centroid must be in the top band of the object.
-    height_mask = face_centroids[:, 2] >= z_band_floor
+    # 2. Above minimum height
+    height_mask = face_centroids[:, 2] > min_height
 
-    # 3. Centroid must be on the FAR side of the object from the tip edge.
-    #    Use the mesh's own XY centroid as the dividing plane, not the edge
-    #    midpoint.  This correctly splits the object in half along push_dir
-    #    regardless of where the tip edge sits, and handles symmetric objects
-    #    (e.g. a box whose CoM and edge midpoint project to the same point).
-    mesh_center_proj = np.dot(mesh.centroid, push_dir)
-    face_projs       = face_centroids @ push_dir
-    far_side_mask    = face_projs < mesh_center_proj
-
-    valid_mask = opposing_mask & height_mask & far_side_mask
+    # 3. On the "push side" of the object (behind the CoM relative to push dir)
+    # Face centroid should be on the side the push comes FROM
+    # i.e., face centroid projected onto push_dir should be less than CoM
+    valid_mask = opposing_mask & height_mask
     valid_indices = np.where(valid_mask)[0]
 
     if len(valid_indices) == 0:
@@ -378,20 +363,12 @@ def score_pair(tip_edge: TipEdge,
     loa_offset = line_of_action_offset(push.point, push_dir, com_2d)
     if loa_offset > loa_epsilon:
         return ScoredPair(tip_edge, push, score=-np.inf,
-                          score_breakdown={
-                              'rejected': f'LoA offset {loa_offset:.4f}m > tol {loa_epsilon:.4f}m — '
-                                          f'push line misses CoM; object would spin sideways',
-                              'loa_offset': loa_offset,
-                          })
+                          score_breakdown={'rejected': f'LoA offset {loa_offset:.4f} > {loa_epsilon}'})
 
     # Reject concave push surfaces
     if push.curvature_sign < -0.05:
         return ScoredPair(tip_edge, push, score=-np.inf,
-                          score_breakdown={
-                              'rejected': f'concave push surface (curvature={push.curvature_sign:.3f}) — '
-                                          f'robot finger would slip off inward curve',
-                              'loa_offset': loa_offset,
-                          })
+                          score_breakdown={'rejected': 'concave push surface'})
 
     # --- Soft scores ---
     # 1. Tipping ease: inversely proportional to CoM-edge distance
@@ -439,17 +416,12 @@ def score_pair(tip_edge: TipEdge,
 
 def select_push_config(mesh: trimesh.Trimesh,
                        com_2d: np.ndarray,
-                       loa_epsilon: float = 0.03,
+                       loa_epsilon: float = 0.01,
                        weights: Optional[dict] = None,
                        top_k_edges: int = 5,
                        verbose: bool = True) -> List[ScoredPair]:
     """
     Full pipeline: given mesh and 2D CoM, return ranked push configurations.
-
-    ALL candidates are returned — valid ones ranked by score first, then
-    rejected ones (score == -inf) appended after, each with a rejection
-    reason in score_breakdown['rejected'].  Visualization will show all
-    of them with distinct color coding so you can diagnose filtering issues.
 
     Parameters
     ----------
@@ -458,7 +430,7 @@ def select_push_config(mesh: trimesh.Trimesh,
     com_2d : (2,) array
         Estimated 2D CoM projection (xc, yc).
     loa_epsilon : float
-        Line of action tolerance (meters).  Default 3 cm.
+        Line of action tolerance (meters).
     weights : dict, optional
         Scoring weights.
     top_k_edges : int
@@ -469,9 +441,7 @@ def select_push_config(mesh: trimesh.Trimesh,
     Returns
     -------
     ranked_pairs : list of ScoredPair
-        Valid pairs (score > -inf) sorted descending, followed by rejected
-        pairs sorted by loa_offset ascending so the 'least bad' rejected
-        candidates appear first.
+        All valid pairs, sorted by score (descending).
     """
     com_2d = np.asarray(com_2d, dtype=float)
 
@@ -497,9 +467,7 @@ def select_push_config(mesh: trimesh.Trimesh,
 
     candidate_edges = edges[:top_k_edges]
 
-    valid_pairs = []
-    rejected_pairs = []
-
+    all_pairs = []
     for edge in candidate_edges:
         push_candidates = find_push_candidates(mesh, edge)
         if verbose:
@@ -513,316 +481,102 @@ def select_push_config(mesh: trimesh.Trimesh,
                 loa_epsilon, weights
             )
             if pair.score > -np.inf:
-                valid_pairs.append(pair)
-            else:
-                rejected_pairs.append(pair)
+                all_pairs.append(pair)
 
-    # --- Step 3: Rank valid pairs; sort rejected by LoA offset ascending ---
-    valid_pairs.sort(key=lambda p: p.score, reverse=True)
-    rejected_pairs.sort(
-        key=lambda p: p.score_breakdown.get('loa_offset', np.inf)
-    )
+    # --- Step 3: Rank ---
+    all_pairs.sort(key=lambda p: p.score, reverse=True)
 
-    all_pairs = valid_pairs + rejected_pairs
-
-    if verbose:
+    if verbose and all_pairs:
         print(f"\n{'='*60}")
-        if valid_pairs:
-            print(f"Top {min(5, len(valid_pairs))} VALID configurations:")
-            print(f"{'='*60}")
-            for i, pair in enumerate(valid_pairs[:5]):
-                e = pair.tip_edge
-                p = pair.push
-                b = pair.score_breakdown
-                print(f"\n  #{i+1} | Score: {pair.score:.3f}")
-                print(f"    Tip edge: d_perp={e.d_perp_to_com:.4f}m, "
-                      f"len={e.length:.4f}m")
-                print(f"    Push at:  ({p.point[0]:.3f}, {p.point[1]:.3f}, "
-                      f"{p.point[2]:.3f}), height={p.height:.3f}m")
-                print(f"    Push dir: ({e.inward_normal[0]:.3f}, "
-                      f"{e.inward_normal[1]:.3f}, {e.inward_normal[2]:.3f})")
-                print(f"    Breakdown: tip_ease={b['tipping_ease']:.3f}, "
-                      f"align={b['push_alignment']:.3f}, "
-                      f"leverage={b['leverage']:.3f}, "
-                      f"edge_stab={b['edge_stability']:.3f}, "
-                      f"LoA_offset={b['loa_offset']:.4f}m")
-        else:
-            print("WARNING: No VALID push configurations found.")
-            print(f"  loa_epsilon={loa_epsilon:.3f}m — consider increasing it.")
+        print(f"Top 5 configurations:")
+        print(f"{'='*60}")
+        for i, pair in enumerate(all_pairs[:5]):
+            e = pair.tip_edge
+            p = pair.push
+            b = pair.score_breakdown
+            print(f"\n  #{i+1} | Score: {pair.score:.3f}")
+            print(f"    Tip edge: d_perp={e.d_perp_to_com:.4f}m, "
+                  f"len={e.length:.4f}m")
+            print(f"    Push at:  ({p.point[0]:.3f}, {p.point[1]:.3f}, "
+                  f"{p.point[2]:.3f}), height={p.height:.3f}m")
+            print(f"    Push dir: ({e.inward_normal[0]:.3f}, "
+                  f"{e.inward_normal[1]:.3f}, {e.inward_normal[2]:.3f})")
+            print(f"    Breakdown: tip_ease={b['tipping_ease']:.3f}, "
+                  f"align={b['push_alignment']:.3f}, "
+                  f"leverage={b['leverage']:.3f}, "
+                  f"edge_stab={b['edge_stability']:.3f}, "
+                  f"LoA_offset={b['loa_offset']:.4f}m")
 
-        if rejected_pairs:
-            print(f"\n  {len(rejected_pairs)} candidates REJECTED. "
-                  f"Top rejected (by LoA offset):")
-            for i, pair in enumerate(rejected_pairs[:3]):
-                b = pair.score_breakdown
-                reason = b.get('rejected', 'unknown')
-                loa = b.get('loa_offset', float('nan'))
-                print(f"    [{i}] reason='{reason}', LoA={loa:.4f}m, "
-                      f"push_z={pair.push.height:.3f}m")
+    if verbose and not all_pairs:
+        print("\n  WARNING: No valid push configurations found!")
+        print("  Try increasing loa_epsilon or checking mesh orientation.")
 
     return all_pairs
 
 
 # =============================================================================
-# Visualization Helpers
+# Demo / Test with a simple box
 # =============================================================================
 
-def _apply_color(mesh_obj: trimesh.Trimesh,
-                 color: Tuple[int, int, int, int]) -> trimesh.Trimesh:
-    """Assign a uniform RGBA color to every face of a mesh, replacing any existing visual."""
-    rgba = np.array(color, dtype=np.uint8)
-    mesh_obj.visual = trimesh.visual.ColorVisuals(
-        mesh=mesh_obj,
-        face_colors=np.tile(rgba, (len(mesh_obj.faces), 1)),
-    )
-    return mesh_obj
+def demo_box():
+    """Test pipeline with a box (known geometry, known CoM)."""
+    # Create a box: 0.2m x 0.15m x 0.3m, base centered at origin
+    box = trimesh.creation.box(extents=[0.2, 0.15, 0.3])
+    # Shift so base is at z=0 (box is centered at origin by default)
+    box.vertices[:, 2] += 0.15  # half-height
 
+    # Known CoM for uniform box: geometric center
+    com_2d = np.array([0.0, 0.0])
 
-def _segment_mesh(p0: np.ndarray,
-                  p1: np.ndarray,
-                  radius: float,
-                  color: Tuple[int, int, int, int]) -> trimesh.Trimesh:
-    """Create a colored cylinder segment between two 3D points."""
-    p0 = np.asarray(p0, dtype=float)
-    p1 = np.asarray(p1, dtype=float)
-    vec = p1 - p0
-    length = np.linalg.norm(vec)
-    if length < 1e-10:
-        return _point_marker(p0, radius, color)
+    print("Box mesh:")
+    print(f"  Vertices: {len(box.vertices)}")
+    print(f"  Faces: {len(box.faces)}")
+    print(f"  Bounds: {box.bounds}")
+    print(f"  2D CoM: {com_2d}")
+    print()
 
-    z_hat = np.array([0.0, 0.0, 1.0])
-    axis = vec / length
-    cross = np.cross(z_hat, axis)
-    cross_norm = np.linalg.norm(cross)
-    dot_val = float(np.dot(z_hat, axis))
-    if cross_norm < 1e-8:
-        rot = trimesh.transformations.rotation_matrix(np.pi, [1, 0, 0]) if dot_val < 0 else np.eye(4)
-    else:
-        rot = trimesh.transformations.rotation_matrix(
-            np.arctan2(cross_norm, dot_val), cross / cross_norm
-        )
-
-    mid = (p0 + p1) / 2.0
-    T = trimesh.transformations.translation_matrix(mid)
-
-    cyl = trimesh.creation.cylinder(radius=radius, height=length, sections=16)
-    cyl.apply_transform(T @ rot)
-    return _apply_color(cyl, color)
-
-
-def _point_marker(center: np.ndarray,
-                  radius: float,
-                  color: Tuple[int, int, int, int]) -> trimesh.Trimesh:
-    """Create a colored sphere marker at a given 3D point."""
-    marker = trimesh.creation.icosphere(subdivisions=2, radius=radius)
-    marker.apply_translation(center)
-    return _apply_color(marker, color)
-
-
-def visualize_ranked_pairs(mesh: trimesh.Trimesh,
-                           ranked_pairs: List[ScoredPair],
-                           com_2d: np.ndarray,
-                           top_n: int = 5,
-                           show: bool = True,
-                           loa_epsilon: float = 0.03) -> trimesh.Scene:
-    """
-    Visualize push/tip configurations on top of the object mesh (trimesh viewer).
-
-    ALL candidates are shown — valid ones are color-ranked, rejected ones
-    are shown in grey with their rejection reason printed to stdout.
-
-    Color scheme
-    ------------
-    Valid candidates (ranked best → worst):
-      #1  bright green   (60, 190, 80)
-      #2  yellow-orange  (255, 180, 60)
-      #3  orange         (255, 120, 60)
-      #4  red            (255, 80, 80)
-      #5  magenta        (200, 60, 140)
-    Rejected candidates:
-      semi-transparent grey (150, 150, 150, 130)
-    CoM marker: bright red dot
-    LoA epsilon: transparent grey sphere of radius loa_epsilon around CoM
-    Push direction arrow: cyan
-    """
-    scene = trimesh.Scene()
-
-    # Keep original mesh visible but slightly transparent.
-    mesh_vis = mesh.copy()
-    mesh_vis.visual.face_colors = np.array([180, 180, 190, 200], dtype=np.uint8)
-    scene.add_geometry(mesh_vis, node_name="object_mesh")
-
-    if len(ranked_pairs) == 0:
-        if show:
-            scene.show()
-        return scene
-
-    z_min = mesh.bounds[0, 2]
-    z_max = mesh.bounds[1, 2]
-    diag = np.linalg.norm(mesh.bounds[1] - mesh.bounds[0])
-    marker_r = max(diag * 0.008, 0.0015)
-    line_r   = max(diag * 0.003, 0.0008)
-    arrow_len = max(diag * 0.12, 0.03)
-
-    # CoM: place at mid-height so it sits visibly on the object rather than the floor.
-    com_z = z_min + (z_max - z_min) * 0.5
-    com_pt = np.array([com_2d[0], com_2d[1], com_z])
-
-    # Bright red CoM dot.
-    scene.add_geometry(
-        _point_marker(com_pt, marker_r * 1.8, (220, 30, 30, 255)),
-        node_name="com",
+    results = select_push_config(
+        box, com_2d,
+        loa_epsilon=0.05,  # 5cm tolerance (triangle centroids offset from ideal)
+        verbose=True
     )
 
-    # Transparent grey sphere showing the LoA epsilon tolerance radius.
-    eps_sphere = trimesh.creation.icosphere(subdivisions=3, radius=loa_epsilon)
-    eps_sphere.apply_translation(com_pt)
-    eps_sphere.visual.face_colors = np.array([160, 160, 160, 55], dtype=np.uint8)
-    scene.add_geometry(eps_sphere, node_name="loa_epsilon_sphere")
-
-    # Colors for valid ranked candidates (best → worst).
-    valid_colors = [
-        (60, 190, 80, 255),
-        (255, 180, 60, 255),
-        (255, 120, 60, 255),
-        (255, 80, 80, 255),
-        (200, 60, 140, 255),
-    ]
-    rejected_color = (150, 150, 150, 130)
-
-    # Split into valid / rejected.
-    valid_pairs    = [p for p in ranked_pairs if p.score > -np.inf]
-    rejected_pairs = [p for p in ranked_pairs if p.score <= -np.inf]
-
-    # ---- Render valid top-N ----
-    for i, pair in enumerate(valid_pairs[:top_n]):
-        color = valid_colors[min(i, len(valid_colors) - 1)]
-        e = pair.tip_edge
-
-        scene.add_geometry(
-            _segment_mesh(e.v0, e.v1, line_r, color),
-            node_name=f"tip_edge_{i}",
-        )
-        p = pair.push.point
-        scene.add_geometry(
-            _point_marker(p, marker_r, color),
-            node_name=f"push_point_{i}",
-        )
-        d = -e.inward_normal / (np.linalg.norm(e.inward_normal) + 1e-9)
-        arrow_end = p + d * arrow_len
-        scene.add_geometry(
-            _segment_mesh(p, arrow_end, line_r * 0.8, (60, 230, 230, 255)),
-            node_name=f"push_dir_{i}",
-        )
-
-    # ---- Render rejected candidates (grey, smaller markers) ----
-    # Deduplicate: one representative per unique push point (cap at 20 to avoid clutter).
-    seen_points: set = set()
-    rej_shown = 0
-    for pair in rejected_pairs:
-        if rej_shown >= 20:
-            break
-        pt_key = tuple(np.round(pair.push.point, 4))
-        if pt_key in seen_points:
-            continue
-        seen_points.add(pt_key)
-
-        e = pair.tip_edge
-        p = pair.push.point
-
-        scene.add_geometry(
-            _point_marker(p, marker_r * 0.6, rejected_color),
-            node_name=f"rej_point_{rej_shown}",
-        )
-        d = -e.inward_normal / (np.linalg.norm(e.inward_normal) + 1e-9)
-        arrow_end = p + d * arrow_len * 0.7
-        scene.add_geometry(
-            _segment_mesh(p, arrow_end, line_r * 0.5, rejected_color),
-            node_name=f"rej_dir_{rej_shown}",
-        )
-        rej_shown += 1
-
-    # ---- Print rejection reasons to stdout ----
-    if rejected_pairs:
-        print("\n--- Rejected candidates (unique reasons) ---")
-        reason_counts: dict = {}
-        for pair in rejected_pairs:
-            reason = pair.score_breakdown.get('rejected', 'unknown')
-            reason_counts[reason] = reason_counts.get(reason, 0) + 1
-        for reason, count in sorted(reason_counts.items(), key=lambda x: -x[1]):
-            print(f"  x{count:3d}  {reason}")
-        print()
-
-    if show:
-        scene.show()
-
-    return scene
+    return results
 
 
-def load_object_mesh(stl_path: str) -> trimesh.Trimesh:
+def demo_offset_com():
     """
-    Load an object mesh and shift it so the lowest point lies on z=0.
+    Test with a box where CoM is NOT at geometric center.
+    Simulates non-uniform mass distribution.
     """
-    mesh = trimesh.load_mesh(stl_path)
-    if not isinstance(mesh, trimesh.Trimesh):
-        raise TypeError(f"Expected a single Trimesh from '{stl_path}', got {type(mesh)}")
+    box = trimesh.creation.box(extents=[0.2, 0.15, 0.3])
+    box.vertices[:, 2] += 0.15
 
-    mesh = mesh.copy()
-    z_min = mesh.vertices[:, 2].min()
-    mesh.vertices[:, 2] -= z_min
-    return mesh
+    # CoM offset toward +x edge
+    com_2d = np.array([0.06, 0.0])  # 6cm offset from center
+
+    print("Box mesh with offset CoM:")
+    print(f"  2D CoM: {com_2d}")
+    print(f"  (CoM is 6cm from center toward +x edge)")
+    print()
+
+    results = select_push_config(
+        box, com_2d,
+        loa_epsilon=0.05,
+        verbose=True
+    )
+
+    return results
 
 
 if __name__ == "__main__":
-    import argparse
+    print("=" * 60)
+    print("DEMO 1: Symmetric Box (CoM at center)")
+    print("=" * 60)
+    demo_box()
 
-    _default_stl = (
-        Path(__file__).resolve().parents[1]
-        / "assets" / "my_objects" / "box" / "box.stl" #"heart" / "heart_exp.stl"
-    )
-
-    parser = argparse.ArgumentParser(
-        description="Run the push-selection pipeline on an object mesh."
-    )
-    parser.add_argument(
-        "stl", nargs="?", default=str(_default_stl),
-        help="Path to STL (or OBJ) file. Defaults to the heart asset.",
-    )
-    parser.add_argument(
-        "--loa-epsilon", type=float, default=0.03,
-        help="Line-of-action tolerance in metres (default: 0.03).",
-    )
-    parser.add_argument(
-        "--top-k-edges", type=int, default=6,
-        help="Number of tip-edge candidates to evaluate (default: 6).",
-    )
-    parser.add_argument(
-        "--top-n", type=int, default=5,
-        help="Number of results to highlight in the viewer (default: 5).",
-    )
-    args = parser.parse_args()
-
-    mesh = load_object_mesh(args.stl)
-    com = mesh.center_mass
-    com_2d = np.array([com[0], com[1]])
-
-    print(f"Mesh: {args.stl}")
-    print(f"  Vertices: {len(mesh.vertices)}")
-    print(f"  Faces:    {len(mesh.faces)}")
-    print(f"  Bounds:   {mesh.bounds}")
-    print(f"  CoM 2D:   {com_2d}")
-    print()
-
-    ranked = select_push_config(
-        mesh, com_2d,
-        loa_epsilon=args.loa_epsilon,
-        top_k_edges=args.top_k_edges,
-        verbose=True,
-    )
-
-    visualize_ranked_pairs(
-        mesh, ranked, com_2d,
-        top_n=args.top_n,
-        show=True,
-        loa_epsilon=args.loa_epsilon,
-    )
+    print("\n\n")
+    print("=" * 60)
+    print("DEMO 2: Box with Offset CoM")
+    print("=" * 60)
+    demo_offset_com()
