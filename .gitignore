@@ -405,3 +405,4 @@ assets/object_sim/raw_files/
 *.mp4
 .venv/
 .vscode/
+copilot-instructions.md
