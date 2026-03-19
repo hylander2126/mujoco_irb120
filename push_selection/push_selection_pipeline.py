@@ -100,7 +100,7 @@ def extract_support_polygon(mesh: trimesh.Trimesh, z_tol: float = 1e-3) -> np.nd
     base_mask = np.abs(mesh.vertices[:, 2]) < z_tol
     if base_mask.sum() < 3:
         z_min = mesh.vertices[:, 2].min()
-        base_mask = mesh.vertices[:, 2] < (z_min + z_tol * 10)
+        base_mask = mesh.vertices[:, 2] < (z_min + z_tol * 2)  # tighter fallback
 
     base_verts_2d = mesh.vertices[base_mask][:, :2]
 
@@ -109,6 +109,323 @@ def extract_support_polygon(mesh: trimesh.Trimesh, z_tol: float = 1e-3) -> np.nd
     hull_vertices = base_verts_2d[hull.vertices]
 
     return hull_vertices
+
+def debug_visualize_hull(mesh: trimesh.Trimesh,
+                         hull_vertices_2d: np.ndarray,
+                         tip_edges: List[TipEdge],
+                         z_tol: float = 1e-3) -> trimesh.Scene:
+    """
+    Debug visualization: show all base vertices, convex hull, and tip edges.
+
+    Parameters
+    ----------
+    mesh : trimesh.Trimesh
+    hull_vertices_2d : (N, 2) array of hull vertices in XY
+    tip_edges : list of TipEdge from compute_tip_edges
+    z_tol : float tolerance for base detection
+
+    Returns
+    -------
+    scene : trimesh.Scene
+    """
+    scene = trimesh.Scene()
+
+    # Add the mesh (semi-transparent)
+    mesh_vis = mesh.copy()
+    mesh_vis.visual.face_colors = np.array([200, 200, 200, 100], dtype=np.uint8)
+    scene.add_geometry(mesh_vis, node_name="mesh")
+
+    # Get all base vertices matching z_tol (use same logic as extract_support_polygon)
+    base_mask = np.abs(mesh.vertices[:, 2]) < z_tol
+    if base_mask.sum() < 3:
+        z_min = mesh.vertices[:, 2].min()
+        base_mask = mesh.vertices[:, 2] < (z_min + z_tol * 2)  # Match the tighter fallback
+
+    all_base_verts = mesh.vertices[base_mask]
+
+    # Visualize convex hull vertices as small blue dots
+    for i, v in enumerate(hull_vertices_2d):
+        marker = trimesh.creation.icosphere(subdivisions=1, radius=0.003)
+        marker.apply_translation(np.append(v, 0.0))
+        marker.visual.vertex_colors = np.array([100, 150, 255, 255], dtype=np.uint8)
+        scene.add_geometry(marker, node_name=f"hull_vert_{i}")
+
+    # Visualize convex hull outline as green edges
+    n_hull = len(hull_vertices_2d)
+    for i in range(n_hull):
+        v0 = np.array([hull_vertices_2d[i][0], hull_vertices_2d[i][1], 0.0])
+        v1 = np.array([hull_vertices_2d[(i + 1) % n_hull][0], hull_vertices_2d[(i + 1) % n_hull][1], 0.0])
+
+        # Create a thin cylinder for the hull edge
+        vec = v1 - v0
+        length = np.linalg.norm(vec)
+        if length > 1e-10:
+            z_hat = np.array([0.0, 0.0, 1.0])
+            axis = vec / length
+            cross = np.cross(z_hat, axis)
+            cross_norm = np.linalg.norm(cross)
+            dot_val = float(np.dot(z_hat, axis))
+            if cross_norm < 1e-8:
+                rot = trimesh.transformations.rotation_matrix(np.pi, [1, 0, 0]) if dot_val < 0 else np.eye(4)
+            else:
+                rot = trimesh.transformations.rotation_matrix(
+                    np.arctan2(cross_norm, dot_val), cross / cross_norm
+                )
+
+            mid = (v0 + v1) / 2.0
+            T = trimesh.transformations.translation_matrix(mid)
+            cyl = trimesh.creation.cylinder(radius=0.002, height=length, sections=8)
+            cyl.apply_transform(T @ rot)
+            cyl.visual.face_colors = np.array([100, 255, 100, 255], dtype=np.uint8)
+            scene.add_geometry(cyl, node_name=f"hull_edge_{i}")
+
+    # Visualize tip edges as red edges with arrows at midpoint
+    for i, tip in enumerate(tip_edges):
+        vec = tip.v1 - tip.v0
+        length = np.linalg.norm(vec)
+        if length > 1e-10:
+            z_hat = np.array([0.0, 0.0, 1.0])
+            axis = vec / length
+            cross = np.cross(z_hat, axis)
+            cross_norm = np.linalg.norm(cross)
+            dot_val = float(np.dot(z_hat, axis))
+            if cross_norm < 1e-8:
+                rot = trimesh.transformations.rotation_matrix(np.pi, [1, 0, 0]) if dot_val < 0 else np.eye(4)
+            else:
+                rot = trimesh.transformations.rotation_matrix(
+                    np.arctan2(cross_norm, dot_val), cross / cross_norm
+                )
+
+            mid = (tip.v0 + tip.v1) / 2.0
+            T = trimesh.transformations.translation_matrix(mid)
+            cyl = trimesh.creation.cylinder(radius=0.0025, height=length, sections=8)
+            cyl.apply_transform(T @ rot)
+            cyl.visual.face_colors = np.array([255, 100, 100, 255], dtype=np.uint8)
+            scene.add_geometry(cyl, node_name=f"tip_edge_{i}")
+
+    print(f"\nDebug Hull Visualization:")
+    print(f"  Total base vertices (z_tol={z_tol*1000:.1f}mm): {len(all_base_verts)}")
+    print(f"  Convex hull size: {len(hull_vertices_2d)}")
+    print(f"  Tip edges: {len(tip_edges)}")
+
+    scene.show()
+    return scene
+
+
+def debug_visualize_push_faces(mesh: trimesh.Trimesh,
+                               z_band_height: float,
+                               top_band_frac: float = 0.10,
+                               min_horiz_component: float = 0.3,
+                               normal_cluster_thresh: float = 0.98) -> trimesh.Scene:
+    """
+    Debug visualization: show convex hull vertices from top band and push faces.
+    
+    Displays:
+      - Mesh (semi-transparent)
+      - Convex hull vertices from top band (blue dots)
+      - Hull edges (green lines)
+      - Raw push faces in top band (color-coded by cluster)
+      - Cluster representatives with outward normal arrows
+
+    Parameters
+    ----------
+    mesh : trimesh.Trimesh
+    z_band_height : float
+        The z-coordinate below which vertices are excluded.
+    top_band_frac : float
+        Fraction of height defining top band (for raw face clustering).
+    min_horiz_component : float
+        Filter for push faces by horizontal normal component.
+    normal_cluster_thresh : float
+        Dot product threshold for clustering faces.
+
+    Returns
+    -------
+    scene : trimesh.Scene
+    """
+    scene = trimesh.Scene()
+
+    # Add the mesh (semi-transparent)
+    mesh_vis = mesh.copy()
+    mesh_vis.visual.face_colors = np.array([200, 200, 200, 100], dtype=np.uint8)
+    scene.add_geometry(mesh_vis, node_name="mesh")
+
+    verts = mesh.vertices
+    faces = mesh.faces
+    face_normals = mesh.face_normals
+
+    # --- Extract and visualize convex hull of top band vertices ---
+    band_verts_idx = np.where(verts[:, 2] >= z_band_height)[0]
+    
+    if len(band_verts_idx) >= 3:
+        band_verts = verts[band_verts_idx]
+        pts_2d = band_verts[:, :2]
+        
+        from scipy.spatial import ConvexHull
+        try:
+            hull = ConvexHull(pts_2d)
+            hull_indices = hull.vertices
+            hull_verts = band_verts[hull_indices]
+            
+            # Visualize hull vertices as blue dots
+            for vid, vert in enumerate(hull_verts):
+                marker = trimesh.creation.icosphere(subdivisions=2, radius=0.003)
+                marker.apply_translation(vert)
+                marker.visual.vertex_colors = np.array([50, 150, 255, 255], dtype=np.uint8)
+                scene.add_geometry(marker, node_name=f"hull_vertex_{vid}")
+            
+            # Visualize hull edges as green lines
+            n_hull = len(hull_verts)
+            for i in range(n_hull):
+                p0 = hull_verts[i]
+                p1 = hull_verts[(i + 1) % n_hull]
+                edge_vec = p1 - p0
+                edge_len = np.linalg.norm(edge_vec)
+                
+                if edge_len > 1e-10:
+                    mid = (p0 + p1) / 2.0
+                    cyl = trimesh.creation.cylinder(radius=0.0015, height=edge_len, sections=8)
+                    
+                    z_hat = np.array([0.0, 0.0, 1.0])
+                    axis = edge_vec / edge_len
+                    cross = np.cross(z_hat, axis)
+                    cross_norm = np.linalg.norm(cross)
+                    dot_val = float(np.dot(z_hat, axis))
+                    
+                    if cross_norm < 1e-8:
+                        rot = trimesh.transformations.rotation_matrix(np.pi, [1, 0, 0]) if dot_val < 0 else np.eye(4)
+                    else:
+                        rot = trimesh.transformations.rotation_matrix(
+                            np.arctan2(cross_norm, dot_val), cross / cross_norm
+                        )
+                    T = trimesh.transformations.translation_matrix(mid)
+                    cyl.apply_transform(T @ rot)
+                    cyl.visual.face_colors = np.array([100, 200, 100, 200], dtype=np.uint8)
+                    scene.add_geometry(cyl, node_name=f"hull_edge_{i}")
+        except Exception:
+            pass
+
+    # --- Extract and visualize push faces in top band ---
+    z_min = mesh.bounds[0, 2]
+    z_max = mesh.bounds[1, 2]
+    z_band_floor = z_max - top_band_frac * (z_max - z_min)
+
+    centroids = verts[faces].mean(axis=1)
+
+    raw: List[dict] = []
+    for fi in range(len(faces)):
+        centroid = centroids[fi]
+        if centroid[2] < z_band_floor:
+            continue
+
+        fn = face_normals[fi]
+        horiz = np.array([fn[0], fn[1], 0.0])
+        horiz_mag = np.linalg.norm(horiz)
+        if horiz_mag < min_horiz_component:
+            continue
+
+        outward_normal = horiz / horiz_mag
+        face_verts = verts[faces[fi]]
+        e1 = face_verts[1] - face_verts[0]
+        e2 = face_verts[2] - face_verts[0]
+        area = 0.5 * np.linalg.norm(np.cross(e1, e2))
+
+        raw.append({
+            'face_index': fi,
+            'centroid': centroid.copy(),
+            'outward_normal': outward_normal,
+            'area': area,
+            'vertices': face_verts.copy(),
+        })
+
+    if not raw:
+        print("No push faces found in top band.")
+        scene.show()
+        return scene
+
+    # Cluster by outward normal direction
+    clusters: List[dict] = []
+    for item in raw:
+        n = item['outward_normal']
+        assigned = False
+        for cluster in clusters:
+            if np.dot(cluster['normal'], n) >= normal_cluster_thresh:
+                cluster['faces'].append(item)
+                assigned = True
+                break
+        if not assigned:
+            clusters.append({'normal': n.copy(), 'faces': [item]})
+
+    # Cluster colors
+    cluster_colors = [
+        (255, 50, 50, 180),    # red
+        (50, 255, 50, 180),    # green
+        (50, 50, 255, 180),    # blue
+        (255, 255, 50, 180),   # yellow
+        (255, 50, 255, 180),   # magenta
+        (50, 255, 255, 180),   # cyan
+        (255, 150, 50, 180),   # orange
+        (150, 50, 255, 180),   # purple
+    ]
+
+    # Visualize all raw push faces, color-coded by cluster
+    for ci, cluster in enumerate(clusters):
+        color = cluster_colors[ci % len(cluster_colors)]
+        for item in cluster['faces']:
+            face_mesh = trimesh.Trimesh(
+                vertices=item['vertices'],
+                faces=np.array([[0, 1, 2]]),
+            )
+            rgba = np.array(color, dtype=np.uint8)
+            face_mesh.visual = trimesh.visual.ColorVisuals(
+                mesh=face_mesh,
+                face_colors=np.tile(rgba, (len(face_mesh.faces), 1)),
+            )
+            scene.add_geometry(face_mesh, node_name=f"raw_face_c{ci}_f{item['face_index']}")
+
+    # Visualize cluster representatives and their normals
+    for ci, cluster in enumerate(clusters):
+        cluster_faces = cluster['faces']
+        total_area = sum(f['area'] for f in cluster_faces)
+        if total_area < 1e-12:
+            continue
+
+        weighted_centroid = sum(
+            f['centroid'] * f['area'] for f in cluster_faces
+        ) / total_area
+
+        avg_normal = sum(
+            f['outward_normal'] * f['area'] for f in cluster_faces
+        ) / total_area
+        avg_normal_mag = np.linalg.norm(avg_normal)
+        if avg_normal_mag < 1e-8:
+            continue
+        avg_normal /= avg_normal_mag
+
+        # White dot for cluster representative centroid
+        marker = trimesh.creation.icosphere(subdivisions=2, radius=0.004)
+        marker.apply_translation(weighted_centroid)
+        marker.visual.vertex_colors = np.array([255, 255, 255, 255], dtype=np.uint8)
+        scene.add_geometry(marker, node_name=f"cluster_center_{ci}")
+
+        # Arrow for outward normal direction
+        arrow_len = 0.03
+        arrow_end = weighted_centroid + avg_normal * arrow_len
+        arrow_cyl = trimesh.creation.cylinder(radius=0.002, height=arrow_len, sections=8)
+        mid = (weighted_centroid + arrow_end) / 2.0
+        T = trimesh.transformations.translation_matrix(mid)
+        arrow_cyl.apply_transform(T)
+        arrow_cyl.visual.face_colors = np.array([255, 255, 100, 255], dtype=np.uint8)
+        scene.add_geometry(arrow_cyl, node_name=f"cluster_normal_{ci}")
+
+    print(f"\nDebug Push Faces Visualization:")
+    print(f"  Top band vertices: {len(band_verts_idx) if len(band_verts_idx) >= 3 else 0}")
+    print(f"  Convex hull vertices: {len(hull_verts) if len(band_verts_idx) >= 3 else 0}")
+    print(f"  Raw push faces: {len(raw)}")
+    print(f"  Clusters: {len(clusters)}")
+
+    scene.show()
+    return scene
 
 
 def compute_tip_edges(hull_vertices_2d: np.ndarray,
@@ -173,240 +490,125 @@ def compute_tip_edges(hull_vertices_2d: np.ndarray,
 
 
 # =============================================================================
-# Step 2: Extract Push Faces from Top Band
+# Step 2: Extract Top-Band Convex Hull Vertices
 # =============================================================================
 
-def extract_push_faces(mesh: trimesh.Trimesh,
-                       top_band_frac: float = 0.10,
-                       min_horiz_component: float = 0.3,
-                       normal_cluster_thresh: float = 0.98) -> List[PushFace]:
+def extract_top_band_hull(mesh: trimesh.Trimesh,
+                          z_band_height: float) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Extract candidate push faces from the top band of the mesh.
-
-    A push face is a mesh triangle where:
-      - Its centroid is in the top band (top `top_band_frac` of object height).
-      - The face has a meaningful horizontal outward normal (i.e. it is a
-        near-vertical face, not the top cap).
-
-    Faces are clustered by their horizontal outward normal direction so that
-    each distinct side of the object produces exactly ONE representative
-    PushFace whose centroid is the area-weighted average of all constituent
-    triangles on that side.  This places the push contact point at the
-    geometric centre of each face rather than at an arbitrary triangle centroid.
-
-    Parameters
-    ----------
-    mesh : trimesh.Trimesh
-    top_band_frac : float
-        Fraction of total height defining the top band (default 0.10 = top 10%).
-    min_horiz_component : float
-        Minimum magnitude of the horizontal component of the face normal for
-        a face to be considered pushable (filters out top/bottom cap faces).
-    normal_cluster_thresh : float
-        Minimum dot product between two face normals to be merged into the same
-        cluster (default 0.98 ≈ 11°).
+    Compute the 2D convex hull of all vertices at or above z_band_height.
 
     Returns
     -------
-    push_faces : list of PushFace
-        One entry per distinct side direction, centroid at the area-weighted
-        centre of that side's top-band triangles.
+    hull_verts_3d : (N, 3) array of hull vertices (3D, at their actual z)
+    hull_verts_2d : (N, 2) array projected to XY (CCW order)
     """
-    z_min = mesh.bounds[0, 2]
-    z_max = mesh.bounds[1, 2]
-    z_band_floor = z_max - top_band_frac * (z_max - z_min)
-
     verts = mesh.vertices
-    faces = mesh.faces
-    face_normals = mesh.face_normals
+    band_mask = verts[:, 2] >= z_band_height
+    band_verts = verts[band_mask]
 
-    # Precompute centroids for all faces
-    centroids = verts[faces].mean(axis=1)  # (F, 3)
+    if len(band_verts) < 3:
+        return np.empty((0, 3)), np.empty((0, 2))
 
-    # --- collect raw top-band side triangles ---
-    raw: List[dict] = []
-    for fi in range(len(faces)):
-        centroid = centroids[fi]
-        if centroid[2] < z_band_floor:
-            continue
+    from scipy.spatial import ConvexHull
+    try:
+        hull = ConvexHull(band_verts[:, :2])
+    except Exception:
+        return np.empty((0, 3)), np.empty((0, 2))
 
-        fn = face_normals[fi]
-        horiz = np.array([fn[0], fn[1], 0.0])
-        horiz_mag = np.linalg.norm(horiz)
-        if horiz_mag < min_horiz_component:
-            continue
+    hull_verts_3d = band_verts[hull.vertices]
+    hull_verts_2d = hull_verts_3d[:, :2]
+    return hull_verts_3d, hull_verts_2d
 
-        outward_normal = horiz / horiz_mag
-        face_verts = verts[faces[fi]]
-        e1 = face_verts[1] - face_verts[0]
-        e2 = face_verts[2] - face_verts[0]
-        area = 0.5 * np.linalg.norm(np.cross(e1, e2))
 
-        raw.append({
-            'face_index': fi,
-            'centroid': centroid.copy(),
-            'outward_normal': outward_normal,
-            'area': area,
-            'vertices': face_verts.copy(),
-        })
+# =============================================================================
+# Step 3: Geometry-first pairing — perpendicular slab projection onto top hull
+# =============================================================================
 
-    if not raw:
+def pair_tip_to_push_by_perpendicular(
+        tip_edges: List[TipEdge],
+        hull_verts_3d: np.ndarray,
+        hull_verts_2d: np.ndarray,
+) -> List[Tuple[TipEdge, PushFace, float]]:
+    """
+    For each tip edge, find the best push point on the top-band convex hull
+    by sweeping a perpendicular slab across the full width of the tip edge
+    and selecting the hull vertex furthest from the tip edge line within that slab.
+
+    Algorithm (per tip edge):
+      1. Define a 2D coordinate frame aligned with the tip edge:
+           - along_axis  = unit vector along the tip edge (v0 → v1)
+           - perp_axis   = inward_normal (perpendicular, pointing into the object)
+      2. For every top-hull vertex, compute:
+           - along_coord = projection onto along_axis, measured from v0
+           - perp_coord  = projection onto perp_axis (signed distance from tip line)
+      3. Slab filter: keep only vertices whose along_coord is within [0, edge_length]
+         (i.e., the vertex falls within the lateral extent of the tip edge — the slab).
+      4. Far-side filter: keep only vertices with perp_coord > 0 (on the inward side).
+      5. Pick the vertex with the maximum perp_coord — the furthest point from the
+         tip edge within the slab.  This is the optimal push contact point because:
+           - The push direction (perp_axis) is exactly perpendicular to the tip edge
+             by construction, maximising the tipping moment.
+           - The furthest point maximises the moment arm.
+
+    The outward_normal of the resulting PushFace is -perp_axis (pointing back toward
+    the robot's approach side), and orthogonality is always 1.0 by construction.
+
+    Parameters
+    ----------
+    tip_edges : list of TipEdge
+    hull_verts_3d : (N, 3) top-band convex hull vertices (3D)
+    hull_verts_2d : (N, 2) same vertices projected to XY
+
+    Returns
+    -------
+    pairs : list of (TipEdge, PushFace, orthogonality=1.0)
+        One pair per tip edge that has a qualifying hull vertex.
+    """
+    if len(hull_verts_3d) == 0:
         return []
 
-    # --- cluster by outward normal direction ---
-    # Greedy: assign each triangle to the first cluster whose representative
-    # normal has dot >= normal_cluster_thresh with this triangle's normal.
-    clusters: List[dict] = []  # list of {normal, faces: [dict]}
-
-    for item in raw:
-        n = item['outward_normal']
-        assigned = False
-        for cluster in clusters:
-            if np.dot(cluster['normal'], n) >= normal_cluster_thresh:
-                cluster['faces'].append(item)
-                assigned = True
-                break
-        if not assigned:
-            clusters.append({'normal': n.copy(), 'faces': [item]})
-
-    # --- build one PushFace per cluster (area-weighted centroid) ---
-    push_faces: List[PushFace] = []
-    for cluster in clusters:
-        cluster_faces = cluster['faces']
-        total_area = sum(f['area'] for f in cluster_faces)
-        if total_area < 1e-12:
-            continue
-
-        # Area-weighted centroid gives the geometric centre of the side
-        weighted_centroid = sum(
-            f['centroid'] * f['area'] for f in cluster_faces
-        ) / total_area
-
-        # Representative normal: area-weighted average (re-normalised)
-        avg_normal = sum(
-            f['outward_normal'] * f['area'] for f in cluster_faces
-        ) / total_area
-        avg_normal_mag = np.linalg.norm(avg_normal)
-        if avg_normal_mag < 1e-8:
-            continue
-        avg_normal /= avg_normal_mag
-
-        # Representative face index: the triangle whose centroid is closest
-        # to the cluster centroid (used only for face highlighting in viz)
-        best_face = min(
-            cluster_faces,
-            key=lambda f: np.linalg.norm(f['centroid'] - weighted_centroid),
-        )
-        best_fi = best_face['face_index']
-
-        # Surface contact point: project the weighted centroid onto the mesh
-        # surface along the outward normal so the arrow starts ON the surface,
-        # not inside it (the avg of curved-face centroids pulls inward).
-        ray_origin = weighted_centroid + avg_normal * 0.5  # start outside
-        ray_dir    = -avg_normal                           # shoot inward
-        locs, _, _ = mesh.ray.intersects_location(
-            ray_origins=ray_origin[np.newaxis],
-            ray_directions=ray_dir[np.newaxis],
-        )
-        if len(locs) > 0:
-            # Pick the intersection closest to weighted_centroid
-            dists = np.linalg.norm(locs - weighted_centroid, axis=1)
-            surface_pt = locs[np.argmin(dists)]
-        else:
-            # Fallback: use the centroid of the nearest triangle
-            surface_pt = best_face['centroid']
-
-        push_faces.append(PushFace(
-            face_index=best_fi,
-            vertices=best_face['vertices'],
-            centroid=surface_pt,
-            outward_normal=avg_normal,
-            height=surface_pt[2],
-            area=total_area,
-        ))
-
-    return push_faces
-
-
-# =============================================================================
-# Step 3: Pair by Normal Alignment
-# =============================================================================
-
-def pair_faces_by_normal(tip_edges: List[TipEdge],
-                         push_faces: List[PushFace],
-                         alignment_thresh: float = 0.90) -> List[Tuple[TipEdge, PushFace, float]]:
-    """
-    Pair tip edges with push faces satisfying two hard geometric constraints,
-    then annotate each pair with its orthogonality score for ranking.
-
-    Hard constraints (both must hold in the XY / overhead view):
-      1. The push face's outward normal LINE must intersect the tip edge SEGMENT.
-         i.e. shooting a ray from push_centroid along -outward_normal hits [v0,v1].
-      2. The push face must lie on the far side of the object from the tip edge
-         (push centroid projection along inward_normal > tip midpoint projection).
-
-    Ranking metric (higher = better):
-      orthogonality = 1 - |dot(push.outward_normal_2d, tip.edge_vec_2d)|
-      A value of 1.0 means the push direction is perfectly perpendicular to the
-      tip edge (maximum tipping moment); 0.0 means it's parallel (no moment).
-
-    Parameters
-    ----------
-    alignment_thresh : float
-        Kept for API compatibility; not used (constraint 1 is strictly geometric).
-
-    Returns
-    -------
-    pairs : list of (TipEdge, PushFace, orthogonality)
-        Sorted by orthogonality descending (best first).
-    """
     pairs = []
     for tip in tip_edges:
-        tip_proj = np.dot(tip.midpoint[:2], tip.inward_normal[:2])
-        A = tip.v0[:2]
-        B = tip.v1[:2]
-        AB = B - A
+        along_axis = tip.edge_vec[:2]          # unit vec along tip edge
+        perp_axis  = tip.inward_normal[:2]     # unit vec perpendicular, into object
+        v0_2d      = tip.v0[:2]
 
-        for push in push_faces:
-            # --- Constraint 2: push face on far side ---
-            push_proj = np.dot(push.centroid[:2], tip.inward_normal[:2])
-            if push_proj <= tip_proj:
-                continue
+        # Project every hull vertex into the tip-edge local frame
+        delta      = hull_verts_2d - v0_2d    # (N, 2)
+        along_proj = delta @ along_axis        # coordinate along edge axis
+        perp_proj  = delta @ perp_axis         # signed perpendicular distance
 
-            # --- Constraint 1: -outward_normal ray hits the tip edge segment ---
-            # Ray: P + t * d,  d = -outward_normal_2d,  t >= 0
-            # Edge: A + s * AB,  s in [0, 1]
-            # Solve: P + t*d = A + s*AB
-            #   => t*d - s*AB = A - P
-            P = push.centroid[:2]
-            d = -push.outward_normal[:2]   # push direction (inward)
-            AP = A - P                     # A - P
+        # Slab filter: vertex must be within the lateral extent of the tip edge
+        slab_mask = (along_proj >= -1e-6) & (along_proj <= tip.length + 1e-6)
 
-            # 2x2 system: [d | -AB] * [t, s]^T = AP
-            # denom = det([d, -AB]) = d[0]*(-AB[1]) - d[1]*(-AB[0])
-            #                       = -d[0]*AB[1] + d[1]*AB[0]
-            denom = d[0] * (-AB[1]) - d[1] * (-AB[0])
-            if abs(denom) < 1e-10:
-                # Ray is parallel to the tip edge — skip
-                continue
+        # Far-side filter: vertex must be on the inward (object) side
+        far_mask  = perp_proj > 1e-6
 
-            t = (AP[0] * (-AB[1]) - AP[1] * (-AB[0])) / denom
-            s = (AP[0] * d[1]     - AP[1] * d[0])     / denom  # noqa: E221
+        valid_mask = slab_mask & far_mask
+        if not np.any(valid_mask):
+            continue
 
-            if t < -1e-6:
-                # Intersection is behind the push face (wrong direction)
-                continue
-            if not (-1e-4 <= s <= 1.0 + 1e-4):
-                # Ray misses the tip edge segment
-                continue
+        valid_indices = np.where(valid_mask)[0]
+        best_idx = valid_indices[np.argmax(perp_proj[valid_mask])]
 
-            # --- Orthogonality: how perpendicular is push_dir to tip edge? ---
-            orth = 1.0 - abs(np.dot(push.outward_normal[:2], tip.edge_vec[:2]))
+        best_3d = hull_verts_3d[best_idx]
 
-            pairs.append((tip, push, orth))
+        # outward_normal faces away from the object (robot approaches from here)
+        outward_normal = np.array([-perp_axis[0], -perp_axis[1], 0.0])
 
-    # Sort best-first so callers can take top-N directly
-    pairs.sort(key=lambda x: x[2], reverse=True)
+        push_face = PushFace(
+            face_index=-1,
+            vertices=np.array([best_3d, best_3d, best_3d]),
+            centroid=best_3d.copy(),
+            outward_normal=outward_normal,
+            height=float(best_3d[2]),
+            area=1e-8,
+        )
+
+        # orthogonality = 1.0 by construction (push ⊥ tip edge)
+        pairs.append((tip, push_face, 1.0))
+
     return pairs
 
 
@@ -515,10 +717,10 @@ def score_pair(tip_edge: TipEdge,
     """
     Score a (tip_edge, push_face) pair.
 
-    All candidates reaching this function have already passed the hard geometric
-    filter in pair_faces_by_normal (face normal line intersects tip edge segment).
+    All candidates reaching this function were selected by the perpendicular slab
+    pairing step and have orthogonality = 1.0 by construction.
 
-    Primary ranking key  — orthogonality (passed in from the pairing step):
+    Primary ranking key  — orthogonality (always 1.0 from slab pairing):
       1 - |dot(push.outward_normal_2d, tip.edge_vec_2d)|
       = 1.0  =>  push is perfectly perpendicular to tip edge (best tipping moment)
       = 0.0  =>  push is parallel to tip edge (no moment)
@@ -536,7 +738,7 @@ def score_pair(tip_edge: TipEdge,
         and loa_closeness contributes to the score.
         If False (default), LoA constraint is skipped; push_dir = -outward_normal.
     orthogonality : float
-        Pre-computed value from pair_faces_by_normal (in [0, 1]).
+        Pre-computed value from pair_tip_to_push_by_perpendicular (always 1.0).
     """
     if weights is None:
         weights = {
@@ -612,9 +814,28 @@ def select_push_config(mesh: trimesh.Trimesh,
     Steps
     -----
     1. Extract tip edges from the support polygon.
-    2. Extract push faces from the top band of the mesh.
+    2. Extract push faces from the convex hull of vertices in the top band.
     3. Pair by PARALLEL normal alignment.
     4. LoA check + scoring.
+
+    Parameters
+    ----------
+    mesh : trimesh.Trimesh
+    com_2d : (2,) array of CoM in XY
+    loa_epsilon : float
+        Line of action tolerance (meters).
+    enforce_loa : bool
+        If True, enforce LoA constraint as a hard constraint.
+    weights : dict, optional
+        Scoring weights for orthogonality, tipping_ease, leverage, edge_stability, loa_closeness.
+    top_k_edges : int
+        Number of top tip edges to consider (sorted by CoM proximity).
+    top_band_frac : float
+        Fraction of object height defining the top band for push candidates.
+    normal_alignment_thresh : float
+        Dot product threshold for normal alignment scoring.
+    verbose : bool
+        Print diagnostic info.
 
     Returns
     -------
@@ -639,18 +860,21 @@ def select_push_config(mesh: trimesh.Trimesh,
 
     candidate_tip_edges = tip_edges[:top_k_edges]
 
-    # --- Step 2: Push faces ---
-    push_faces = extract_push_faces(mesh, top_band_frac=top_band_frac)
+    # --- Step 2: Top-band convex hull ---
+    z_min = mesh.bounds[0, 2]
+    z_max = mesh.bounds[1, 2]
+    z_band_height = z_max - top_band_frac * (z_max - z_min)
+    hull_verts_3d, hull_verts_2d = extract_top_band_hull(mesh, z_band_height)
 
     if verbose:
-        print(f"\nPush faces in top {top_band_frac*100:.0f}% band: {len(push_faces)}")
+        print(f"\nTop-band hull vertices: {len(hull_verts_3d)}")
 
-    # --- Step 3: Pair by normal alignment ---
-    pairs = pair_faces_by_normal(candidate_tip_edges, push_faces,
-                                 alignment_thresh=normal_alignment_thresh)
+    # --- Step 3: Pair via perpendicular slab projection ---
+    pairs = pair_tip_to_push_by_perpendicular(candidate_tip_edges,
+                                               hull_verts_3d, hull_verts_2d)
 
     if verbose:
-        print(f"Face pairs after normal alignment: {len(pairs)}")
+        print(f"Pairs after perpendicular slab pairing: {len(pairs)}")
 
     # --- Step 4 & 5: LoA check + scoring ---
     object_height = mesh.vertices[:, 2].max() - mesh.vertices[:, 2].min()
@@ -782,24 +1006,6 @@ def _point_marker(center: np.ndarray,
     return _apply_color(marker, color)
 
 
-def _face_highlight(mesh: trimesh.Trimesh,
-                    face_index: int,
-                    color: Tuple[int, int, int, int],
-                    offset: float = 0.0005) -> trimesh.Trimesh:
-    """
-    Create a thin highlighted triangle slightly offset from the mesh surface
-    to visually mark a push face.
-    """
-    verts = mesh.vertices[mesh.faces[face_index]].copy()
-    fn = mesh.face_normals[face_index]
-    # Offset slightly along the face normal to avoid z-fighting
-    verts += fn * offset
-    face_mesh = trimesh.Trimesh(
-        vertices=verts,
-        faces=np.array([[0, 1, 2]]),
-    )
-    return _apply_color(face_mesh, color)
-
 
 def visualize_ranked_pairs(mesh: trimesh.Trimesh,
                            ranked_pairs: List[ScoredPair],
@@ -917,11 +1123,11 @@ def visualize_ranked_pairs(mesh: trimesh.Trimesh,
             )
             rendered_tip_edges.add(tip_key)
 
-        # Push face -- highlight the triangle on the mesh surface
-        face_key = pf.face_index
+        # Push point -- sphere marker at the push contact location
+        face_key = tuple(np.round(pf.centroid, 6))
         if face_key not in rendered_push_faces:
             scene.add_geometry(
-                _face_highlight(mesh, pf.face_index, face_color),
+                _point_marker(pf.centroid, base_line_r * thickness_scale * 1.5, face_color),
                 node_name=f"push_face_{i}",
             )
             rendered_push_faces.add(face_key)
@@ -941,19 +1147,19 @@ def visualize_ranked_pairs(mesh: trimesh.Trimesh,
             node_name=f"approach_dir_{i}",
         )
 
-    # ---- Rejected (grey, deduplicated by face index) ----
+    # ---- Rejected (grey point markers) ----
     seen_faces: set = set()
     rej_shown = 0
     for pair in rejected_pairs:
         if rej_shown >= 20:
             break
-        fk = pair.push_face.face_index
+        fk = tuple(np.round(pair.push_face.centroid, 6))
         if fk in seen_faces:
             continue
         seen_faces.add(fk)
 
         scene.add_geometry(
-            _face_highlight(mesh, fk, rejected_color),
+            _point_marker(pair.push_face.centroid, base_line_r, rejected_color),
             node_name=f"rej_push_{rej_shown}",
         )
         rej_shown += 1
@@ -1068,6 +1274,18 @@ if __name__ == "__main__":
             "--no-enforce-loa", action="store_true",
             help="Relax the LoA constraint: score by normals only, push straight inward.",
         )
+        parser.add_argument(
+            "--debug-hull", action="store_true",
+            help="Show debug visualization of convex hull, base vertices, and tip edges.",
+        )
+        parser.add_argument(
+            "--debug-push-faces", action="store_true",
+            help="Show debug visualization of all push faces in the top band, color-coded by cluster.",
+        )
+        parser.add_argument(
+            "--debug-band-contour", action="store_true",
+            help="Show debug visualization of push faces and top band convex hull vertices.",
+        )
         args = parser.parse_args()
 
         mesh = load_object_mesh(args.stl)
@@ -1080,6 +1298,27 @@ if __name__ == "__main__":
         print(f"  Bounds:   {mesh.bounds}")
         print(f"  CoM 2D:   {com_2d}")
         print()
+
+        # Debug visualization (optional)
+        if args.debug_hull:
+            print("Launching debug hull visualization...")
+            hull_verts = extract_support_polygon(mesh)
+            tip_edges = compute_tip_edges(hull_verts, com_2d)
+            debug_visualize_hull(mesh, hull_verts, tip_edges)
+            print("Debug visualization complete. Continuing with pipeline...\n")
+
+        if args.debug_push_faces:
+            print("Launching debug push faces visualization...")
+            debug_visualize_push_faces(mesh, top_band_frac=args.top_band_frac)
+            print("Debug visualization complete. Continuing with pipeline...\n")
+
+        if args.debug_band_contour:
+            print("Launching debug push faces visualization...")
+            z_min = mesh.bounds[0, 2]
+            z_max = mesh.bounds[1, 2]
+            z_band_height = z_max - args.top_band_frac * (z_max - z_min)
+            debug_visualize_push_faces(mesh, z_band_height, top_band_frac=args.top_band_frac)
+            print("Debug visualization complete. Continuing with pipeline...\n")
 
         ranked = select_push_config(
             mesh, com_2d,
