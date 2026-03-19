@@ -17,7 +17,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 
-from push_selection_pipeline import (
+from push_selection.OLDpush_selection_pipeline import (
     load_object_mesh,
     select_push_config,
     visualize_ranked_pairs,
