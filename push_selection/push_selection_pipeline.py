@@ -220,13 +220,12 @@ def find_push_candidates(mesh: trimesh.Trimesh,
     height_mask = face_centroids[:, 2] >= z_band_floor
 
     # 3. Centroid must be on the FAR side of the object from the tip edge.
-    #    Use the mesh's own XY centroid as the dividing plane, not the edge
-    #    midpoint.  This correctly splits the object in half along push_dir
-    #    regardless of where the tip edge sits, and handles symmetric objects
-    #    (e.g. a box whose CoM and edge midpoint project to the same point).
+    #    push_dir points TOWARD the tip edge (inward), so the robot approaches
+    #    from the OPPOSITE direction.  Faces the robot can reach project
+    #    GREATER than the mesh center along push_dir.
     mesh_center_proj = np.dot(mesh.centroid, push_dir)
     face_projs       = face_centroids @ push_dir
-    far_side_mask    = face_projs < mesh_center_proj
+    far_side_mask    = face_projs > mesh_center_proj
 
     valid_mask = opposing_mask & height_mask & far_side_mask
     valid_indices = np.where(valid_mask)[0]
@@ -668,17 +667,26 @@ def visualize_ranked_pairs(mesh: trimesh.Trimesh,
     com_z = z_min + (z_max - z_min) * 0.5
     com_pt = np.array([com_2d[0], com_2d[1], com_z])
 
-    # Bright red CoM dot.
+    # LoA epsilon sphere: semi-transparent cyan shell around CoM.
+    # Added before the CoM dot so the dot renders on top.
+    eps_sphere = trimesh.creation.icosphere(subdivisions=3, radius=loa_epsilon)
+    eps_sphere.apply_translation(com_pt)
+    eps_sphere.visual.face_colors = np.array([80, 200, 220, 90], dtype=np.uint8)
+    scene.add_geometry(eps_sphere, node_name="loa_epsilon_sphere")
+
+    # CoM dot: pinpoint marker, always smaller than the epsilon sphere.
+    com_dot_r = loa_epsilon * 0.08
+    # com_dot_r = 0.1
     scene.add_geometry(
-        _point_marker(com_pt, marker_r * 1.8, (220, 30, 30, 255)),
+        _point_marker(com_pt, com_dot_r, (220, 30, 30, 255)),
         node_name="com",
     )
 
-    # Transparent grey sphere showing the LoA epsilon tolerance radius.
-    eps_sphere = trimesh.creation.icosphere(subdivisions=3, radius=loa_epsilon)
-    eps_sphere.apply_translation(com_pt)
-    eps_sphere.visual.face_colors = np.array([160, 160, 160, 55], dtype=np.uint8)
-    scene.add_geometry(eps_sphere, node_name="loa_epsilon_sphere")
+    # # Bright red CoM dot.
+    # scene.add_geometry(
+    #     _point_marker(com_pt, marker_r * 1.8, (220, 30, 30, 255)),
+    #     node_name="com",
+    # )
 
     # Colors for valid ranked candidates (best → worst).
     valid_colors = [
@@ -695,14 +703,20 @@ def visualize_ranked_pairs(mesh: trimesh.Trimesh,
     rejected_pairs = [p for p in ranked_pairs if p.score <= -np.inf]
 
     # ---- Render valid top-N ----
+    # Each tip edge is drawn only once, using the color of its best-ranked pair.
+    rendered_edges: set = set()
     for i, pair in enumerate(valid_pairs[:top_n]):
         color = valid_colors[min(i, len(valid_colors) - 1)]
         e = pair.tip_edge
 
-        scene.add_geometry(
-            _segment_mesh(e.v0, e.v1, line_r, color),
-            node_name=f"tip_edge_{i}",
-        )
+        edge_key = (tuple(np.round(e.v0, 6)), tuple(np.round(e.v1, 6)))
+        if edge_key not in rendered_edges:
+            scene.add_geometry(
+                _segment_mesh(e.v0, e.v1, line_r, color),
+                node_name=f"tip_edge_{i}",
+            )
+            rendered_edges.add(edge_key)
+
         p = pair.push.point
         scene.add_geometry(
             _point_marker(p, marker_r, color),
@@ -767,6 +781,21 @@ def load_object_mesh(stl_path: str) -> trimesh.Trimesh:
     if not isinstance(mesh, trimesh.Trimesh):
         raise TypeError(f"Expected a single Trimesh from '{stl_path}', got {type(mesh)}")
 
+    # Sanity-check units: everyday objects should fit within 1 m in every axis.
+    extents = mesh.bounding_box.extents  # (dx, dy, dz)
+    if np.any(extents > 1.0):
+        RED = "\033[1;31m"
+        RESET = "\033[0m"
+        raise SystemExit(
+            f"{RED}\n"
+            f"  *** UNIT ERROR: mesh is too large to be in meters ***\n"
+            f"  Extents: {extents[0]:.1f} x {extents[1]:.1f} x {extents[2]:.1f} "
+            f"(units assumed meters)\n"
+            f"  The file was likely exported in millimeters instead of meters.\n"
+            f"  Fix: re-export with meter units, or scale the STL by 0.001.\n"
+            f"{RESET}"
+        )
+
     mesh = mesh.copy()
     z_min = mesh.vertices[:, 2].min()
     mesh.vertices[:, 2] -= z_min
@@ -778,7 +807,7 @@ if __name__ == "__main__":
 
     _default_stl = (
         Path(__file__).resolve().parents[1]
-        / "assets" / "my_objects" / "box" / "box.stl" #"heart" / "heart_exp.stl"
+        / "assets" / "my_objects" / "box" / "box_m.stl" #"heart" / "heart_exp.stl"
     )
 
     parser = argparse.ArgumentParser(
