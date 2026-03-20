@@ -1,35 +1,41 @@
 """
 run_push_selection.py
 =====================
-Run the push/tip selection pipeline on one or more experiment object meshes.
+Run push/tip selection on the four experiment meshes and save one PNG each.
 
 Usage
 -----
-    python run_push_selection.py                          # all objects
-    python run_push_selection.py --objects box heart      # subset
-    python run_push_selection.py --no-viz                 # scores only
-    python run_push_selection.py --backend matplotlib     # static plots
-    python run_push_selection.py --loa-epsilon 0.02       # relax LoA tolerance
-    python run_push_selection.py --top-k 3                # fewer tip-edge candidates
+    python run_push_selection.py
+    python run_push_selection.py --output-dir figures/push_selection
+    python run_push_selection.py --loa-epsilon 0.02
+    python run_push_selection.py --top-k 3
 """
 
 import argparse
 from pathlib import Path
 import numpy as np
 
-from push_selection.OLDpush_selection_pipeline import (
-    load_object_mesh,
-    select_push_config,
-    visualize_ranked_pairs,
-)
+try:
+    # Works when launched from repo root (package import).
+    from push_selection.push_selection_pipeline import (
+        load_object_mesh,
+        select_push_config,
+        visualize_ranked_pairs,
+    )
+except ModuleNotFoundError:
+    # Works when launched directly from the push_selection directory.
+    from push_selection_pipeline import (
+        load_object_mesh,
+        select_push_config,
+        visualize_ranked_pairs,
+    )
 
 # ---------------------------------------------------------------------------
 # Object registry
-# Each entry: name → (stl_path_relative_to_repo_root, com_2d_estimate)
+# Each entry: name -> per-object settings and STL path.
 #
-# com_2d is the (x, y) CoM projection in the object frame [meters].
-# Use (0, 0) as a default for rotationally symmetric objects or when unknown.
-# Replace with estimated values from analyze_experiment.py output as needed.
+# CoM is computed from mesh.center_mass so batch runs match standalone runs.
+# The requested experiment meshes are processed in FIXED_OBJECT_ORDER.
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -37,35 +43,23 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 OBJECTS = {
     "box": {
         "stl":    REPO_ROOT / "assets" / "my_objects" / "box"         / "box_exp.stl",
-        "com_2d": np.array([0.0, 0.0]),   # symmetric box, CoM at center
         "loa_epsilon": 0.05,
     },
     "heart": {
         "stl":    REPO_ROOT / "assets" / "my_objects" / "heart"       / "heart_exp.stl",
-        "com_2d": np.array([0.0, 0.0]),   # replace with estimate from analysis
         "loa_epsilon": 0.02,
     },
     "flashlight": {
         "stl":    REPO_ROOT / "assets" / "my_objects" / "flashlight"  / "flashlight_exp.stl",
-        "com_2d": np.array([0.0, 0.0]),
-        "loa_epsilon": 0.02,
-    },
-    "L": {
-        "stl":    REPO_ROOT / "assets" / "my_objects" / "L"           / "L_exp.stl",
-        "com_2d": np.array([0.0, 0.0]),   # asymmetric — update with real estimate
         "loa_epsilon": 0.02,
     },
     "monitor": {
         "stl":    REPO_ROOT / "assets" / "my_objects" / "monitor"     / "monitor_exp.stl",
-        "com_2d": np.array([0.0, 0.0]),
         "loa_epsilon": 0.02,
     },
-    "soda": {
-        "stl":    REPO_ROOT / "assets" / "my_objects" / "soda"        / "soda_exp.stl",
-        "com_2d": np.array([0.0, 0.0]),   # cylindrical, symmetric
-        "loa_epsilon": 0.03,
-    },
 }
+
+FIXED_OBJECT_ORDER = ["box", "heart", "flashlight", "monitor"]
 
 
 # ---------------------------------------------------------------------------
@@ -76,18 +70,15 @@ def run_object(name: str,
                config: dict,
                loa_epsilon_override: float | None,
                top_k: int,
-               visualize: bool,
-               backend: str) -> None:
+               output_dir: Path) -> None:
     """Run the full pipeline for one object and print results."""
 
     stl_path = config["stl"]
-    com_2d   = config["com_2d"]
     loa_eps  = loa_epsilon_override if loa_epsilon_override is not None else config["loa_epsilon"]
 
     print("\n" + "=" * 65)
     print(f"  Object : {name.upper()}")
     print(f"  Mesh   : {stl_path.relative_to(REPO_ROOT)}")
-    print(f"  CoM 2D : {com_2d}")
     print(f"  LoA ε  : {loa_eps} m")
     print("=" * 65)
 
@@ -95,7 +86,10 @@ def run_object(name: str,
         print(f"  [SKIP] STL not found: {stl_path}")
         return
 
-    mesh   = load_object_mesh(str(stl_path))
+    mesh = load_object_mesh(str(stl_path))
+    com = mesh.center_mass
+    com_2d = np.array([com[0], com[1]], dtype=float)
+    print(f"  CoM 2D : {com_2d}")
     ranked = select_push_config(
         mesh,
         com_2d,
@@ -104,41 +98,32 @@ def run_object(name: str,
         verbose=True,
     )
 
-    if visualize and ranked:
-        visualize_ranked_pairs(
-            mesh,
-            ranked,
-            com_2d,
-            top_n=5,
-            show=True,
-            backend=backend,
-        )
-    elif visualize and not ranked:
-        print("  [VIZ SKIPPED] No valid configurations found.")
+    output_path = output_dir / f"{name}.png"
+    visualize_ranked_pairs(
+        mesh,
+        ranked,
+        com_2d,
+        top_n=5,
+        show=False,
+        save_png_path=output_path,
+        loa_epsilon=loa_eps,
+    )
+    if output_path.exists():
+        try:
+            disp = output_path.relative_to(REPO_ROOT)
+        except ValueError:
+            disp = output_path
+        print(f"  [SAVED] {disp}")
+    else:
+        print(f"  [WARN] Expected image not found after render: {output_path}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run push/tip selection pipeline on experiment object meshes."
-    )
-    parser.add_argument(
-        "--objects",
-        nargs="+",
-        metavar="NAME",
-        choices=list(OBJECTS.keys()),
-        default=list(OBJECTS.keys()),
-        help="Object(s) to process. Choices: %(choices)s. Default: all.",
-    )
-    parser.add_argument(
-        "--no-viz",
-        action="store_true",
-        help="Skip visualization, print scores only.",
-    )
-    parser.add_argument(
-        "--backend",
-        choices=["trimesh", "matplotlib"],
-        default="trimesh",
-        help="Visualization backend. Default: trimesh (interactive).",
+        description=(
+            "Run push/tip selection for box, heart, flashlight, and monitor "
+            "and save [object].png for each."
+        )
     )
     parser.add_argument(
         "--loa-epsilon",
@@ -154,16 +139,27 @@ def main() -> None:
         metavar="K",
         help="Number of top tip-edge candidates to evaluate per object. Default: 5.",
     )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path(__file__).resolve().parent,
+        metavar="DIR",
+        help="Directory for output PNG files. Default: push_selection/",
+    )
     args = parser.parse_args()
 
-    for name in args.objects:
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    print("Processing objects:", ", ".join(FIXED_OBJECT_ORDER))
+    print(f"Output directory: {args.output_dir}")
+
+    for name in FIXED_OBJECT_ORDER:
         run_object(
             name=name,
             config=OBJECTS[name],
             loa_epsilon_override=args.loa_epsilon,
             top_k=args.top_k,
-            visualize=not args.no_viz,
-            backend=args.backend,
+            output_dir=args.output_dir,
         )
 
     print("\nDone.")

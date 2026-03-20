@@ -590,9 +590,38 @@ def pair_tip_to_push_by_perpendicular(
             continue
 
         valid_indices = np.where(valid_mask)[0]
-        best_idx = valid_indices[np.argmax(perp_proj[valid_mask])]
+        valid_perp = perp_proj[valid_mask]
+        max_perp = valid_perp.max()
 
-        best_3d = hull_verts_3d[best_idx]
+        # Among candidates at (or near) maximum perp distance, compute the
+        # push contact point as the along-edge midpoint clamped to [0, tip.length],
+        # then reconstruct 3D position by interpolating among the near-max vertices.
+        near_max_mask = valid_perp >= max_perp - 1e-6
+        near_max_indices = valid_indices[near_max_mask]
+        near_max_verts_3d = hull_verts_3d[near_max_indices]
+        near_max_along = along_proj[near_max_indices]
+
+        # Target: the along-edge midpoint, clamped to the span of near-max vertices.
+        midpoint_along = tip.length / 2.0
+        clamped = np.clip(midpoint_along,
+                          near_max_along.min(),
+                          near_max_along.max())
+
+        # Interpolate 3D position at clamped along-coordinate.
+        # Sort near-max vertices by along_proj and linearly interpolate.
+        sort_order = np.argsort(near_max_along)
+        sorted_along = near_max_along[sort_order]
+        sorted_verts = near_max_verts_3d[sort_order]
+
+        if len(sorted_along) == 1 or sorted_along[-1] - sorted_along[0] < 1e-8:
+            best_3d = sorted_verts[0]
+        else:
+            # Find bracketing segment and lerp
+            i_right = np.searchsorted(sorted_along, clamped, side='left')
+            i_right = int(np.clip(i_right, 1, len(sorted_along) - 1))
+            i_left = i_right - 1
+            t = (clamped - sorted_along[i_left]) / (sorted_along[i_right] - sorted_along[i_left])
+            best_3d = (1 - t) * sorted_verts[i_left] + t * sorted_verts[i_right]
 
         # outward_normal faces away from the object (robot approaches from here)
         outward_normal = np.array([-perp_axis[0], -perp_axis[1], 0.0])
@@ -1006,6 +1035,29 @@ def _point_marker(center: np.ndarray,
     return _apply_color(marker, color)
 
 
+def _set_isometric_camera(scene: trimesh.Scene,
+                          mesh: trimesh.Trimesh,
+                          fov_deg: float = 45.0) -> None:
+    """Set a consistent isometric-like camera pose for scene rendering."""
+    try:
+        bounds = mesh.bounds
+        center = bounds.mean(axis=0)
+        extents = bounds[1] - bounds[0]
+        diag = float(np.linalg.norm(extents))
+
+        # Fixed isometric-like view using trimesh's native camera helper.
+        scene.set_camera(
+            angles=np.radians([45.0, 0.0, 30.0]), #35.264, 0.0]),
+            distance=max(diag * 1.5, 0.25),
+            center=center,
+            fov=(fov_deg, fov_deg),
+            resolution=(1600, 1000),
+        )
+    except Exception:
+        # Rendering should still proceed even if camera setup fails.
+        return
+
+
 
 def visualize_ranked_pairs(mesh: trimesh.Trimesh,
                            ranked_pairs: List[ScoredPair],
@@ -1035,6 +1087,7 @@ def visualize_ranked_pairs(mesh: trimesh.Trimesh,
     scene.add_geometry(mesh_vis, node_name="object_mesh")
 
     if len(ranked_pairs) == 0:
+        _set_isometric_camera(scene, mesh)
         if save_png_path is not None:
             save_png_path = Path(save_png_path)
             try:
@@ -1055,8 +1108,8 @@ def visualize_ranked_pairs(mesh: trimesh.Trimesh,
     z_min = mesh.bounds[0, 2]
     z_max = mesh.bounds[1, 2]
     diag = np.linalg.norm(mesh.bounds[1] - mesh.bounds[0])
-    base_line_r = max(diag * 0.003, 0.0008)
-    arrow_len   = max(diag * 0.12, 0.03)
+    base_line_r = max(diag * 0.0035, 0.0015)
+    arrow_len   = max(diag * 0.14, 0.045)
 
     # CoM at mid-height
     com_z = z_min + (z_max - z_min) * 0.5
@@ -1132,19 +1185,18 @@ def visualize_ranked_pairs(mesh: trimesh.Trimesh,
             )
             rendered_push_faces.add(face_key)
 
-        # Arrow inward: push face centroid → tip edge (push direction)
-        push_dir = pair.push_dir
-        # arrow_end = pf.centroid + push_dir * arrow_len
-        # scene.add_geometry(
-        #     _segment_mesh(pf.centroid, arrow_end, line_r * 0.7, color),
-        #     node_name=f"push_dir_{i}",
-        # )
-
-        # Arrow outward: centroid → outside the object (approach direction)
-        outward_end = pf.centroid + pf.outward_normal * arrow_len
+        # Arrow inwards: centroid → inside the object (approach direction)
+        inward_end = pf.centroid + pf.outward_normal * arrow_len
         scene.add_geometry(
-            _segment_mesh(pf.centroid, outward_end, line_r * 0.7, color),
+            _segment_mesh(pf.centroid, inward_end, max(line_r * 0.8, base_line_r * 0.9), color),
             node_name=f"approach_dir_{i}",
+        )
+
+        ## Add an outwards arrow as well, pointing in the same axis as the inwards arrow
+        outward_end = pf.centroid - pf.outward_normal * arrow_len
+        scene.add_geometry(
+            _segment_mesh(pf.centroid, outward_end, max(line_r * 0.8, base_line_r * 0.9), color),
+            node_name=f"outward_dir_{i}",
         )
 
     # ---- Rejected (grey point markers) ----
@@ -1175,6 +1227,7 @@ def visualize_ranked_pairs(mesh: trimesh.Trimesh,
         print()
 
     if save_png_path is not None:
+        _set_isometric_camera(scene, mesh)
         save_png_path = Path(save_png_path)
         try:
             png_bytes = scene.save_image(resolution=(1600, 1000), visible=True)
@@ -1239,7 +1292,7 @@ if __name__ == "__main__":
 
         _default_stl = (
             Path(__file__).resolve().parents[1]
-            / "assets" / "my_objects" / "box" / "box_m.stl"
+            / "assets" / "my_objects" / "box" / "box_exp.stl"
         )
 
         parser = argparse.ArgumentParser(
