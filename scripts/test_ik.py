@@ -1,4 +1,7 @@
-import utils.robot_controller as robot_controller
+try:
+    import mujoco_irb120.common.robot_controller as robot_controller
+except ModuleNotFoundError:
+    import utils.robot_controller as robot_controller
 from load_obj_in_env import load_environment
 import numpy as np
 import mujoco
