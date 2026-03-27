@@ -58,7 +58,7 @@
 		
         <include file="my_objects/robot/robot.xml"> </include>
 
-        <include file="my_objects/flashlight/flashlight_exp.xml"/>
+        <include file="my_objects/box/box_exp.xml"/>
         
 		<!-- ^ Object body will inject here ^ -->
 

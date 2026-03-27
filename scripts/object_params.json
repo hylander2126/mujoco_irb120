@@ -1,0 +1,32 @@
+{
+    "objects": {
+        "0": {
+            "name": "box",
+            "mass_gt": 0.635,
+            "com_gt_onshape": [-0.0500, 0.0, 0.1500],
+            "com_gt_offset":  [ 0.0000, 0.0, 0.0000],
+            "init_xyz":       [ 0.374,  0.0, 0.250]
+        },
+        "10": {
+            "name": "heart",
+            "mass_gt": 0.269,
+            "com_gt_onshape": [ 0.0458, 0.0, 0.1000],
+            "com_gt_offset":  [ 0.0000, 0.0, 0.0000],
+            "init_xyz":       [ 0.374,  0.0, 0.250]
+        },
+        "11": {
+            "name": "lshape",
+            "mass_gt": 0.118,
+            "com_gt_onshape": [ 0.0127, 0.0, 0.0887],
+            "com_gt_offset":  [-0.0250, 0.0, 0.0000],
+            "init_xyz":       [ 0.374,  0.0, 0.170]
+        },
+        "14": {
+            "name": "flashlight",
+            "mass_gt": 0.386,
+            "com_gt_onshape": [ 0.0000, 0.0, 0.0938],
+            "com_gt_offset":  [ 0.0280, 0.0, 0.0000],
+            "init_xyz":       [ 0.374,  0.0, 0.225]
+        }
+    }
+}
