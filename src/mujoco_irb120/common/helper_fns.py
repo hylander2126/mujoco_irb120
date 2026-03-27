@@ -24,12 +24,13 @@ import numpy as np
 '''
 *** HYLAND ADDED FUNCTIONS ***
 '''
-def vec_to_unit(vec):
+def vec_to_unit(vec, ax=1, keepdims=True):
     """Converts a vector to a unit vector, with error handling for zero vectors."""
     vec = np.asarray(vec, dtype=float)
-    norm = np.linalg.norm(vec)
-    if norm < 1e-12:
-        raise ValueError("Cannot convert zero vector to unit vector.")
+    norm = np.linalg.norm(vec, axis=ax, keepdims=keepdims)
+    if np.any(norm < 1e-12):
+        # print("Cannot convert zero vector to unit vector.")
+        return np.zeros_like(vec)  # or return np.nan * np.ones_like(vec) to indicate invalidity
     return vec / norm
 
 def enforce_quat_continuity(Q, eps=1e-12, normalize=True):
