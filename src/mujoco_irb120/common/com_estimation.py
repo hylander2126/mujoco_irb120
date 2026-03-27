@@ -72,6 +72,7 @@ def model_fwd_wrench(
     R_B = rotvec_to_rot(rot_vecs)  # (N,3,3) object rotation in world frame
     R_B_T = R_B.transpose(0, 2, 1)  # (N,3b,3a) Transpose for inverse rotation (swaps correctly each 3x3 block)
     g_B = np.array([0, 0, -9.81])  # gravity in world/robot/table frame
+    N_table_B = np.array([0, 0, N_table])  # normal force in world/robot/table frame
     if rob_vel_B is None:
         rob_vel_B = np.tile(np.array([-1.0, 0.0, 0.0]), (rot_vecs.shape[0], 1))
     else:
@@ -98,14 +99,17 @@ def model_fwd_wrench(
     moving = vel_norm[:, 0] > 1e-12
     dir_S[moving] = rob_vel_B[moving] / vel_norm[moving]
 
-    f_fr_S = -dir_S * (mu_table * N_table)  # (N,3) friction force in sensor/world frame
+    f_fr_S = -dir_S * (mu_table * N_table)              # (N,3) friction force in sensor/world frame
     # 'nij' is A (N,3,3) 'nj' is B (N,3) -> 'ni' is (N,3)  ---> 'n' iterated for mult. 'j' matches dot prod rules, 'i' is remaining axis
-    f_fr_O = np.einsum('nij,ni->ni', R_B_T, f_fr_S)  # (N,3) friction force in object frame
-    tau_ground_O = np.zeros_like(f_fr_O)               # (N,3) zero ground reaction torque about pivot (tipping edge)
-    w_ground_O = np.hstack((f_fr_O, tau_ground_O))       # (N,6) ground reaction wrench in object frame
+    f_fr_O = np.einsum('nij,ni->ni', R_B_T, f_fr_S)     # (N,3) friction force in object frame
+    # TEMP HACK TODO NOTE
+    f_fr_O[:,:2] = 0.0
+    f_fr_O += R_B_T @ N_table_B                              # z-component is Normal force
+    tau_ground_O = np.zeros_like(f_fr_O)                # (N,3) zero ground reaction torque about pivot (tipping edge)
+    w_ground_O = np.hstack((f_fr_O, tau_ground_O))      # (N,6) ground reaction wrench in object frame
 
     # print("\nGravity wrench in object frame:\n", w_grav_O)
-    print("Ground reaction wrench in object frame:\n", w_ground_O)
+    # print("Ground reaction wrench in object frame:\n", w_ground_O)
     
     return w_grav_O + w_ground_O
 
