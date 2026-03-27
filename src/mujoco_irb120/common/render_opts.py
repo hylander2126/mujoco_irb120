@@ -1,6 +1,7 @@
 import mujoco
 import numpy as np
 import contextlib
+from pynput import keyboard as pynput_keyboard
 
 
 ### Camera parameters for BOTH viewer and offscreen renderer ###
@@ -31,9 +32,18 @@ class RendererViewerOpts:
         # Video recording needs a renderer (as opposed to the passive viewer for live-viewing)
         self.renderer = mujoco.Renderer(model_obj, height=self.height, width=self.width)
 
+        # Keyboard state: tracks which arrow keys are currently held down (via pynput)
+        self.key_state = {
+            pynput_keyboard.Key.left:  False,
+            pynput_keyboard.Key.right: False,
+            pynput_keyboard.Key.up:    False,
+            pynput_keyboard.Key.down:  False,
+        }
+        self._kb_listener = None  # started in __enter__
+
         # Launch the viewer context if visualization is enabled
         self._viewer_ctx = (
-            mujoco.viewer.launch_passive(model_obj, data_obj, show_left_ui=False) 
+            mujoco.viewer.launch_passive(model_obj, data_obj, show_left_ui=False)
             if vis else contextlib.nullcontext(None)
         )
         self.viewer = None # becomes the actual viewer after __enter__
@@ -53,14 +63,20 @@ class RendererViewerOpts:
         self.viewer = self._viewer_ctx.__enter__()  # will be None if vis=False
         if self.viewer is not None:
             self._apply_viewer_opts(self.viewer)
+        self._kb_listener = pynput_keyboard.Listener(
+            on_press=self._on_key_press,
+            on_release=self._on_key_release,
+        )
+        self._kb_listener.start()
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        # Close renderer reliably
+        if self._kb_listener is not None:
+            self._kb_listener.stop()
+            self._kb_listener = None
         if getattr(self, "renderer", None) is not None:
             self.renderer.close()
             self.renderer = None
-        # Exit viewer context (no-op if headless)
         return self._viewer_ctx.__exit__(exc_type, exc, tb)
     
     
@@ -76,6 +92,47 @@ class RendererViewerOpts:
         if len(self.frames) < data_obj.time * self.framerate:     # Add frame to the video recording
             self.renderer.update_scene(data_obj, camera=self.cam_obj, scene_option=self.opt_obj)  # Update the renderer with the current scene
             self.frames.append(self.renderer.render())        # Capture the current frame for video recording
+
+    def _on_key_press(self, key):
+        if key in self.key_state:
+            self.key_state[key] = True
+
+    def _on_key_release(self, key):
+        if key in self.key_state:
+            self.key_state[key] = False
+
+    def get_keyboard_input(self):
+        """Poll keyboard input and return velocity commands for cartesian control.
+
+        Arrow keys control end-effector motion:
+        - LEFT arrow:  Move -X (away from object)
+        - RIGHT arrow: Move +X (toward object)
+        - UP arrow:    Move +Z (lift)
+        - DOWN arrow:  Move -Z (lower)
+
+        Velocity is applied for as long as the key is held; stops when released.
+
+        Returns:
+            np.ndarray: 6D command [wx, wy, wz, vx, vy, vz] (rad/s and m/s)
+                        or None if viewer is not available
+        """
+        if self.viewer is None or not self.viewer.is_running():
+            return None
+
+        v_cmd = np.zeros(6)
+        max_lin_vel = 0.1  # m/s
+
+        if self.key_state[pynput_keyboard.Key.right]:
+            v_cmd[3] = max_lin_vel
+        elif self.key_state[pynput_keyboard.Key.left]:
+            v_cmd[3] = -max_lin_vel
+
+        if self.key_state[pynput_keyboard.Key.up]:
+            v_cmd[5] = max_lin_vel
+        elif self.key_state[pynput_keyboard.Key.down]:
+            v_cmd[5] = -max_lin_vel
+
+        return v_cmd
 
     @staticmethod
     def _apply_viewer_opts(v_ctx):

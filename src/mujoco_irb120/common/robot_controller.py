@@ -9,7 +9,8 @@ class controller:
         self.model          = model
         self.data           = data
         self.joint_names    = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
-        self.joint_idx      = np.array([model.joint(name).qposadr for name in self.joint_names]) # This is same as dofadr (v_indices)
+        self.joint_idx      = np.array([model.joint(name).qposadr for name in self.joint_names]).flatten() # qpos indices (for qpos, jnt_range, ctrl)
+        self.joint_dof_idx  = np.array([model.joint(name).dofadr  for name in self.joint_names]).flatten() # velocity DOF indices (for Jacobian columns)
         self.ee_site        = model.site(ee_site).id
         self.table_site     = model.site('surface_site').id
         self.obj_frame_site = model.site('obj_frame_site').id
@@ -36,6 +37,10 @@ class controller:
         # --- Inverse Kinematics Parameters ---
         self.error_history  = []
         self.prev_error     = np.inf
+        
+        # --- Cartesian Keyboard Control Parameters ---
+        self.kb_goal_pose = None  # Legacy IK goal pose (kept for compatibility)
+        self.kb_q_des = None      # Persistent joint target for keyboard control
 
         # --- Force Sensor Calculations ---
         self.f_sensor_id    = model.sensor('force_sensor').id
@@ -59,8 +64,8 @@ class controller:
         jacp = np.zeros((3, self.model.nv))
         jacr = np.zeros((3, self.model.nv))
         mujoco.mj_jacSite(self.model, self.data, jacp, jacr, self.ee_site)
-        J_pos = jacp[:, self.joint_idx]
-        J_rot = jacr[:, self.joint_idx]
+        J_pos = jacp[:, self.joint_dof_idx]
+        J_rot = jacr[:, self.joint_dof_idx]
         self.J = np.vstack([J_rot, J_pos]).squeeze()
         if set_pinv:
             self.J_pinv = np.linalg.pinv(self.J)  # Pseudo-inverse of the Jacobian
@@ -91,9 +96,12 @@ class controller:
             print("Warning: Desired pose is outside the manipulability ellipsoid.")
             return
         self.data.qpos[self.joint_idx] = q
-        self.data.qvel[self.joint_idx] = 0.0
+        self.data.qvel[self.joint_dof_idx] = 0.0
+        self.data.ctrl[:] = np.asarray(q).flatten()  # sync actuator targets so position controllers don't spring back
         mujoco.mj_fwdPosition(self.model, self.data)
         self.error_history = []
+        self.kb_q_des = self.data.qpos[self.joint_idx].copy().astype(float)
+        self.kb_goal_pose = None
     
     def IK(self, T_des, method=2, max_iters=500, tol=1e-3, damping=0.1, step_size=0.5):
         """
@@ -119,6 +127,7 @@ class controller:
 
         # Initialize the IK algo with current joint pos
         q = q_original.copy()
+        prev_error = np.inf
         
         # Use a try...finally block to ensure we restore the original state
         try:
@@ -139,11 +148,11 @@ class controller:
                     return q                                    # Return successful solution
 
                 ## --- Back track dynamic damping size ---
-                if np.linalg.norm(xi_e_space) > self.prev_error:
+                if np.linalg.norm(xi_e_space) > prev_error:
                     damping *= 0.5
                 # else:
                 #     damping *= 1.5
-                self.prev_error = np.linalg.norm(xi_e_space)
+                prev_error = np.linalg.norm(xi_e_space)
 
                 # --- Compute Jacobian ---
                 self.get_jacobian()  # Update the Jacobian matrix
@@ -161,20 +170,16 @@ class controller:
 
                 # --- Update joint angles ---
                 delta_q = J_update @ xi_e_space
-                q += delta_q.reshape(6,1)
+                q += delta_q.flatten()
                 q = np.clip(q, self.q_min, self.q_max)          # Clamp to joint limits
 
             # If loop finishes without converging
-            print("\n**********************************")
-            print("IK failed to converge!")
-            raise RuntimeError(f"IK did not converge within the {max_iters} number of iterations. Final error norm: {np.linalg.norm(xi_e_space):.3f}")
+            raise RuntimeError(f"IK did not converge within {max_iters} iterations. Final error: {np.linalg.norm(xi_e_space):.3f}")
 
         finally:
             ## --- Restore the original state ---
             self.data.qpos[self.joint_idx] = q_original
             mujoco.mj_fwdPosition(self.model, self.data)
-            print("IK done, robot state restored.")
-            print("**********************************")
     
     def set_pos_ctrl(self, q_desired, check_ellipsoid=True):
         """Apply position control to the robot"""
@@ -197,6 +202,65 @@ class controller:
         q_dot = self.J_pinv @ v_desired
         self.data.ctrl[:] = q_dot.flatten()
         mujoco.mj_forward(self.model, self.data)    # Update forward kinematics after control input
+
+    def apply_cartesian_keyboard_ctrl(self, v_cmd, dt=None, maintain_orientation=True, verbose=False):
+        """Apply cartesian keyboard control to move the end-effector.
+        
+        Maintains a goal pose across frames and integrates velocity commands.
+        Uses IK to compute joint angles toward the goal.
+        
+        Args:
+            v_cmd (np.ndarray): 6D command [wx, wy, wz, vx, vy, vz] (rad/s, m/s)
+            dt (float): Time step. If None, uses model.opt.timestep
+            maintain_orientation (bool): If True, maintains current orientation
+            verbose (bool): If True, prints debug info
+        
+        Returns:
+            bool: True if control applied successfully, False otherwise
+        """
+        if dt is None:
+            dt = self.model.opt.timestep
+
+        # Expected command ordering is [wx, wy, wz, vx, vy, vz].
+        if v_cmd is None:
+            v_cmd = np.zeros(6)
+
+        # Maintain orientation by zeroing angular velocity commands.
+        if maintain_orientation:
+            v_cmd = np.asarray(v_cmd, dtype=float).copy()
+            v_cmd[:3] = 0.0
+
+        # Initialize persistent desired joints and actively hold current pose.
+        if self.kb_q_des is None:
+            self.kb_q_des = self.data.qpos[self.joint_idx].copy().astype(float)
+            self.set_pos_ctrl(self.kb_q_des, check_ellipsoid=False)
+            if verbose:
+                print("[KB CTRL] Initialized and holding current joint target")
+
+        try:
+            # Differential IK in one step: qdot = J^+ * v_cmd
+            self.get_jacobian(set_pinv=True)
+            q_dot = self.J_pinv @ v_cmd
+
+            # Clip joint velocity to configured limit for stable keyboard behavior.
+            q_dot = np.clip(q_dot, -self.v_max, self.v_max)
+
+            # Integrate and clamp to joint limits.
+            self.kb_q_des = self.kb_q_des + q_dot.flatten() * dt
+            self.kb_q_des = np.clip(self.kb_q_des, self.q_min, self.q_max)
+
+            # Send desired joint positions to MuJoCo position actuators.
+            self.set_pos_ctrl(self.kb_q_des, check_ellipsoid=False)
+
+            if verbose and not np.allclose(v_cmd, 0):
+                ee = self.FK()[:3, 3]
+                print(f"[KB CTRL] cmd v=({v_cmd[3]:+.3f}, {v_cmd[4]:+.3f}, {v_cmd[5]:+.3f}) m/s | EE=({ee[0]:.3f}, {ee[1]:.3f}, {ee[2]:.3f})")
+            return True
+
+        except Exception as e:
+            if verbose:
+                print(f"[KB CTRL] Error: {str(e)[:80]}")
+            return False
 
     def get_surface_pos(self):
         """Get the position of the table surface, NOT COM"""
@@ -445,7 +509,7 @@ class controller:
         v_des[:3] += dv_ang_corrective.flatten()
 
         # --- Compute velocity (twist) error---
-        v_error = v_des - self.J @ self.data.qvel[self.joint_idx].reshape(-1,)
+        v_error = v_des - self.J @ self.data.qvel[self.joint_dof_idx].reshape(-1,)
         # --- Damped Least Squares ---
         dv = self.J_pinv @ np.linalg.solve(self.J @ self.J_pinv + (damping * np.eye(6)), v_error)
 
@@ -475,7 +539,7 @@ class controller:
         # The core of admittance control: F_err = M*a + D*v
         # We solve for the desired acceleration: a = (F_err - D*v) / M
         # We only control admittance in the linear X direction (pushing direction)
-        v_current_linear = (J @ self.data.qvel[self.joint_idx])[3:]
+        v_current_linear = (J @ self.data.qvel[self.joint_dof_idx])[3:]
         
         # Calculate desired acceleration only in the push direction (world X)
         a_admittance_x = (f_err[0] - D * v_current_linear[0]) / M
@@ -488,7 +552,7 @@ class controller:
         R_current = self.T[:3, :3]
         err_o_mat = self.R_desired_orientation @ R_current.T
         err_o_axis_angle = Robj.from_matrix(err_o_mat).as_rotvec()
-        v_current_angular = (J @ self.data.qvel[self.joint_idx])[:3].flatten()
+        v_current_angular = (J @ self.data.qvel[self.joint_dof_idx])[:3].flatten()
         
         # Calculate desired angular velocity to correct orientation
         self.v_admittance[:3] = Kp_ori * err_o_axis_angle - Kv_ori * v_current_angular
@@ -504,11 +568,11 @@ class controller:
         dq_desired = (np.linalg.pinv(J) @ self.v_admittance).reshape(6,1)
         
         # Calculate joint error
-        err_q = dq_desired - self.data.qvel[self.joint_idx]
+        err_q = dq_desired - self.data.qvel[self.joint_dof_idx]
 
         # --- 5. Calculate and Apply Final Torques ---
-        gravity_comp = self.data.qfrc_bias[self.joint_idx]
-        tau_command = Kp_joint * err_q - Kv_joint * self.data.qvel[self.joint_idx] #+ gravity_comp
+        gravity_comp = self.data.qfrc_bias[self.joint_dof_idx]
+        tau_command = Kp_joint * err_q - Kv_joint * self.data.qvel[self.joint_dof_idx] #+ gravity_comp
 
         self.data.ctrl[self.joint_idx] = tau_command
 
@@ -600,7 +664,7 @@ class controller:
         
         # Get current end-effector velocity (linear and angular)
         J = self.get_jacobian()
-        v_current_full = J @ self.data.qvel[self.joint_idx]
+        v_current_full = J @ self.data.qvel[self.joint_dof_idx]
         v_current_angular = v_current_full[:3].squeeze()  # Extract angular velocity (first 3 elements)
         v_current_linear = v_current_full[3:].squeeze()  # Extract linear velocity (last 3 elements)
 
