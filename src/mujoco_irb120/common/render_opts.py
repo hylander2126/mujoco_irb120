@@ -153,8 +153,8 @@ class RendererViewerOpts:
 
     @staticmethod
     def _apply_model_vis(model_obj):
-        model_obj.vis.scale.contactwidth    = 0.025  # Contact arrow width
-        model_obj.vis.scale.contactheight   = 0.25   # Contact arrow height
+        model_obj.vis.scale.contactwidth    = 0.004  # Contact arrow width
+        model_obj.vis.scale.contactheight   = 0.02   # Contact arrow height
         # model_obj.vis.scale.forcewidth      = 0.05 # Gross... force 'disc' size
         # model_obj.vis.map.force             = 0.3  # Gross... force 'disc' scale
         model_obj.vis.scale.framewidth      = 0.025  # Frame axis width
