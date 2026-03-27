@@ -213,7 +213,6 @@ def debug_visualize_hull(mesh: trimesh.Trimesh,
 
 
 def debug_visualize_push_faces(mesh: trimesh.Trimesh,
-                               z_band_height: float,
                                top_band_frac: float = 0.10,
                                min_horiz_component: float = 0.3,
                                normal_cluster_thresh: float = 0.98) -> trimesh.Scene:
@@ -230,8 +229,6 @@ def debug_visualize_push_faces(mesh: trimesh.Trimesh,
     Parameters
     ----------
     mesh : trimesh.Trimesh
-    z_band_height : float
-        The z-coordinate below which vertices are excluded.
     top_band_frac : float
         Fraction of height defining top band (for raw face clustering).
     min_horiz_component : float
@@ -253,6 +250,10 @@ def debug_visualize_push_faces(mesh: trimesh.Trimesh,
     verts = mesh.vertices
     faces = mesh.faces
     face_normals = mesh.face_normals
+
+    z_min = mesh.bounds[0, 2]
+    z_max = mesh.bounds[1, 2]
+    z_band_height = z_max - top_band_frac * (z_max - z_min)
 
     # --- Extract and visualize convex hull of top band vertices ---
     band_verts_idx = np.where(verts[:, 2] >= z_band_height)[0]
@@ -306,8 +307,6 @@ def debug_visualize_push_faces(mesh: trimesh.Trimesh,
             pass
 
     # --- Extract and visualize push faces in top band ---
-    z_min = mesh.bounds[0, 2]
-    z_max = mesh.bounds[1, 2]
     z_band_floor = z_max - top_band_frac * (z_max - z_min)
 
     centroids = verts[faces].mean(axis=1)
@@ -835,7 +834,6 @@ def select_push_config(mesh: trimesh.Trimesh,
                        weights: Optional[dict] = None,
                        top_k_edges: int = 5,
                        top_band_frac: float = 0.10,
-                       normal_alignment_thresh: float = 0.90,
                        verbose: bool = True) -> List[ScoredPair]:
     """
     Full pipeline: given mesh and 2D CoM, return ranked push configurations.
@@ -861,8 +859,6 @@ def select_push_config(mesh: trimesh.Trimesh,
         Number of top tip edges to consider (sorted by CoM proximity).
     top_band_frac : float
         Fraction of object height defining the top band for push candidates.
-    normal_alignment_thresh : float
-        Dot product threshold for normal alignment scoring.
     verbose : bool
         Print diagnostic info.
 
@@ -968,8 +964,6 @@ def select_push_config(mesh: trimesh.Trimesh,
         else:
             print("WARNING: No VALID push configurations found.")
             print(f"  loa_epsilon={loa_epsilon:.3f}m -- consider increasing it.")
-            print(f"  normal_alignment_thresh={normal_alignment_thresh:.2f} "
-                  f"-- consider decreasing it.")
 
         if rejected_pairs:
             print(f"\n  {len(rejected_pairs)} candidates REJECTED. "
@@ -1320,10 +1314,6 @@ if __name__ == "__main__":
             help="Fraction of object height defining the push-face top band (default: 0.10).",
         )
         parser.add_argument(
-            "--normal-thresh", "--normal_thresh", type=float, default=0.90,
-            help="Min |cos| for parallel normal pairing (default: 0.90).",
-        )
-        parser.add_argument(
             "--no-enforce-loa", action="store_true",
             help="Relax the LoA constraint: score by normals only, push straight inward.",
         )
@@ -1334,10 +1324,6 @@ if __name__ == "__main__":
         parser.add_argument(
             "--debug-push-faces", action="store_true",
             help="Show debug visualization of all push faces in the top band, color-coded by cluster.",
-        )
-        parser.add_argument(
-            "--debug-band-contour", action="store_true",
-            help="Show debug visualization of push faces and top band convex hull vertices.",
         )
         args = parser.parse_args()
 
@@ -1365,21 +1351,12 @@ if __name__ == "__main__":
             debug_visualize_push_faces(mesh, top_band_frac=args.top_band_frac)
             print("Debug visualization complete. Continuing with pipeline...\n")
 
-        if args.debug_band_contour:
-            print("Launching debug push faces visualization...")
-            z_min = mesh.bounds[0, 2]
-            z_max = mesh.bounds[1, 2]
-            z_band_height = z_max - args.top_band_frac * (z_max - z_min)
-            debug_visualize_push_faces(mesh, z_band_height, top_band_frac=args.top_band_frac)
-            print("Debug visualization complete. Continuing with pipeline...\n")
-
         ranked = select_push_config(
             mesh, com_2d,
             loa_epsilon=args.loa_epsilon,
             enforce_loa=not args.no_enforce_loa,
             top_k_edges=args.top_k_edges,
             top_band_frac=args.top_band_frac,
-            normal_alignment_thresh=args.normal_thresh,
             verbose=True,
         )
 

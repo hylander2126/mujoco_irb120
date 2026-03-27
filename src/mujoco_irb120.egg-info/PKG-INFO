@@ -1,3 +1,10 @@
+Metadata-Version: 2.4
+Name: mujoco-irb120
+Version: 0.1.0
+Summary: MuJoCo IRB120 experimentation, analysis, and push-selection utilities
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+
 # MuJoCo IRB120 — 3D Center-of-Mass Estimation via Robotic Tipping
 
 A physics-based framework for estimating the 3D center-of-mass (CoM) of unknown objects using an ABB IRB120 6-DOF manipulator. The robot pushes objects to the edge of a table, and a torque-balance model is fit to the observed tipping dynamics to recover object mass and CoM height. Both MuJoCo simulation and real-world experiments on a physical robot are supported.
