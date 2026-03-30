@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from .helper_fns import *
 
 class controller:
-    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, ee_site='site:tool0'):
+    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, ee_site='site:tool0', ft_output='row'):
         self.model          = model
         self.data           = data
         self.joint_names    = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
@@ -44,9 +44,13 @@ class controller:
 
         # --- Force Sensor Calculations ---
         self.f_sensor_id    = model.sensor('force_sensor').id
-        self.ft_offset      = np.zeros((3, 1))  # Force-torque sensor offset for biasing
-        self.grav_offset    = np.zeros((3, 1))  # Gravity compensation offset
+        self.t_sensor_id    = model.sensor('torque_sensor').id
+        self.ft_offset      = np.zeros(6)  # Force-torque sensor offset for biasing
+        self.grav_offset    = np.zeros(6)  # Gravity compensation offset
         self.grav_mass      = 0.0339              # Gravity compensation mass
+        if ft_output not in ('row', 'column'):
+            raise ValueError("ft_output must be either 'row' or 'column'.")
+        self.ft_output      = ft_output
 
 
     def FK(self):
@@ -58,6 +62,16 @@ class controller:
         self.T[:3, :3] = R_curr
         self.T[:3, 3] = p_curr.flatten()
         return self.T
+
+    def get_ee_position(self, copy=True):
+        """Get end-effector position in world frame as a shape-(3,) vector."""
+        p = self.data.site_xpos[self.ee_site]
+        return p.copy() if copy else p
+
+    @property
+    def ee_position(self):
+        """Convenience property for a copied end-effector world position."""
+        return self.get_ee_position(copy=True)
     
     def get_jacobian(self, set_pinv=True):
         """Calculate the Jacobian matrix for the end-effector site"""
@@ -71,24 +85,29 @@ class controller:
             self.J_pinv = np.linalg.pinv(self.J)  # Pseudo-inverse of the Jacobian
         return self.J
 
-    def ft_get_reading(self, grav_comp=True):
-        """Get the force reading from the force sensor, optionally gravity compensated."""
-        f_meas = self.data.sensordata[self.f_sensor_id:self.f_sensor_id + 3].reshape(3, 1)
+    def ft_get_reading(self, grav_comp=True, as_column=None):
+        """Get the wrench reading from the F/T sensor, optionally gravity compensated.
 
-        # Apply any prior bias
-        f = f_meas - self.ft_offset
+        Returns a (6,) row-style vector by default, or (6,1) if configured/requested.
+        """
+        # MuJoCo sensor id is not the same as the sensordata address; use sensor_adr.
+        f_adr = int(self.model.sensor_adr[self.f_sensor_id])
+        t_adr = int(self.model.sensor_adr[self.t_sensor_id])
+        f_meas = np.asarray(self.data.sensordata[f_adr:f_adr + 3], dtype=float)
+        t_meas = np.asarray(self.data.sensordata[t_adr:t_adr + 3], dtype=float)
+        w_out = np.concatenate([f_meas, t_meas]) - np.asarray(self.ft_offset, dtype=float).reshape(6)
 
         if not grav_comp:
-            return f
-        # Optional gravity comp (force only; torque left untouched since you read 3D force)
-        # site rotation: site frame -> world; take transpose for world -> site
-        R_sw = self.data.site_xmat[self.ee_site].reshape(3, 3).T
-        # gravity force expressed in site frame
-        f_g_site = R_sw @ (self.grav_mass * np.array([0, 0, -9.81])).reshape(3, 1)
-        
-        # f_g_site = np.zeros((3,1))  # DISABLE GRAVITY COMPENSATION FOR NOW
+            w = w_out
+        else:
+            # site rotation: site frame -> world; transpose maps world -> site.
+            R_sw = self.data.site_xmat[self.ee_site].reshape(3, 3).T
+            f_g_site = R_sw @ (self.grav_mass * np.array([0.0, 0.0, -9.81]))
+            w = w_out - np.concatenate([f_g_site, np.zeros(3)])
 
-        return f - f_g_site  # subtract mg
+        if as_column is None:
+            as_column = (self.ft_output == 'column')
+        return w.reshape(6, 1) if as_column else w
     
     def set_pose(self, q=np.zeros((6,1))):
         """Forcibly set the robot to a specific joint configuration by ignoring dynamics"""
@@ -284,87 +303,44 @@ class controller:
             return False
         return True
 
-    def get_payload_pose(self, site='payload_site', output='T', degrees=False):
-        payload_site_id = self.model.site(site).id
-        payload_R = self.data.site_xmat[payload_site_id].reshape(3, 3)
-        payload_p = self.data.site_xpos[payload_site_id].flatten()
-        T_payload = np.eye(4)
-        T_payload[:3, :3] = payload_R
-        T_payload[:3, 3] = payload_p
-        if output == 'T':
-            return T_payload
-        elif output == 'pitch':
-            rot = Robj.from_matrix(payload_R).as_euler('xyz', degrees=False)
-            tip_angle = rot[1]  # pitch angle
-            if degrees:
-                tip_angle = np.degrees(tip_angle)
-            return tip_angle
-        elif output == 'p':
-            return payload_p
-        else:
-            raise ValueError("Output must be 'pitch', 'p', or 'T'.")
-        
-    def get_payload_rpy(self, site='payload_site', degrees=False, frame='world'):
-        """
-        Get the Euler angles representation of the payload's orientation.
-        """
-
-        sid = self.model.site(site).id
-        Rw = self.data.site_xmat[sid].reshape(3, 3)
-
-        if frame == 'body':
-            Rb = Rw.T @ Rw  # Identity, since Rw.T @ Rw = I
-            R = Rb
-        else:
-            R = Rw
-
-        rot = Robj.from_matrix(R)
-        rpy = rot.as_euler('xyz', degrees=degrees)  # roll, pitch, yaw
-        return rpy
-
-    def get_payload_axis_angle(self, site='payload_site', degrees=False, frame='world', reset_ref=False):
-        """
-        Finite axis–angle of the payload's rotation relative to its initial pose.
+    def get_payload_pose(self, site='payload_site', out='T', degrees=False, frame='world'):
+        """Unified payload state accessor.
 
         Args:
-            site:       site name for payload
-            degrees:    if True, return angle in degrees (else radians)
-            frame:      'world' (default) or 'body' to express the axis
-            reset_ref:  if True, set current pose as new zero-rotation reference
-
-        Returns:
-            angle, axis
-            - angle: scalar >= 0 (rad or deg)
-            - axis:  (3,) unit vector (undefined if angle≈0; we return [1,0,0])
+            site: payload site name.
+            output: one of {'T', 'R', 'p', 'rpy', 'quat'}.
+            degrees: when True, angular outputs are returned in degrees.
+            frame: 'world' (default) or 'body' for axis-angle/RPY conventions.
+            reset_ref: for 'axis_angle', set current pose as new reference.
         """
         sid = self.model.site(site).id
         Rw = self.data.site_xmat[sid].reshape(3, 3)
+        p = self.data.site_xpos[sid].flatten()
 
-        # cache/refresh reference orientation
-        if reset_ref or not hasattr(self, '_payload_R0'):
-            self._payload_R0 = Rw.copy()
-        R0 = self._payload_R0
+        if out == 'T':
+            T_payload = np.eye(4)
+            T_payload[:3, :3] = Rw
+            T_payload[:3, 3] = p
+            return T_payload
 
-        # relative rotation
-        R_rel = Rw @ R0.T
+        if out == 'R':
+            return Rw
 
-        # axis–angle via rotation vector
-        rotvec = Robj.from_matrix(R_rel).as_rotvec()
-        angle = float(np.linalg.norm(rotvec))
-        axis = (rotvec / angle) if angle > 1e-12 else np.array([1.0, 0.0, 0.0])
-
-        # express axis in desired frame
-        if frame == 'body':
-            axis = Rw.T @ axis
-
-        if degrees:
-            angle = np.rad2deg(angle)
-
-        return angle, axis
+        if out == 'p':
+            return p
         
+        if out == "quat":
+            return Robj.from_matrix(Rw).as_quat()  # (x, y, z, w) format
+
+        if out == 'rpy':
+            R_eval = np.eye(3) if frame == 'body' else Rw
+            return Robj.from_matrix(R_eval).as_euler('xyz', degrees=degrees)
+
+        raise ValueError("Output must be one of 'T', 'R', 'p', 'rpy', 'quat'.")
+
     def check_topple(self):
-        payload_angle = self.get_payload_pose(output='pitch', degrees=True)
-        if np.isclose(payload_angle, 90, atol=1e-2):
+        payload_angle = self.get_payload_pose(out='rpy', degrees=True)
+        if np.isclose(np.any(payload_angle == 90), True, atol=1e-2):
             self.stop = True
 
     def check_contact(self):
