@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from .helper_fns import *
 
 class controller:
-    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, ee_site='site:tool0', ft_output='row'):
+    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, ee_site='site:tool0'):
         self.model          = model
         self.data           = data
         self.joint_names    = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
@@ -15,6 +15,12 @@ class controller:
         self.table_site     = model.site('surface_site').id
         self.obj_frame_site = model.site('obj_frame_site').id
         self.o_obj          = self.data.site_xpos[self.obj_frame_site]  # (3,)
+        self.payload_body_id = int(self.model.site_bodyid[self.obj_frame_site])
+        self.pusher_body_id = int(model.body('pusher_link').id)
+        try:
+            self.pusher_geom_id = model.geom('push_rod').id
+        except Exception:
+            self.pusher_geom_id = None
         self.stop           = False                              # Stop flag for the controller
         self.q_min          = model.jnt_range[self.joint_idx, 0] # Max joint limits
         self.q_max          = model.jnt_range[self.joint_idx, 1] # Min joint limits
@@ -45,12 +51,14 @@ class controller:
         # --- Force Sensor Calculations ---
         self.f_sensor_id    = model.sensor('force_sensor').id
         self.t_sensor_id    = model.sensor('torque_sensor').id
+        try:
+            self.ft_site = model.site('sensor_site').id
+        except Exception:
+            # Fallback: if sensor_site is absent, use tool flange site.
+            self.ft_site = self.ee_site
         self.ft_offset      = np.zeros(6)  # Force-torque sensor offset for biasing
         self.grav_offset    = np.zeros(6)  # Gravity compensation offset
         self.grav_mass      = 0.0339              # Gravity compensation mass
-        if ft_output not in ('row', 'column'):
-            raise ValueError("ft_output must be either 'row' or 'column'.")
-        self.ft_output      = ft_output
 
 
     def FK(self):
@@ -85,29 +93,33 @@ class controller:
             self.J_pinv = np.linalg.pinv(self.J)  # Pseudo-inverse of the Jacobian
         return self.J
 
-    def ft_get_reading(self, grav_comp=True, as_column=None):
-        """Get the wrench reading from the F/T sensor, optionally gravity compensated.
+    def ft_get_reading(self, grav_comp=True):
+        """Get wrench in WORLD frame from the F/T sensor.
 
-        Returns a (6,) row-style vector by default, or (6,1) if configured/requested.
+        Args:
+            grav_comp: subtract gravity load from force component.
         """
+
         # MuJoCo sensor id is not the same as the sensordata address; use sensor_adr.
         f_adr = int(self.model.sensor_adr[self.f_sensor_id])
         t_adr = int(self.model.sensor_adr[self.t_sensor_id])
         f_meas = np.asarray(self.data.sensordata[f_adr:f_adr + 3], dtype=float)
         t_meas = np.asarray(self.data.sensordata[t_adr:t_adr + 3], dtype=float)
-        w_out = np.concatenate([f_meas, t_meas]) - np.asarray(self.ft_offset, dtype=float).reshape(6)
+        w_site = np.concatenate([f_meas, t_meas]) #- np.asarray(self.ft_offset, dtype=float).reshape(6)
 
-        if not grav_comp:
-            w = w_out
-        else:
-            # site rotation: site frame -> world; transpose maps world -> site.
-            R_sw = self.data.site_xmat[self.ee_site].reshape(3, 3).T
-            f_g_site = R_sw @ (self.grav_mass * np.array([0.0, 0.0, -9.81]))
-            w = w_out - np.concatenate([f_g_site, np.zeros(3)])
+        # Sensor-site rotation: sensor -> world.
+        R_wsensor = np.array([[0, 0, -1],
+                              [0, 1, 0],
+                             [1, 0, 0]]) # static 90 flip about Y-axis
 
-        if as_column is None:
-            as_column = (self.ft_output == 'column')
-        return w.reshape(6, 1) if as_column else w
+        # R_wsensor = np.eye(3)
+        w_site_out = w_site
+
+        # Always return world-frame wrench.
+        f_world = R_wsensor @ w_site_out[:3]
+        t_world = R_wsensor @ w_site_out[3:]
+        w = np.concatenate([f_world, t_world])
+        return w
     
     def set_pose(self, q=np.zeros((6,1))):
         """Forcibly set the robot to a specific joint configuration by ignoring dynamics"""
@@ -344,11 +356,33 @@ class controller:
             self.stop = True
 
     def check_contact(self):
+        """Return True only when the pusher is contacting the payload."""
         for contact in self.data.contact:
-            geom_names = [mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, int(id)) for id in contact.geom]
-            if 'pusher_link' in geom_names:         # If contact is between pusher and payload, skip it
+            g0, g1 = int(contact.geom[0]), int(contact.geom[1])
+            b0, b1 = int(self.model.geom_bodyid[g0]), int(self.model.geom_bodyid[g1])
+
+            # Primary path: detect contact between any geom on pusher body and any geom on payload body.
+            pusher_in_contact = (b0 == self.pusher_body_id) or (b1 == self.pusher_body_id)
+            payload_in_contact = (b0 == self.payload_body_id) or (b1 == self.payload_body_id)
+            if pusher_in_contact and payload_in_contact:
+                return True
+
+            # Fast path: known pusher geom id.
+            if self.pusher_geom_id is not None:
+                if g0 != self.pusher_geom_id and g1 != self.pusher_geom_id:
+                    continue
+                other_gid = g1 if g0 == self.pusher_geom_id else g0
+                if int(self.model.geom_bodyid[other_gid]) == self.payload_body_id:
+                    return True
                 continue
-            else:
+
+            # Fallback path: name-based pusher detection if geom id is unavailable.
+            names = [mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, gid) or '' for gid in (g0, g1)]
+            pusher_flags = [('push_rod' in n) or ('pusher_link' in n) for n in names]
+            if not any(pusher_flags):
+                continue
+            other_gid = g1 if pusher_flags[0] else g0
+            if int(self.model.geom_bodyid[other_gid]) == self.payload_body_id:
                 return True
         return False
 
