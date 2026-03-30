@@ -35,21 +35,31 @@
                                 <geom type="mesh" mesh="link_6" name="robot0:link_6" rgba="0 0 0 1" contype="0" conaffinity="0"/>
                                 
                                 <!-- SITE: tool0 flange -->
-                                <site name="site:tool0" pos="0 0 0" euler="0 0 0" size="0.01" rgba="0 1 0 0"/> <!-- 0.072-->
+                                <site name="site:tool0" pos="0 0 0" euler="0 1.5708 0" size="0.01" rgba="0 1 0 0"/> <!-- rotated to match ft and adapter link -->
 
                                 <!-- Force sensor adapter, body, etc. -->
                                 <body name="ft_and_adapter_link" pos="0.041125 0 0" euler="0 1.570795 0" gravcomp="1">
                                     <geom type="cylinder" size="0.0375 0.041125" rgba="0.5 0.5 0.5 1"/>
 
-                                    <!-- Force Sensor Site -->
-                                    <site name="sensor_site" pos="0 0 0.041125" euler="0 3.1416 0" size="0.01" rgba="1 0 0 0"/>
+                                    <!-- Force Sensor Site 0, 90, 0-->
+                                    <site name="sensor_site" pos="0 0 0.041125" euler="0 0 0" size="0.01" rgba="1 0 0 0"/> <!-- 0 pi 0 -->
 
                                     <!-- Pusher link -->
                                     <body name="pusher_link" pos="0 0 0.041125" euler="0 0 0" gravcomp="1"> <!-- 0 1.5708 0 -->
-                                        <geom name="push_rod" type="mesh" mass="0.066" mesh="pusher_link" material="robot0:gripper_mat" friction="1.5 0.02 0.001" condim="4"/>
+                                        <!-- Visual mesh only; collision handled by explicit primitives. -->
+                                        <geom name="push_rod" type="mesh" mass="0.066" mesh="pusher_link" material="robot0:gripper_mat" contype="0" conaffinity="0"/>
+
+                                        <!-- Tip sphere collision model aligned to STL local frame.
+                                            Measured mesh bounds for pusher_link.stl:
+                                            - zmin = 0.000 m, zmax = 0.110 m
+                                            - ball diameter = 26.5 mm  => radius = 13.25 mm
+                                            - sphere center z = 0.110 - 0.01325 = 0.09675 m
+                                        -->
+                                        <geom name="push_ball_col" type="sphere" pos="0 0 0.09675" size="0.01325"
+                                              friction="1.5 0.02 0.001" condim="4"/>
 
                                         <!-- Pusher contact site -->
-                                        <site name="site:fingertip" pos="0.0 0.0 0.10" euler="0 -1.570795 0" size="0.01" rgba="1 0 0 0"/>
+                                        <site name="site:fingertip" pos="0.0 0.0 0.11" euler="0 -1.570795 0" size="0.01" rgba="1 0 0 0"/>
                                     </body>
                                 </body>
                             </body>
