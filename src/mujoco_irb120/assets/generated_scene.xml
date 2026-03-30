@@ -26,8 +26,8 @@
 </actuator>
 
 <sensor>
-    <force name="force_sensor" site="sensor_site"/>
-    <torque name="torque_sensor" site="sensor_site"/>
+    <force name="force_sensor" site="site:sensor"/>
+    <torque name="torque_sensor" site="site:sensor"/>
 </sensor>
 
 	<!-- v ROBOT actuators will inject here v -->

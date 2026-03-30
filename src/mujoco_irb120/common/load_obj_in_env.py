@@ -12,7 +12,7 @@ from xml.etree import ElementTree as ET
 # so this has to be done empirically, for now
 
 OBJECT_CONFIGS = {
-    0: {"name": "box",          "pos": "0.1 0.0 0.2",   "euler": "0 0 0",   "rgba": "1 0 0 0.2"},
+    0: {"name": "box",          "pos": "0.1 0.0 0.2",   "euler": "0 0 0",   "rgba": "1 0 0 0.9"},
     1: {"name": "alarmclock",   "pos": "1.0 0.0 0.1",   "quat": "1 0 0 0",  'scale': "1.0"},
     2: {"name": "binoculars",   "pos": "1.0 0.0 0.1",   "quat": "1 0 0 0",  'scale': "1.0"},
     3: {"name": "camera",       "pos": "1.0 0.0 0.1",   "quat": "1 0 0 0",  'scale': "1.0"},
@@ -41,8 +41,8 @@ ACTUATOR_BLOCK = f"""
 </actuator>
 
 <sensor>
-    <force name="force_sensor" site="sensor_site"/>
-    <torque name="torque_sensor" site="sensor_site"/>
+    <force name="force_sensor" site="site:sensor"/>
+    <torque name="torque_sensor" site="site:sensor"/>
 </sensor>
 """
 

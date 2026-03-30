@@ -137,14 +137,10 @@ class RendererViewerOpts:
     @staticmethod
     def _apply_viewer_opts(v_ctx):
         """ Set visualization options for the passive viewer context """
-        v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
-        # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Gross... Contact 'translucent' force 'disc'
-        
-        # v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_SITE # Visualize SITE frames only
-        # v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_BODY # Visualize BODY frames only
-        # v_ctx.opt.frame                                          = mujoco.mjtFrame.mjFRAME_WORLD # Visualize WORLD frames only
-
-        # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_COM]              = True # Center of mass spheres
+        # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
+        v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Gross... Contact 'translucent' force 'disc'
+       # Just use keyboard shortcut ('v') to toggle visualization of frames as needed; too cluttered otherwise.
+        # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_COM]              = True # Center of mass spheres TOO BIG, don't use...
 
         v_ctx.cam.distance                                       = CAM_DISTANCE
         v_ctx.cam.elevation                                      = CAM_ELEVATION
@@ -163,8 +159,8 @@ class RendererViewerOpts:
     @staticmethod
     def _apply_offscreen_opts(cam_obj, opt_obj):
         """ Set visualization options for the offscreen renderer (video recording) """
-        opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
-        # opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Contact 'translucent' force 'disc'
+        # opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
+        opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Contact 'translucent' force 'disc'
         # opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_BODY # Visualize BODY frames only
         opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_SITE # Visualize SITE frames only NOT WORKING TODO
 
