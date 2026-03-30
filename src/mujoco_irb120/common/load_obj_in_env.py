@@ -42,6 +42,7 @@ ACTUATOR_BLOCK = f"""
 
 <sensor>
     <force name="force_sensor" site="sensor_site"/>
+    <torque name="torque_sensor" site="sensor_site"/>
 </sensor>
 """
 
