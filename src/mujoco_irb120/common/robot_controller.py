@@ -68,32 +68,48 @@ class controller:
         self.T[:3, 3] = p_curr.flatten()
         return self.T
 
-    def get_position(self, which='ee', copy=True):
-        """Get a named site position in world frame as a shape-(3,) vector."""
+    def get_site_pose(self, which='ee'):
+        """Get a named site pose in world frame as a (4,4) homogeneous transform."""
         site_map = {
-            'ee': self.ee_site,
-            'ball': self.ball_site,
+            'ee':     self.ee_site,
+            'ball':   self.ball_site,
             'sensor': self.ft_site,
         }
         if which not in site_map:
-            raise ValueError("which must be one of {'ee', 'ball', 'sensor'}")
-        p = self.data.site_xpos[site_map[which]]
-        return p.copy() if copy else p
+            raise ValueError(f"which must be one of {set(site_map)}")
+        sid = site_map[which]
+        T = np.eye(4)
+        T[:3, :3] = self.data.site_xmat[sid].reshape(3, 3).copy()
+        T[:3,  3] = self.data.site_xpos[sid].copy()
+        return T
 
     @property
+    def ee_pose(self):
+        """End-effector site pose in world frame as (4,4)."""
+        return self.get_site_pose('ee')
+
+    @property
+    def ball_pose(self):
+        """Ball-center site pose in world frame as (4,4)."""
+        return self.get_site_pose('ball')
+
+    @property
+    def sensor_pose(self):
+        """FT sensor site pose in world frame as (4,4)."""
+        return self.get_site_pose('sensor')
+
+    # --- Legacy position-only convenience (kept for backward compat) ----------
+    @property
     def ee_position(self):
-        """Convenience property for a copied end-effector world position."""
-        return self.get_position('ee', copy=True)
-    
+        return self.get_site_pose('ee')[:3, 3]
+
     @property
     def ball_position(self):
-        """Convenience property for a copied ball world position."""
-        return self.get_position('ball', copy=True)
-    
+        return self.get_site_pose('ball')[:3, 3]
+
     @property
     def sensor_position(self):
-        """Convenience property for a copied sensor world position."""
-        return self.get_position('sensor', copy=True)
+        return self.get_site_pose('sensor')[:3, 3]
     
     def get_jacobian(self, set_pinv=True):
         """Calculate the Jacobian matrix for the end-effector site"""

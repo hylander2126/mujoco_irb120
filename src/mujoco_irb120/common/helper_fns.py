@@ -396,10 +396,12 @@ def RotInv(R):
     return np.array(R).T
 
 def VecToso3(omg):
-    """Converts a 3-vector to an so(3) representation
+    """Converts angular vector(s) to so(3) skew-symmetric matrix/matrices.
 
-    :param omg: A 3-vector
-    :return: The skew symmetric representation of omg
+    :param omg: A 3-vector with shape (3,) or batched vectors with shape (N, 3)
+    :return: The skew symmetric representation(s) of omg.
+             If input is (3,), returns (3,3).
+             If input is (N,3), returns (N,3,3).
 
     Example Input:
         omg = np.array([1, 2, 3])
@@ -408,9 +410,26 @@ def VecToso3(omg):
                   [ 3,  0, -1],
                   [-2,  1,  0]])
     """
-    return np.array([[0,      -omg[2],  omg[1]],
-                     [omg[2],       0, -omg[0]],
-                     [-omg[1], omg[0],       0]])
+    omg = np.asarray(omg, dtype=float)
+
+    if omg.ndim == 1:
+        if omg.shape[0] != 3:
+            raise ValueError(f"Expected omg shape (3,), got {omg.shape}")
+        return np.array([[0,       -omg[2],  omg[1]],
+                         [omg[2],        0, -omg[0]],
+                         [-omg[1], omg[0],        0]])
+
+    if omg.ndim != 2 or omg.shape[1] != 3:
+        raise ValueError(f"Expected omg shape (3,) or (N,3), got {omg.shape}")
+
+    out = np.zeros((omg.shape[0], 3, 3), dtype=float)
+    out[:, 0, 1] = -omg[:, 2]
+    out[:, 0, 2] =  omg[:, 1]
+    out[:, 1, 0] =  omg[:, 2]
+    out[:, 1, 2] = -omg[:, 0]
+    out[:, 2, 0] = -omg[:, 1]
+    out[:, 2, 1] =  omg[:, 0]
+    return out
 
 def so3ToVec(so3mat):
     """Converts an so(3) representation to a 3-vector
