@@ -150,21 +150,57 @@ def quat_mul(q1, q2):  # Hamilton product, [x,y,z,w]
     ], dtype=float)
 
 def quat_to_rotvec(q):  # returns rotation vector (axis * angle), radians
-    # assumes q is unit and represents rotation from reference to current
-    q = quat_normalize(q)
-    if np.any(~np.isfinite(q)):
-        return np.array([np.nan, np.nan, np.nan])
+    """
+    Convert quaternion(s) [x, y, z, w] to rotation vector(s).
 
-    x,y,z,w = q
-    w = np.clip(w, -1.0, 1.0)
+    Accepts:
+      - shape (4,)   -> returns shape (3,)
+      - shape (N, 4) -> returns shape (N, 3)
+    """
+    q = np.asarray(q, dtype=float)
+
+    if q.ndim == 1:
+        # Single quaternion path (backward compatible behavior).
+        qn = quat_normalize(q)
+        if np.any(~np.isfinite(qn)):
+            return np.array([np.nan, np.nan, np.nan])
+
+        x, y, z, w = qn
+        w = np.clip(w, -1.0, 1.0)
+        angle = 2.0 * np.arccos(w)
+        s = np.sqrt(max(0.0, 1.0 - w * w))  # = sin(angle/2)
+
+        if s < 1e-8 or angle < 1e-8:
+            return np.array([0.0, 0.0, 0.0])
+
+        axis = np.array([x, y, z]) / s
+        return axis * angle
+
+    if q.ndim != 2 or q.shape[1] != 4:
+        raise ValueError(f"Expected quaternion shape (4,) or (N,4), got {q.shape}")
+
+    # Batched quaternion path.
+    norms = np.linalg.norm(q, axis=1, keepdims=True)
+    valid = np.isfinite(norms[:, 0]) & (norms[:, 0] >= 1e-12) & np.all(np.isfinite(q), axis=1)
+
+    out = np.full((q.shape[0], 3), np.nan, dtype=float)
+    if not np.any(valid):
+        return out
+
+    qn = q[valid] / norms[valid]
+    xyz = qn[:, :3]
+    w = np.clip(qn[:, 3], -1.0, 1.0)
     angle = 2.0 * np.arccos(w)
-    s = np.sqrt(max(0.0, 1.0 - w*w))  # = sin(angle/2)
+    s = np.sqrt(np.maximum(0.0, 1.0 - w * w))  # = sin(angle/2)
 
-    if s < 1e-8 or angle < 1e-8:
-        return np.array([0.0, 0.0, 0.0])
+    rotv = np.zeros((qn.shape[0], 3), dtype=float)
+    mask = (s >= 1e-8) & (angle >= 1e-8)
+    if np.any(mask):
+        axis = xyz[mask] / s[mask, None]
+        rotv[mask] = axis * angle[mask, None]
 
-    axis = np.array([x, y, z]) / s
-    return axis * angle
+    out[valid] = rotv
+    return out
 
 def rotvec_to_rot(rotvec):
     """
