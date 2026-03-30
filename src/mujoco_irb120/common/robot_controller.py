@@ -107,12 +107,14 @@ class controller:
         t_meas = np.asarray(self.data.sensordata[t_adr:t_adr + 3], dtype=float)
         w_site = np.concatenate([f_meas, t_meas]) #- np.asarray(self.ft_offset, dtype=float).reshape(6)
 
-        # Sensor-site rotation: sensor -> world.
-        R_wsensor = np.array([[0, 0, -1],
-                              [0, 1, 0],
-                             [1, 0, 0]]) # static 90 flip about Y-axis
-
-        # R_wsensor = np.eye(3)
+        # Sensor-site rotation from MuJoCo site xmat.
+        # Use transpose (inverse) for this wrench component mapping.
+        R_wsensor = self.data.site_xmat[self.ft_site].reshape(3, 3).T
+        # Static reference kept intentionally:
+        # R_wsensor = np.array([[0, 0, -1],
+        #                       [0, 1, 0],
+        #                       [1, 0, 0]])  # static 90 flip about Y-axis
+        
         w_site_out = w_site
 
         # Always return world-frame wrench.
