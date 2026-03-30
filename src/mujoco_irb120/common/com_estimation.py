@@ -1,7 +1,7 @@
 import numpy as np
 from .helper_fns import axisangle2rot, rotvec_to_rot, vec_to_unit, VecToso3
 
-def get_adT_sensor_O(rot_vecs, p_sensor_B, p_obj_B):
+def get_AdT_sensor_O(rot_vecs, p_sensor_B, p_obj_B):
     """
     Compute adjoint transform from object frame to sensor frame, given object rotation and sensor position.
 

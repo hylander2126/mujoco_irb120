@@ -5,23 +5,12 @@ import matplotlib.pyplot as plt
 from .helper_fns import *
 
 class controller:
-    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, ee_site='site:tool0'):
+    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData):
         self.model          = model
         self.data           = data
         self.joint_names    = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
         self.joint_idx      = np.array([model.joint(name).qposadr for name in self.joint_names]).flatten() # qpos indices (for qpos, jnt_range, ctrl)
         self.joint_dof_idx  = np.array([model.joint(name).dofadr  for name in self.joint_names]).flatten() # velocity DOF indices (for Jacobian columns)
-        self.ee_site        = model.site(ee_site).id
-        self.table_site     = model.site('surface_site').id
-        self.obj_frame_site = model.site('obj_frame_site').id
-        self.fingertip_site = model.site('site:fingertip').id
-        self.o_obj          = self.data.site_xpos[self.obj_frame_site]  # (3,)
-        self.payload_body_id = int(self.model.site_bodyid[self.obj_frame_site])
-        self.pusher_body_id = int(model.body('pusher_link').id)
-        try:
-            self.pusher_geom_id = model.geom('push_rod').id
-        except Exception:
-            self.pusher_geom_id = None
         self.stop           = False                              # Stop flag for the controller
         self.q_min          = model.jnt_range[self.joint_idx, 0] # Max joint limits
         self.q_max          = model.jnt_range[self.joint_idx, 1] # Min joint limits
@@ -49,13 +38,24 @@ class controller:
         self.kb_goal_pose = None  # Legacy IK goal pose (kept for compatibility)
         self.kb_q_des = None      # Persistent joint target for keyboard control
 
+        # --- Site and Body IDs ---
+        self.ee_site        = model.site('site:tool0').id
+        self.table_site     = model.site('site:table').id
+        self.fingertip_site = model.site('site:fingertip').id
+        self.ball_site      = model.site('site:ball_center').id
+        self.obj_frame_site = model.site('obj_frame_site').id
+        # self.o_obj          = self.data.site_xpos[self.obj_frame_site]  # (3,) object frame origin in world frame
+        self.payload_body_id = int(self.model.site_bodyid[self.obj_frame_site])
+        self.pusher_body_id = int(model.body('pusher_link').id)
+        self.ball_geom_id   = model.geom('push_ball_col').id
+
         # --- Force Sensor Calculations ---
-        self.f_adr   = int(self.model.sensor_adr[model.sensor('force_sensor').id]) 
-        self.t_adr   = int(self.model.sensor_adr[model.sensor('torque_sensor').id])
-        self.ft_site = model.site('site:sensor').id
-        self.ft_offset      = np.zeros(6)  # Force-torque sensor offset for biasing
-        self.grav_offset    = np.zeros(6)  # Gravity compensation offset
-        self.grav_mass      = 0.42436 # 0.061              # Gravity compensation mass
+        self.f_adr          = int(self.model.sensor_adr[model.sensor('force_sensor').id]) 
+        self.t_adr          = int(self.model.sensor_adr[model.sensor('torque_sensor').id])
+        self.ft_site        = model.site('site:sensor').id
+        self.ft_bias_val    = np.zeros(6)  # Force-torque sensor offset for biasing
+        self.grav_mass      = float(np.asarray(model.body('pusher_link').mass).flat[0])   # Gravity compensation mass (from model)
+        self.ball_radius    = float(model.geom_size[self.ball_geom_id, 0])  # sphere radius (m)
 
 
     def FK(self):
@@ -68,15 +68,32 @@ class controller:
         self.T[:3, 3] = p_curr.flatten()
         return self.T
 
-    def get_ee_position(self, copy=True):
-        """Get end-effector position in world frame as a shape-(3,) vector."""
-        p = self.data.site_xpos[self.ee_site]
+    def get_position(self, which='ee', copy=True):
+        """Get a named site position in world frame as a shape-(3,) vector."""
+        site_map = {
+            'ee': self.ee_site,
+            'ball': self.ball_site,
+            'sensor': self.ft_site,
+        }
+        if which not in site_map:
+            raise ValueError("which must be one of {'ee', 'ball', 'sensor'}")
+        p = self.data.site_xpos[site_map[which]]
         return p.copy() if copy else p
 
     @property
     def ee_position(self):
         """Convenience property for a copied end-effector world position."""
-        return self.get_ee_position(copy=True)
+        return self.get_position('ee', copy=True)
+    
+    @property
+    def ball_position(self):
+        """Convenience property for a copied ball world position."""
+        return self.get_position('ball', copy=True)
+    
+    @property
+    def sensor_position(self):
+        """Convenience property for a copied sensor world position."""
+        return self.get_position('sensor', copy=True)
     
     def get_jacobian(self, set_pinv=True):
         """Calculate the Jacobian matrix for the end-effector site"""
@@ -103,9 +120,9 @@ class controller:
             mujoco.mj_step(self.model, self.data)
             samples.append(self.ft_get_reading(grav_comp=True, apply_bias=False))
 
-        self.ft_offset = np.mean(np.asarray(samples, dtype=float), axis=0)
-        print(f"Force offset: {self.ft_offset}")
-        return self.ft_offset.copy()
+        self.ft_bias_val = np.mean(np.asarray(samples, dtype=float), axis=0)
+        print(f"Force offset: {self.ft_bias_val}")
+        return self.ft_bias_val.copy()
 
     def ft_get_reading(self, grav_comp=True, apply_bias=True):
         """Get wrench in WORLD frame from the F/T sensor.
@@ -136,8 +153,74 @@ class controller:
             t_world = t_world - grav_torque
 
         w = np.concatenate([f_world, t_world])
-        return w - self.ft_offset if apply_bias else w
-    
+        return w - self.ft_bias_val if apply_bias else w
+
+    def ft_contact_point(self, f_threshold=0.05):
+        """Estimate the contact point on the pusher ball in world frame from the FT reading.
+
+        Uses the fact that contact on a sphere must lie along the line from the sphere
+        center in the direction of the contact force:
+
+            p_contact = p_ball_center + r_ball * f̂_world
+
+        The MuJoCo force sensor measures the force the child subtree exerts on the
+        parent (i.e. the reaction force transmitted up the chain).  When the ball
+        pushes on an object in direction +d, the object pushes back in -d, so the
+        sensor reads -d.  Therefore the contact point is in the +f direction from
+        center (opposite of the common reaction-force intuition).
+
+        A torque-based cross-check is also computed:
+            r_expected = p_contact - p_sensor_origin
+            tau_check  = r_expected × f_world
+        This should match the measured torque if the estimate is consistent.
+
+        Args:
+            f_threshold: minimum force magnitude (N) below which contact is
+                         considered absent and None is returned.
+
+        Returns:
+            dict with keys:
+                'contact_point'  : (3,) world-frame contact point, or None if no contact
+                'f_world'        : (3,) contact force in world frame (N)
+                'tau_world'      : (3,) contact torque about sensor origin in world frame (Nm)
+                'tau_check'      : (3,) torque predicted from recovered contact point (Nm)
+                'tau_residual'   : (3,) difference tau_world - tau_check (Nm)
+                'ball_center'    : (3,) ball center in world frame
+        """
+        w = self.ft_get_reading(grav_comp=True, apply_bias=True)
+        f_world = w[:3]
+        tau_world = w[3:]
+
+        f_norm = np.linalg.norm(f_world)
+        if f_norm < f_threshold:
+            return {'contact_point': None, 'f_world': f_world, 'tau_world': tau_world,
+                    'tau_check': None, 'tau_residual': None, 'ball_center': self.data.geom_xpos[self.ball_geom_id].copy()}
+
+        f_hat = f_world / f_norm
+
+        # Ball center in world frame (updated every call via MuJoCo kinematics).
+        p_ball = self.data.geom_xpos[self.ball_geom_id].copy()
+
+        # Contact point: the sensor reads the reaction from the object, so
+        # f points in the same direction the ball is pushing the object.
+        # The contact point is therefore at ball_center + r * f̂.
+        p_contact = p_ball + self.ball_radius * f_hat
+
+        # Cross-check via torque consistency: τ should equal r × f
+        p_sensor = self.data.site_xpos[self.ft_site].copy()
+        r_expected = p_contact - p_sensor
+        tau_check = np.cross(r_expected, f_world)
+        tau_residual = tau_world - tau_check
+
+        return {
+            'contact_point': p_contact,
+            'f_world':       f_world,
+            'tau_world':     tau_world,
+            'tau_check':     tau_check,
+            'tau_residual':  tau_residual,
+            'ball_center':   p_ball,
+        }
+
     def set_pose(self, q=np.zeros((6,1))):
         """Forcibly set the robot to a specific joint configuration by ignoring dynamics"""
         if not self.is_in_ellipsoid():
@@ -385,10 +468,10 @@ class controller:
                 return True
 
             # Fast path: known pusher geom id.
-            if self.pusher_geom_id is not None:
-                if g0 != self.pusher_geom_id and g1 != self.pusher_geom_id:
+            if self.ball_geom_id is not None:
+                if g0 != self.ball_geom_id and g1 != self.ball_geom_id:
                     continue
-                other_gid = g1 if g0 == self.pusher_geom_id else g0
+                other_gid = g1 if g0 == self.ball_geom_id else g0
                 if int(self.model.geom_bodyid[other_gid]) == self.payload_body_id:
                     return True
                 continue
