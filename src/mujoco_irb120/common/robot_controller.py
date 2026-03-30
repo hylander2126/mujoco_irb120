@@ -14,6 +14,7 @@ class controller:
         self.ee_site        = model.site(ee_site).id
         self.table_site     = model.site('surface_site').id
         self.obj_frame_site = model.site('obj_frame_site').id
+        self.fingertip_site = model.site('site:fingertip').id
         self.o_obj          = self.data.site_xpos[self.obj_frame_site]  # (3,)
         self.payload_body_id = int(self.model.site_bodyid[self.obj_frame_site])
         self.pusher_body_id = int(model.body('pusher_link').id)
@@ -49,16 +50,12 @@ class controller:
         self.kb_q_des = None      # Persistent joint target for keyboard control
 
         # --- Force Sensor Calculations ---
-        self.f_sensor_id    = model.sensor('force_sensor').id
-        self.t_sensor_id    = model.sensor('torque_sensor').id
-        try:
-            self.ft_site = model.site('sensor_site').id
-        except Exception:
-            # Fallback: if sensor_site is absent, use tool flange site.
-            self.ft_site = self.ee_site
+        self.f_adr   = int(self.model.sensor_adr[model.sensor('force_sensor').id]) 
+        self.t_adr   = int(self.model.sensor_adr[model.sensor('torque_sensor').id])
+        self.ft_site = model.site('site:sensor').id
         self.ft_offset      = np.zeros(6)  # Force-torque sensor offset for biasing
         self.grav_offset    = np.zeros(6)  # Gravity compensation offset
-        self.grav_mass      = 0.0339              # Gravity compensation mass
+        self.grav_mass      = 0.42436 # 0.061              # Gravity compensation mass
 
 
     def FK(self):
@@ -92,36 +89,54 @@ class controller:
         if set_pinv:
             self.J_pinv = np.linalg.pinv(self.J)  # Pseudo-inverse of the Jacobian
         return self.J
+    
+    def ft_bias(self, n_samples=200):
+        """Estimate FT bias from static multi-sample averaging and store in self.ft_offset."""
+        print(f"Biasing F/T sensor with {n_samples} static samples...")
+        samples = []
 
-    def ft_get_reading(self, grav_comp=True):
+        # Let physics settle before sampling.
+        for _ in range(50):
+            mujoco.mj_step(self.model, self.data)
+
+        for _ in range(n_samples):
+            mujoco.mj_step(self.model, self.data)
+            samples.append(self.ft_get_reading(grav_comp=True, apply_bias=False))
+
+        self.ft_offset = np.mean(np.asarray(samples, dtype=float), axis=0)
+        print(f"Force offset: {self.ft_offset}")
+        return self.ft_offset.copy()
+
+    def ft_get_reading(self, grav_comp=True, apply_bias=True):
         """Get wrench in WORLD frame from the F/T sensor.
-
         Args:
             grav_comp: subtract gravity load from force component.
+            apply_bias: apply the estimated bias to the measurement.
         """
-
         # MuJoCo sensor id is not the same as the sensordata address; use sensor_adr.
-        f_adr = int(self.model.sensor_adr[self.f_sensor_id])
-        t_adr = int(self.model.sensor_adr[self.t_sensor_id])
-        f_meas = np.asarray(self.data.sensordata[f_adr:f_adr + 3], dtype=float)
-        t_meas = np.asarray(self.data.sensordata[t_adr:t_adr + 3], dtype=float)
+        f_meas = np.asarray(self.data.sensordata[self.f_adr:self.f_adr + 3], dtype=float)
+        t_meas = np.asarray(self.data.sensordata[self.t_adr:self.t_adr + 3], dtype=float)
         w_site = np.concatenate([f_meas, t_meas]) #- np.asarray(self.ft_offset, dtype=float).reshape(6)
 
-        # Sensor-site rotation from MuJoCo site xmat.
         # Use transpose (inverse) for this wrench component mapping.
-        R_wsensor = self.data.site_xmat[self.ft_site].reshape(3, 3).T
-        # Static reference kept intentionally:
-        # R_wsensor = np.array([[0, 0, -1],
-        #                       [0, 1, 0],
-        #                       [1, 0, 0]])  # static 90 flip about Y-axis
-        
-        w_site_out = w_site
+        R_wsensor = self.data.site_xmat[self.ft_site].reshape(3, 3).T # (-90 about Y)
 
         # Always return world-frame wrench.
-        f_world = R_wsensor @ w_site_out[:3]
-        t_world = R_wsensor @ w_site_out[3:]
+        f_world = R_wsensor @ w_site[:3]
+        t_world = R_wsensor @ w_site[3:]
+
+        # And in the world frame, subtract gravity load from the force component if requested.
+        if grav_comp:
+            grav_force = np.array([0, 0, self.grav_mass * self.model.opt.gravity[2]])  # (3,) gravity force in world frame
+            # print(f"grav: {grav_force}, meas: {f_world}")
+            f_world = f_world - grav_force
+            # Also calculate the torque caused by the weight of the pusher at sensor site:
+            r_pusher = self.data.site_xpos[self.ft_site] - self.data.site_xpos[self.fingertip_site]  # (3,) vector from payload COM to sensor site
+            grav_torque = np.cross(r_pusher, grav_force)  # (3,) torque in world frame
+            t_world = t_world - grav_torque
+
         w = np.concatenate([f_world, t_world])
-        return w
+        return w - self.ft_offset if apply_bias else w
     
     def set_pose(self, q=np.zeros((6,1))):
         """Forcibly set the robot to a specific joint configuration by ignoring dynamics"""
@@ -416,12 +431,6 @@ class controller:
 # Unused fns
 # ======================================================================================================
 '''
-    def bias_ft_reading(self): # NOTE: BROKEN, SO UNUSED
-        print("Biasing F/T sensor...")
-        force_offset = self.ft_get_reading()
-        self.ft_offset = force_offset.copy()
-        print(f"Force offset: {self.ft_offset.flatten()}")
-
     def generate_quintic_trajectory(self, q_start, q_end, duration):
         """
         Generates coefficients for a quintic polynomial trajectory.

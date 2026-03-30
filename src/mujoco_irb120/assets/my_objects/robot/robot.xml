@@ -42,12 +42,12 @@
                                     <geom type="cylinder" size="0.0375 0.041125" rgba="0.5 0.5 0.5 1"/>
 
                                     <!-- Force Sensor Site -->
-                                    <site name="sensor_site" pos="0 0 0.041125" euler="0 0 0" size="0.01" rgba="1 0 0 0"/>
+                                    <site name="site:sensor" pos="0 0 0.041125" euler="0 0 0" size="0.01" rgba="1 0 0 0"/>
 
                                     <!-- Pusher link -->
-                                    <body name="pusher_link" pos="0 0 0.041125" euler="0 0 0" gravcomp="1">
+                                    <body name="pusher_link" pos="0 0 0.041125" euler="0 0 0" gravcomp="0">
                                         <!-- Visual mesh only; collision handled by explicit primitives. -->
-                                        <geom name="push_rod" type="mesh" mass="0.066" mesh="pusher_link" material="robot0:gripper_mat" contype="0" conaffinity="0"/>
+                                        <geom name="push_rod" type="mesh" mass="0.061" mesh="pusher_link" material="robot0:gripper_mat" contype="0" conaffinity="0"/>
 
                                         <!-- Tip sphere collision model aligned to STL local frame.
                                             Measured mesh bounds for pusher_link.stl:
