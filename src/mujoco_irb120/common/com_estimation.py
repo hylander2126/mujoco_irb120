@@ -8,18 +8,29 @@ def get_AdT_sensor_O(rot_vecs, p_sensor_B, p_obj_B):
     {O}, {B}, {S} are object, robot base/table/world, and sensor frames, respectively.
 
     rot_vecs: (N,3) array of axis-angle rotation vectors (angle in radians)
-    p_sensor_B: (3,) position of sensor in robot base frame
-    p_obj_B: (3,) position of object in robot base frame
+    p_sensor_B: (3,) or (N,3) position of sensor in robot base frame
+    p_obj_B: (3,) or (N,3) position of object in robot base frame
     """
+    rot_vecs = np.asarray(rot_vecs, dtype=float)
+    n = rot_vecs.shape[0]
+    p_sensor_B = np.asarray(p_sensor_B, dtype=float)
+    p_obj_B = np.asarray(p_obj_B, dtype=float)
+
+    if p_sensor_B.ndim == 1:
+        p_sensor_B = np.broadcast_to(p_sensor_B, (n, 3))
+    if p_obj_B.ndim == 1:
+        p_obj_B = np.broadcast_to(p_obj_B, (n, 3))
+
     R_O = rotvec_to_rot(rot_vecs)  # (N,3,3) Object rotation in sensor frame
     R_O_T = R_O.transpose(0, 2, 1)  # (N,3,3) Transpose for inverse rotation (swaps correctly each 3x3 block)
-    adT_S_O = np.zeros((rot_vecs.shape[0], 6, 6))
-    adT_S_O[:, :3, :3] = R_O
-    adT_S_O[:, 3:, 3:] = R_O
+    AdT_S_O = np.zeros((n, 6, 6))
+    AdT_S_O[:, :3, :3] = R_O
+    AdT_S_O[:, 3:, 3:] = R_O
     # Calculate coordinates of sensor frame IN OBJECT FRAME:
-    p_S_O = R_O_T @ (p_sensor_B - p_obj_B)
-    adT_S_O[:, :3, 3:] = -R_O @ VecToso3(p_S_O)
-    return adT_S_O
+    # p_S_O = R_O_T @ (p_sensor_B - p_obj_B)
+    p_S_O = np.einsum('nij,nj->ni', R_O_T, p_sensor_B - p_obj_B)  # (N,3) position of sensor in object frame
+    AdT_S_O[:, :3, 3:] = -R_O @ VecToso3(p_S_O)  # (N,3,3) upper right block of adjoint transform (skew second term)
+    return AdT_S_O
 
 def model_bkwd_wrench(
     w_meas_S: np.ndarray,
@@ -31,13 +42,25 @@ def model_bkwd_wrench(
     {O}, {B}, {S} are object, robot base/table/world, and sensor frames, respectively.
 
     w_meas_S: (N,6) array of measured wrenches in sensor frame (F_x, F_y, F_z, tau_x, tau_y, tau_z)
-    adT_sensor_O: (N,4,4) array of adjoint transforms from object frame to sensor frame
+    adT_sensor_O: (N,6,6) array of adjoint transforms from object frame to sensor frame
     p_finger_O: (3,) position of finger in object frame
     """
-    w_meas_O = adT_sensor_O @ w_meas_S.T  # (N,6) measured wrench in object frame
+    w_meas_S = np.asarray(w_meas_S, dtype=float)
+    adT_sensor_O = np.asarray(adT_sensor_O, dtype=float)
+    p_finger_O = np.asarray(p_finger_O, dtype=float)
+
+    if w_meas_S.ndim != 2 or w_meas_S.shape[1] != 6:
+        raise ValueError(f"w_meas_S must have shape (N,6), got {w_meas_S.shape}")
+    if adT_sensor_O.shape != (w_meas_S.shape[0], 6, 6):
+        raise ValueError(
+            f"adT_sensor_O must have shape (N,6,6) with same N as w_meas_S; got {adT_sensor_O.shape} and {w_meas_S.shape}"
+        )
+
+    # Transform measured wrench from sensor frame to object frame.
+    w_meas_O = np.einsum('nij,nj->ni', adT_sensor_O, w_meas_S)
 
     ## CONSTRUCT APPLIED WRENCH IN OBJECT FRAME
-    f_app_O = -w_meas_O[:3].T
+    f_app_O = -w_meas_O[:, :3]
     t_app_O = np.cross(p_finger_O, f_app_O)  # Torque applied ON object by finger is r_o_to_finger x f_app
     w_app_O = np.hstack((f_app_O, t_app_O))  # (N,6) applied wrench on object frame
     return w_app_O
