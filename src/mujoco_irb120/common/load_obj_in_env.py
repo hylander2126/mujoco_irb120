@@ -95,8 +95,8 @@ def create_scene_xml(
 
         <body name="{name}_base" pos="{cfg['pos']}" quat="{cfg['quat']}" childclass="grab">
             <joint type="free"/>
-            <site name="payload_site" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
-            <site name="obj_frame_site" pos="0.05 0.0 -0.15" size="0.02 0.02 0.02" type="box" rgba="1 0 0 0"></site>
+            <site name="site:payload" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
+            <site name="site:obj_frame" pos="0.05 0.0 -0.15" size="0.02 0.02 0.02" type="box" rgba="1 0 0 0"></site>
             <include file="{body_path}"/>
         </body>
         """

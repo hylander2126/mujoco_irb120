@@ -14,7 +14,7 @@ CAM_LOOKAT     = np.array([0.75, 0, 0.25]) # structure: (x, y, z)
 
 
 class RendererViewerOpts:
-    def __init__(self, model_obj, data_obj, vis=True, width=1280, height=720, framerate=60):
+    def __init__(self, model_obj, data_obj, vis=True, width=1280, height=720, framerate=60, show_left_UI=False):
 
         self.model_obj  = model_obj
         self.data_obj   = data_obj
@@ -43,7 +43,7 @@ class RendererViewerOpts:
 
         # Launch the viewer context if visualization is enabled
         self._viewer_ctx = (
-            mujoco.viewer.launch_passive(model_obj, data_obj, show_left_ui=False)
+            mujoco.viewer.launch_passive(model_obj, data_obj, show_left_ui=show_left_UI)
             if vis else contextlib.nullcontext(None)
         )
         self.viewer = None # becomes the actual viewer after __enter__
@@ -162,7 +162,7 @@ class RendererViewerOpts:
         # opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
         opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Contact 'translucent' force 'disc'
         # opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_BODY # Visualize BODY frames only
-        opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_SITE # Visualize SITE frames only NOT WORKING TODO
+        # opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_SITE # Visualize SITE frames only NOT WORKING TODO
 
         cam_obj.distance                                       = CAM_DISTANCE
         cam_obj.elevation                                      = CAM_ELEVATION

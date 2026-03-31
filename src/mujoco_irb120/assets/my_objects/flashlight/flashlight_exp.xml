@@ -4,7 +4,7 @@
         <!-- <inertial mass="0.236" pos="0 0 0.1"/> -->
         <geom name="flashlight" type="mesh" mesh="flashlight_exp" rgba="0.9 0.1 0.1 1" mass="0.236"/>
 
-        <site name="payload_site" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
-        <site name="obj_frame_site" pos="0.05 0.0 -0.15" size="0.02 0.02 0.02" type="box" rgba="1 0 0 0"></site>
+        <site name="site:payload" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
+        <site name="site:obj_frame" pos="0.05 0.0 -0.15" size="0.02 0.02 0.02" type="box" rgba="1 0 0 0"></site>
     </body>
 </mujoco>
