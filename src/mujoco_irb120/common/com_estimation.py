@@ -1,25 +1,49 @@
 import numpy as np
 from .helper_fns import axisangle2rot, rotvec_to_rot, vec_to_unit, VecToso3
 
-def get_AdT_sensor_O(rot_vecs_B, p_sensor_B, p_obj_B):
+def get_AdT_sensor_O(rot_vecs_B, p_sensor_B, p_obj_B, R_sensor_B=None):
     """
-    Compute adjoint transform from object frame to sensor frame, given object rotation and sensor position.
+    Compute adjoint transform that maps a wrench from sensor frame {S} to object frame {O}.
 
     {O}, {B}, {S} are object, robot base/table/world, and sensor frames, respectively.
 
-    rot_vecs: (N,3) array of axis-angle rotation vectors (angle in radians)
-    p_sensor_B: (N,3) position of sensor in robot base frame
-    p_obj_B: (N,3) position of object in robot base frame
+    For a wrench w = [f; tau], the transformation is:
+        f_O   = R_O_S @ f_S
+        tau_O = [p_S_O]_x @ (R_O_S @ f_S) + R_O_S @ tau_S
+
+    giving the 6x6 matrix (Modern Robotics / standard convention):
+        Ad(T_O_S) = | R_O_S           0     |
+                    | [p_S_O]_x R_O_S  R_O_S |
+
+    where R_O_S = R_B_O.T @ R_B_S  maps vectors from {S} into {O},
+    and p_S_O is the origin of {S} expressed in {O}.
+
+    rot_vecs_B: (N,3) axis-angle rotation vectors of the object in world frame
+    p_sensor_B: (N,3) sensor origin positions in world frame
+    p_obj_B:    (N,3) object origin positions in world frame
+    R_sensor_B: (N,3,3) sensor orientation in world frame (world <- sensor columns).
+                If None, sensor axes are assumed aligned with the world frame.
     """
-    R_O = rotvec_to_rot(rot_vecs_B)  # (N,3,3) Object rotation in sensor frame
-    R_O_T = R_O.transpose(0, 2, 1)  # (N,3,3) Transpose for inverse rotation (swaps correctly each 3x3 block)
+    R_B_O = rotvec_to_rot(rot_vecs_B)       # (N,3,3) world <- object
+    R_O_B = R_B_O.transpose(0, 2, 1)        # (N,3,3) object <- world  (R_B_O^T)
+
+    if R_sensor_B is None:
+        # Sensor frame coincides with world frame
+        R_O_S = R_O_B
+    else:
+        # R_O_S = R_O_B @ R_B_S : sensor-frame vectors -> world -> object
+        R_O_S = np.einsum('nij,njk->nik', R_O_B, R_sensor_B)  # (N,3,3)
+
+    # Position of sensor origin expressed in object frame
+    p_S_O = np.einsum('nij,nj->ni', R_O_B, p_sensor_B - p_obj_B)  # (N,3)
+
     AdT_S_O = np.zeros((rot_vecs_B.shape[0], 6, 6))
-    AdT_S_O[:, :3, :3] = R_O
-    AdT_S_O[:, 3:, 3:] = R_O
-    # Calculate coordinates of sensor frame IN OBJECT FRAME:
-    # p_S_O = R_O_T @ (p_sensor_B - p_obj_B)
-    p_S_O = np.einsum('nij,nj->ni', R_O_T, p_sensor_B - p_obj_B)  # (N,3) position of sensor in object frame
-    AdT_S_O[:, :3, 3:] = -R_O @ VecToso3(p_S_O)  # (N,3,3) upper right block of adjoint transform (skew second term)
+    # Upper-left:  R_O_S  (rotate force from {S} to {O})
+    AdT_S_O[:, :3, :3] = R_O_S
+    # Lower-right: R_O_S  (rotate torque from {S} to {O})
+    AdT_S_O[:, 3:, 3:] = R_O_S
+    # Lower-left:  [p_S_O]_x R_O_S  (couple term: moment arm shift)
+    AdT_S_O[:, 3:, :3] = np.einsum('nij,njk->nik', VecToso3(p_S_O), R_O_S)
     return AdT_S_O
 
 def model_bkwd_wrench(
