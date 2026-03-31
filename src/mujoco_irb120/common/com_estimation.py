@@ -40,7 +40,7 @@ def model_bkwd_wrench(
     t_app_O  = np.cross(p_finger_O, f_app_O)                  # r × f about object origin
     w_app_O = np.hstack((f_app_O, t_app_O))                      # (N,6)
 
-    return -w_meas_O
+    return w_app_O
 
 
 def model_fwd_wrench(
@@ -90,14 +90,17 @@ def model_fwd_wrench(
     N_table_val = np.maximum(0.0, -np.einsum('ni,ni->n', f_O_ext, n_O_table)) # (N,) NOTE: negate ext force
     f_O_norm = np.einsum('n,ni->ni', N_table_val, n_O_table) # (N,3) table normal force vector in object frame
 
-    # 2. Friction opposes the applied tangential force direction (Coulomb magnitude mu*N).
-    # Extract tangential component of APPLIED force only (not total external force including gravity)
+    # 2. Friction opposes the applied tangential force direction.
+    # Use a capped magnitude per sample: min(mu*N, tangential force demand).
+    # This captures static-like behavior below the Coulomb limit while preserving the Coulomb cap.
     f_O_app_tan = f_O_app - np.einsum('ni,ni->n', f_O_app, n_O_table)[:, None] * n_O_table
-    tan_norm = np.linalg.norm(f_O_app_tan, axis=1, keepdims=True)
+    tan_norm = np.linalg.norm(f_O_app_tan, axis=1)
     dir_fric_O = np.zeros_like(f_O_app_tan)
-    valid = tan_norm[:, 0] > 1e-12
-    dir_fric_O[valid] = -f_O_app_tan[valid] / tan_norm[valid]
-    f_O_fr = np.einsum('n,ni->ni', mu_table * N_table_val, dir_fric_O)
+    valid = tan_norm > 1e-12
+    dir_fric_O[valid] = -f_O_app_tan[valid] / tan_norm[valid, None]
+    f_O_fric_max = mu_table * N_table_val
+    f_O_fric_mag = np.minimum(f_O_fric_max, tan_norm)
+    f_O_fr = np.einsum('n,ni->ni', f_O_fric_mag, dir_fric_O)
     
     # 3. Finish construction; ground cannot apply torque to object (explicit force)
     f_O_ground = f_O_norm + f_O_fr                              # (N,3) total ground reaction force in object frame

@@ -82,34 +82,6 @@ class controller:
         T[:3, :3] = self.data.site_xmat[sid].reshape(3, 3).copy()
         T[:3,  3] = self.data.site_xpos[sid].copy()
         return T
-
-    @property
-    def ee_pose(self):
-        """End-effector site pose in world frame as (4,4)."""
-        return self.get_site_pose('ee')
-
-    @property
-    def ball_pose(self):
-        """Ball-center site pose in world frame as (4,4)."""
-        return self.get_site_pose('ball')
-
-    @property
-    def sensor_pose(self):
-        """FT sensor site pose in world frame as (4,4)."""
-        return self.get_site_pose('sensor')
-
-    # --- Legacy position-only convenience (kept for backward compat) ----------
-    @property
-    def ee_position(self):
-        return self.get_site_pose('ee')[:3, 3]
-
-    @property
-    def ball_position(self):
-        return self.get_site_pose('ball')[:3, 3]
-
-    @property
-    def sensor_position(self):
-        return self.get_site_pose('sensor')[:3, 3]
     
     def get_jacobian(self, set_pinv=True):
         """Calculate the Jacobian matrix for the end-effector site"""
@@ -178,73 +150,6 @@ class controller:
         w *= -1
 
         return w - self.ft_bias_val if apply_bias else w
-
-    # def ft_contact_point(self, f_threshold=0.05):
-    #     """Estimate the contact point on the pusher ball in world frame from the FT reading.
-
-    #     Uses the fact that contact on a sphere must lie along the line from the sphere
-    #     center in the direction of the contact force:
-
-    #         p_contact = p_ball_center + r_ball * f̂_world
-
-    #     The MuJoCo force sensor measures the force the child subtree exerts on the
-    #     parent (i.e. the reaction force transmitted up the chain).  When the ball
-    #     pushes on an object in direction +d, the object pushes back in -d, so the
-    #     sensor reads -d.  Therefore the contact point is in the +f direction from
-    #     center (opposite of the common reaction-force intuition).
-
-    #     A torque-based cross-check is also computed:
-    #         r_expected = p_contact - p_sensor_origin
-    #         tau_check  = r_expected × f_world
-    #     This should match the measured torque if the estimate is consistent.
-
-    #     Args:
-    #         f_threshold: minimum force magnitude (N) below which contact is
-    #                      considered absent and None is returned.
-
-    #     Returns:
-    #         dict with keys:
-    #             'contact_point'  : (3,) world-frame contact point, or None if no contact
-    #             'f_world'        : (3,) contact force in world frame (N)
-    #             'tau_world'      : (3,) contact torque about sensor origin in world frame (Nm)
-    #             'tau_check'      : (3,) torque predicted from recovered contact point (Nm)
-    #             'tau_residual'   : (3,) difference tau_world - tau_check (Nm)
-    #             'ball_center'    : (3,) ball center in world frame
-    #     """
-    #     w_S = self.ft_get_reading(grav_comp=True, apply_bias=True)
-    #     # ft_get_reading now returns sensor-frame wrench; rotate to world for geometry.
-    #     R_BS = self.data.site_xmat[self.ft_site].reshape(3, 3)  # world←sensor
-    #     f_world   = R_BS @ w_S[:3]
-    #     tau_world = R_BS @ w_S[3:]
-
-    #     f_norm = np.linalg.norm(f_world)
-    #     if f_norm < f_threshold:
-    #         return {'contact_point': None, 'f_world': f_world, 'tau_world': tau_world,
-    #                 'tau_check': None, 'tau_residual': None, 'ball_center': self.data.geom_xpos[self.ball_geom_id].copy()}
-
-    #     f_hat = f_world / f_norm
-
-    #     # Ball center in world frame (updated every call via MuJoCo kinematics).
-    #     p_ball = self.data.geom_xpos[self.ball_geom_id].copy()
-
-    #     # Contact point: f points in the direction the ball pushes the object,
-    #     # so the contact point is at ball_center + r * f̂.
-    #     p_contact = p_ball + self.ball_radius * f_hat
-
-    #     # Cross-check: τ = r × f about sensor origin.
-    #     p_sensor = self.data.site_xpos[self.ft_site].copy()
-    #     r_expected = p_contact - p_sensor
-    #     tau_check = np.cross(r_expected, f_world)
-    #     tau_residual = tau_world - tau_check
-
-    #     return {
-    #         'contact_point': p_contact,
-    #         'f_world':       f_world,
-    #         'tau_world':     tau_world,
-    #         'tau_check':     tau_check,
-    #         'tau_residual':  tau_residual,
-    #         'ball_center':   p_ball,
-    #     }
 
     def set_pose(self, q=np.zeros((6,1))):
         """Forcibly set the robot to a specific joint configuration by ignoring dynamics"""
@@ -440,7 +345,7 @@ class controller:
             return False
         return True
 
-    def get_payload_pose(self, site='site:payload', out='T', degrees=False, frame='world'):
+    def get_payload_pose(self, site='site:obj_frame', out='T', degrees=False, frame='world'):
         """Unified payload state accessor.
 
         Args:
