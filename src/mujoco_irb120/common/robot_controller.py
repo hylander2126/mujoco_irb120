@@ -43,7 +43,7 @@ class controller:
         self.table_site     = model.site('site:table').id
         self.fingertip_site = model.site('site:fingertip').id
         self.ball_site      = model.site('site:ball_center').id
-        self.obj_frame_site = model.site('obj_frame_site').id
+        self.obj_frame_site = model.site('site:obj_frame').id
         # self.o_obj          = self.data.site_xpos[self.obj_frame_site]  # (3,) object frame origin in world frame
         self.payload_body_id = int(self.model.site_bodyid[self.obj_frame_site])
         self.pusher_body_id = int(model.body('pusher_link').id)
@@ -141,101 +141,110 @@ class controller:
         return self.ft_bias_val.copy()
 
     def ft_get_reading(self, grav_comp=True, apply_bias=True):
-        """Get wrench in WORLD frame from the F/T sensor.
-        Args:
-            grav_comp: subtract gravity load from force component.
-            apply_bias: apply the estimated bias to the measurement.
-        """
-        # MuJoCo sensor id is not the same as the sensordata address; use sensor_adr.
-        f_meas = np.asarray(self.data.sensordata[self.f_adr:self.f_adr + 3], dtype=float)
-        t_meas = np.asarray(self.data.sensordata[self.t_adr:self.t_adr + 3], dtype=float)
-        w_site = np.concatenate([f_meas, t_meas]) #- np.asarray(self.ft_offset, dtype=float).reshape(6)
+        """Return the compensated wrench in sensor frame {S}.
 
-        # Use transpose (inverse) for this wrench component mapping.
-        R_wsensor = self.data.site_xmat[self.ft_site].reshape(3, 3).T # (-90 about Y)
-
-        # Always return world-frame wrench.
-        f_world = R_wsensor @ w_site[:3]
-        t_world = R_wsensor @ w_site[3:]
-
-        # And in the world frame, subtract gravity load from the force component if requested.
-        if grav_comp:
-            grav_force = np.array([0, 0, self.grav_mass * self.model.opt.gravity[2]])  # (3,) gravity force in world frame
-            # print(f"grav: {grav_force}, meas: {f_world}")
-            f_world = f_world - grav_force
-            # Also calculate the torque caused by the weight of the pusher at sensor site:
-            r_pusher = self.data.site_xpos[self.ft_site] - self.data.site_xpos[self.fingertip_site]  # (3,) vector from payload COM to sensor site
-            grav_torque = np.cross(r_pusher, grav_force)  # (3,) torque in world frame
-            t_world = t_world - grav_torque
-
-        w = np.concatenate([f_world, t_world])
-        return w - self.ft_bias_val if apply_bias else w
-
-    def ft_contact_point(self, f_threshold=0.05):
-        """Estimate the contact point on the pusher ball in world frame from the FT reading.
-
-        Uses the fact that contact on a sphere must lie along the line from the sphere
-        center in the direction of the contact force:
-
-            p_contact = p_ball_center + r_ball * f̂_world
-
-        The MuJoCo force sensor measures the force the child subtree exerts on the
-        parent (i.e. the reaction force transmitted up the chain).  When the ball
-        pushes on an object in direction +d, the object pushes back in -d, so the
-        sensor reads -d.  Therefore the contact point is in the +f direction from
-        center (opposite of the common reaction-force intuition).
-
-        A torque-based cross-check is also computed:
-            r_expected = p_contact - p_sensor_origin
-            tau_check  = r_expected × f_world
-        This should match the measured torque if the estimate is consistent.
+        MuJoCo reports force/torque directly in the site's local frame, so no rotation needed 
+        to get to {S}.  Gravity compensation and bias removal
+        are both performed in {S} as well, keeping the output consistent with
+        what get_AdT_sensor_O / model_bkwd_wrench expect.
 
         Args:
-            f_threshold: minimum force magnitude (N) below which contact is
-                         considered absent and None is returned.
+            grav_comp:   subtract the pusher-weight wrench from the reading.
+            apply_bias:  subtract the stored ft_bias_val offset.
 
         Returns:
-            dict with keys:
-                'contact_point'  : (3,) world-frame contact point, or None if no contact
-                'f_world'        : (3,) contact force in world frame (N)
-                'tau_world'      : (3,) contact torque about sensor origin in world frame (Nm)
-                'tau_check'      : (3,) torque predicted from recovered contact point (Nm)
-                'tau_residual'   : (3,) difference tau_world - tau_check (Nm)
-                'ball_center'    : (3,) ball center in world frame
+            w_S: (6,) wrench [fx, fy, fz, tx, ty, tz] in sensor frame {S}.
         """
-        w = self.ft_get_reading(grav_comp=True, apply_bias=True)
-        f_world = w[:3]
-        tau_world = w[3:]
+        f_S = np.asarray(self.data.sensordata[self.f_adr:self.f_adr + 3], dtype=float).copy()
+        t_S = np.asarray(self.data.sensordata[self.t_adr:self.t_adr + 3], dtype=float).copy()
 
-        f_norm = np.linalg.norm(f_world)
-        if f_norm < f_threshold:
-            return {'contact_point': None, 'f_world': f_world, 'tau_world': tau_world,
-                    'tau_check': None, 'tau_residual': None, 'ball_center': self.data.geom_xpos[self.ball_geom_id].copy()}
+        if grav_comp:
+            # R_BS: columns are sensor-frame axes expressed in world frame (world←sensor).
+            R_BS = self.data.site_xmat[self.ft_site].reshape(3, 3)
+            # Gravity vector rotated into sensor frame.
+            g_S = R_BS.T @ np.asarray(self.model.opt.gravity, dtype=float) # TODO was .T but trying without
+            # Pusher weight in sensor frame.
+            weight_S = self.grav_mass * g_S
+            f_S -= weight_S
+            # Gravity torque about sensor origin: r_{sensor→fingertip} expressed in {S}.
+            r_B = self.data.site_xpos[self.fingertip_site] - self.data.site_xpos[self.ft_site]
+            r_S = R_BS.T @ r_B
+            t_S -= np.cross(r_S, weight_S)
 
-        f_hat = f_world / f_norm
+        w = np.concatenate([f_S, t_S])
 
-        # Ball center in world frame (updated every call via MuJoCo kinematics).
-        p_ball = self.data.geom_xpos[self.ball_geom_id].copy()
+        # ********************** CRITICAL IMPORTANCE *************************
+        # mujoco stupidly reports reaction force... very unintuitive. Negate to get real-world behavior like ATI
+        w *= -1
 
-        # Contact point: the sensor reads the reaction from the object, so
-        # f points in the same direction the ball is pushing the object.
-        # The contact point is therefore at ball_center + r * f̂.
-        p_contact = p_ball + self.ball_radius * f_hat
+        return w - self.ft_bias_val if apply_bias else w
 
-        # Cross-check via torque consistency: τ should equal r × f
-        p_sensor = self.data.site_xpos[self.ft_site].copy()
-        r_expected = p_contact - p_sensor
-        tau_check = np.cross(r_expected, f_world)
-        tau_residual = tau_world - tau_check
+    # def ft_contact_point(self, f_threshold=0.05):
+    #     """Estimate the contact point on the pusher ball in world frame from the FT reading.
 
-        return {
-            'contact_point': p_contact,
-            'f_world':       f_world,
-            'tau_world':     tau_world,
-            'tau_check':     tau_check,
-            'tau_residual':  tau_residual,
-            'ball_center':   p_ball,
-        }
+    #     Uses the fact that contact on a sphere must lie along the line from the sphere
+    #     center in the direction of the contact force:
+
+    #         p_contact = p_ball_center + r_ball * f̂_world
+
+    #     The MuJoCo force sensor measures the force the child subtree exerts on the
+    #     parent (i.e. the reaction force transmitted up the chain).  When the ball
+    #     pushes on an object in direction +d, the object pushes back in -d, so the
+    #     sensor reads -d.  Therefore the contact point is in the +f direction from
+    #     center (opposite of the common reaction-force intuition).
+
+    #     A torque-based cross-check is also computed:
+    #         r_expected = p_contact - p_sensor_origin
+    #         tau_check  = r_expected × f_world
+    #     This should match the measured torque if the estimate is consistent.
+
+    #     Args:
+    #         f_threshold: minimum force magnitude (N) below which contact is
+    #                      considered absent and None is returned.
+
+    #     Returns:
+    #         dict with keys:
+    #             'contact_point'  : (3,) world-frame contact point, or None if no contact
+    #             'f_world'        : (3,) contact force in world frame (N)
+    #             'tau_world'      : (3,) contact torque about sensor origin in world frame (Nm)
+    #             'tau_check'      : (3,) torque predicted from recovered contact point (Nm)
+    #             'tau_residual'   : (3,) difference tau_world - tau_check (Nm)
+    #             'ball_center'    : (3,) ball center in world frame
+    #     """
+    #     w_S = self.ft_get_reading(grav_comp=True, apply_bias=True)
+    #     # ft_get_reading now returns sensor-frame wrench; rotate to world for geometry.
+    #     R_BS = self.data.site_xmat[self.ft_site].reshape(3, 3)  # world←sensor
+    #     f_world   = R_BS @ w_S[:3]
+    #     tau_world = R_BS @ w_S[3:]
+
+    #     f_norm = np.linalg.norm(f_world)
+    #     if f_norm < f_threshold:
+    #         return {'contact_point': None, 'f_world': f_world, 'tau_world': tau_world,
+    #                 'tau_check': None, 'tau_residual': None, 'ball_center': self.data.geom_xpos[self.ball_geom_id].copy()}
+
+    #     f_hat = f_world / f_norm
+
+    #     # Ball center in world frame (updated every call via MuJoCo kinematics).
+    #     p_ball = self.data.geom_xpos[self.ball_geom_id].copy()
+
+    #     # Contact point: f points in the direction the ball pushes the object,
+    #     # so the contact point is at ball_center + r * f̂.
+    #     p_contact = p_ball + self.ball_radius * f_hat
+
+    #     # Cross-check: τ = r × f about sensor origin.
+    #     p_sensor = self.data.site_xpos[self.ft_site].copy()
+    #     r_expected = p_contact - p_sensor
+    #     tau_check = np.cross(r_expected, f_world)
+    #     tau_residual = tau_world - tau_check
+
+    #     return {
+    #         'contact_point': p_contact,
+    #         'f_world':       f_world,
+    #         'tau_world':     tau_world,
+    #         'tau_check':     tau_check,
+    #         'tau_residual':  tau_residual,
+    #         'ball_center':   p_ball,
+    #     }
 
     def set_pose(self, q=np.zeros((6,1))):
         """Forcibly set the robot to a specific joint configuration by ignoring dynamics"""
@@ -431,7 +440,7 @@ class controller:
             return False
         return True
 
-    def get_payload_pose(self, site='payload_site', out='T', degrees=False, frame='world'):
+    def get_payload_pose(self, site='site:payload', out='T', degrees=False, frame='world'):
         """Unified payload state accessor.
 
         Args:

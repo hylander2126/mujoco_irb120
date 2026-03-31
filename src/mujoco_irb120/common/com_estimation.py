@@ -1,29 +1,19 @@
 import numpy as np
 from .helper_fns import axisangle2rot, rotvec_to_rot, vec_to_unit, VecToso3
 
-def get_AdT_sensor_O(rot_vecs, p_sensor_B, p_obj_B):
+def get_AdT_sensor_O(rot_vecs_B, p_sensor_B, p_obj_B):
     """
     Compute adjoint transform from object frame to sensor frame, given object rotation and sensor position.
 
     {O}, {B}, {S} are object, robot base/table/world, and sensor frames, respectively.
 
     rot_vecs: (N,3) array of axis-angle rotation vectors (angle in radians)
-    p_sensor_B: (3,) or (N,3) position of sensor in robot base frame
-    p_obj_B: (3,) or (N,3) position of object in robot base frame
+    p_sensor_B: (N,3) position of sensor in robot base frame
+    p_obj_B: (N,3) position of object in robot base frame
     """
-    rot_vecs = np.asarray(rot_vecs, dtype=float)
-    n = rot_vecs.shape[0]
-    p_sensor_B = np.asarray(p_sensor_B, dtype=float)
-    p_obj_B = np.asarray(p_obj_B, dtype=float)
-
-    if p_sensor_B.ndim == 1:
-        p_sensor_B = np.broadcast_to(p_sensor_B, (n, 3))
-    if p_obj_B.ndim == 1:
-        p_obj_B = np.broadcast_to(p_obj_B, (n, 3))
-
-    R_O = rotvec_to_rot(rot_vecs)  # (N,3,3) Object rotation in sensor frame
+    R_O = rotvec_to_rot(rot_vecs_B)  # (N,3,3) Object rotation in sensor frame
     R_O_T = R_O.transpose(0, 2, 1)  # (N,3,3) Transpose for inverse rotation (swaps correctly each 3x3 block)
-    AdT_S_O = np.zeros((n, 6, 6))
+    AdT_S_O = np.zeros((rot_vecs_B.shape[0], 6, 6))
     AdT_S_O[:, :3, :3] = R_O
     AdT_S_O[:, 3:, 3:] = R_O
     # Calculate coordinates of sensor frame IN OBJECT FRAME:
@@ -45,17 +35,6 @@ def model_bkwd_wrench(
     adT_sensor_O: (N,6,6) array of adjoint transforms from object frame to sensor frame
     p_finger_O: (3,) position of finger in object frame
     """
-    w_meas_S = np.asarray(w_meas_S, dtype=float)
-    adT_sensor_O = np.asarray(adT_sensor_O, dtype=float)
-    p_finger_O = np.asarray(p_finger_O, dtype=float)
-
-    if w_meas_S.ndim != 2 or w_meas_S.shape[1] != 6:
-        raise ValueError(f"w_meas_S must have shape (N,6), got {w_meas_S.shape}")
-    if adT_sensor_O.shape != (w_meas_S.shape[0], 6, 6):
-        raise ValueError(
-            f"adT_sensor_O must have shape (N,6,6) with same N as w_meas_S; got {adT_sensor_O.shape} and {w_meas_S.shape}"
-        )
-
     # Transform measured wrench from sensor frame to object frame.
     w_meas_O = np.einsum('nij,nj->ni', adT_sensor_O, w_meas_S)
 

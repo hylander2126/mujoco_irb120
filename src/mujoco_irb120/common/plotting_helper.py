@@ -23,6 +23,7 @@ def plot_wrench_and_tipping(
     figsize: Tuple[float, float] = (12, 5),
     legend_fontsize: int = 14,
     line_width: float = 3.0,
+    title: Optional[str] = None,
     show: bool = True,
 ):
     """Plot wrench channels with optional pitch-angle overlay.
@@ -40,6 +41,7 @@ def plot_wrench_and_tipping(
         legend_fontsize: Combined legend font size.
         line_width: Shared line width for plotted curves.
         show: If True, call plt.show().
+        title: Optional title for the plot.
 
     Returns:
         fig, ax1, ax2 where ax2 is None if pitch_rad is not provided.
@@ -95,6 +97,9 @@ def plot_wrench_and_tipping(
         align_zeros([ax1, ax2])
     else:
         ax1.legend(loc="best", fontsize=legend_fontsize)
+
+    if title is not None:
+        plt.title(title)
 
     plt.tight_layout()
     if show:
