@@ -9,6 +9,69 @@ import matplotlib.pyplot as plt
 
 from .com_estimation import align_zeros
 
+def plot_3vec_vs_angle(
+    vec_xyz: np.ndarray,
+    pitch_rad: Optional[np.ndarray] = None,
+    *,
+    vec_labels: Sequence[str] = ("tau_x", "tau_y", "tau_z"),
+    x_label: str = "Tipping angle ||$^\circ$||",
+    y_label: str = "Torque (Nm)",
+    contact_time: float = 0.0,
+    figsize: Tuple[float, float] = (12, 5),
+    legend_fontsize: int = 13,
+    line_width: float = 3.0,
+    title: Optional[str] = None,
+    show: bool = True,
+):
+    """Plot wrench channels with optional pitch-angle overlay.
+
+    Args:
+        vec_xyz: Vector channels of shape (N,3).
+        pitch_rad: Optional tipping angle history in radians, shape (N,).
+        vec_labels: Legend labels for vector x/y/z curves.
+        y_label: Left-axis y-label text.
+        contact_time: X-location (s) for the vertical contact marker.
+        figsize: Matplotlib figure size.
+        legend_fontsize: Combined legend font size.
+        line_width: Shared line width for plotted curves.
+        show: If True, call plt.show().
+        title: Optional title for the plot.
+
+    Returns:
+        fig, ax1
+    """
+    vec_xyz = np.asarray(vec_xyz)
+    if vec_xyz.ndim != 2 or vec_xyz.shape[1] != 3:
+        raise ValueError(
+            f"Expected vec_xyz with shape (N, 3), got {vec_xyz.shape}"
+        )
+    if len(vec_labels) != 3:
+        raise ValueError("vec_labels must contain exactly 3 entries")
+    
+    pitch_deg = abs(np.rad2deg(pitch_rad) if pitch_rad is not None else None)
+
+    fig, ax1 = plt.subplots(figsize=figsize)
+    ax1.plot(pitch_deg, vec_xyz[:, 0], color="tab:pink", linewidth=line_width, label=vec_labels[0])
+    ax1.plot(pitch_deg, vec_xyz[:, 1], color="tab:olive", linewidth=line_width, label=vec_labels[1])
+    ax1.plot(pitch_deg, vec_xyz[:, 2], color="tab:cyan", linewidth=line_width, label=vec_labels[2])
+
+    # ax1.axvline(contact_time, color="k", linestyle="-", linewidth=2, label="first contact")
+    ax1.set_xlabel(x_label, color="k")
+    ax1.set_ylabel(y_label, color="tab:blue")
+    ax1.tick_params(axis="y", labelcolor="tab:blue")
+    ax1.grid(True)
+
+    ax1.legend(loc="best", fontsize=legend_fontsize)
+
+    if title is not None:
+        plt.title(title)
+
+    plt.tight_layout()
+    if show:
+        plt.show()
+
+    return fig, ax1
+
 
 def plot_wrench_and_tipping(
     t: np.ndarray,
@@ -21,7 +84,7 @@ def plot_wrench_and_tipping(
     y_label: str = "Force & Torque (N, Nm)",
     contact_time: float = 0.0,
     figsize: Tuple[float, float] = (12, 5),
-    legend_fontsize: int = 14,
+    legend_fontsize: int = 13,
     line_width: float = 3.0,
     title: Optional[str] = None,
     show: bool = True,
@@ -88,12 +151,12 @@ def plot_wrench_and_tipping(
             linestyle="-.",
             label="pitch angle",
         )
-        ax2.set_ylabel("Primary tipping angle (deg)", color="black")
+        ax2.set_ylabel("Tipping angle ($^\circ$)", color="black")
         ax2.tick_params(axis="y", labelcolor="black")
 
         lines1, labels1 = ax1.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc="best", fontsize=legend_fontsize)
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc="lower left", fontsize=legend_fontsize)
         align_zeros([ax1, ax2])
     else:
         ax1.legend(loc="best", fontsize=legend_fontsize)

@@ -562,12 +562,12 @@ def TransToRp(T):
     return T[0: 3, 0: 3], T[0: 3, 3]
 
 def TransInv(T):
-    """Inverts a homogeneous transformation matrix
+    """Inverts a homogeneous transformation matrix.
 
-    :param T: A homogeneous transformation matrix
-    :return: The inverse of T
-    Uses the structure of transformation matrices to avoid taking a matrix
-    inverse, for efficiency.
+    Accepts a single (4,4) matrix or a batch (N,4,4).
+
+    :param T: (4,4) or (N,4,4) homogeneous transformation matrix/matrices
+    :return:  Inverse(s) with the same shape as T
 
     Example input:
         T = np.array([[1, 0,  0, 0],
@@ -580,9 +580,20 @@ def TransInv(T):
                   [0, -1, 0,  0],
                   [0,  0, 0,  1]])
     """
-    R, p = TransToRp(T)
-    Rt = np.array(R).T
-    return np.r_[np.c_[Rt, -np.dot(Rt, p)], [[0, 0, 0, 1]]]
+    T = np.asarray(T, dtype=float)
+    if T.ndim == 2:
+        R, p = TransToRp(T)
+        Rt = R.T
+        return np.r_[np.c_[Rt, -Rt @ p], [[0, 0, 0, 1]]]
+    # Batched: T is (N,4,4)
+    R  = T[:, :3, :3]                              # (N,3,3)
+    p  = T[:, :3,  3]                              # (N,3)
+    Rt = R.transpose(0, 2, 1)                      # (N,3,3)
+    Tinv = np.zeros_like(T)
+    Tinv[:, :3, :3] = Rt
+    Tinv[:, :3,  3] = -np.einsum('nij,nj->ni', Rt, p)
+    Tinv[:,  3,  3] = 1.0
+    return Tinv
 
 def VecTose3(V):
     """Converts a spatial velocity vector into a 4x4 matrix in se3
@@ -619,11 +630,12 @@ def se3ToVec(se3mat):
                  [se3mat[0][3], se3mat[1][3], se3mat[2][3]]]
 
 def Adjoint(T):
-    """Computes the adjoint representation of a homogeneous transformation
-    matrix
+    """Computes the adjoint representation of a homogeneous transformation matrix.
 
-    :param T: A homogeneous transformation matrix
-    :return: The 6x6 adjoint representation [AdT] of T
+    Accepts a single (4,4) matrix or a batch (N,4,4).
+
+    :param T: (4,4) or (N,4,4) homogeneous transformation matrix/matrices
+    :return:  (6,6) or (N,6,6) adjoint representation [AdT] of T
 
     Example Input:
         T = np.array([[1, 0,  0, 0],
@@ -638,9 +650,19 @@ def Adjoint(T):
                   [3, 0,  0, 0, 0, -1],
                   [0, 0,  0, 0, 1,  0]])
     """
-    R, p = TransToRp(T)
-    return np.r_[np.c_[R, np.zeros((3, 3))],
-                 np.c_[np.dot(VecToso3(p), R), R]]
+    T = np.asarray(T, dtype=float)
+    if T.ndim == 2:
+        R, p = TransToRp(T)
+        return np.r_[np.c_[R, np.zeros((3, 3))],
+                     np.c_[np.dot(VecToso3(p), R), R]]
+    # Batched: T is (N,4,4)
+    R = T[:, :3, :3]                               # (N,3,3)
+    p = T[:, :3,  3]                               # (N,3)
+    AdT = np.zeros((T.shape[0], 6, 6))
+    AdT[:, :3, :3] = R
+    AdT[:, 3:, 3:] = R
+    AdT[:, 3:, :3] = np.einsum('nij,njk->nik', VecToso3(p), R)
+    return AdT
 
 def ScrewToAxis(q, s, h):
     """Takes a parametric description of a screw axis and converts it to a
