@@ -7,7 +7,7 @@
 
         <inertial mass="0.663" pos="0 0 -0.01219" diaginertia="0.006083536 0.006083536 0.00185977"/>
 
-        <geom name="payload" type="box" size="0.05 0.05 0.15" material="block_mat" friction="0 0 0" 
+        <geom name="payload" type="box" size="0.05 0.05 0.15" material="block_mat" friction="0.1 0.1 0.0001" 
             solref="0.0001 1.0" rgba="1 0 0 1"/>
         
         <site name="site:payload" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 1 0"></site>
