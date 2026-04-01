@@ -202,26 +202,3 @@ def F_model(theta, m, zc, rf, rc0_known, e_hat=[0,1,0]):
     F_pred = alpha[:, None] * d_hat            # (N,3)
 
     return F_pred
-
-
-## Helper function to align y-axis limits of multiple axes to zero
-def align_zeros(axes):
-    ylims_current = {}   #  Current ylims
-    ylims_mod     = {}   #  Modified ylims
-    deltas        = {}   #  ymax - ymin for ylims_current
-    ratios        = {}   #  ratio of the zero point within deltas
-
-    for ax in axes:
-        ylims_current[ax] = list(ax.get_ylim())
-                        # Need to convert a tuple to a list to manipulate elements.
-        deltas[ax]        = ylims_current[ax][1] - ylims_current[ax][0]
-        ratios[ax]        = -ylims_current[ax][0]/deltas[ax]
-    
-    for ax in axes:      # Loop through all axes to ensure each ax fits in others.
-        ylims_mod[ax]     = [np.nan,np.nan]   # Construct a blank list
-        ylims_mod[ax][1]  = max(deltas[ax] * (1-np.array(list(ratios.values()))))
-                        # Choose the max value among (delta for ax)*(1-ratios),
-                        # and apply it to ymax for ax
-        ylims_mod[ax][0]  = min(-deltas[ax] * np.array(list(ratios.values())))
-                        # Do the same for ymin
-        ax.set_ylim(tuple(ylims_mod[ax]))
