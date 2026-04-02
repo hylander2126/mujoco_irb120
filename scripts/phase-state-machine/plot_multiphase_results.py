@@ -38,6 +38,7 @@ DEFAULT_SKIP_PHASES = {
 
 ALWAYS_SKIP_PHASES = {
     int(Phase.RETREAT),
+    int(Phase.DESCEND),
 }
 
 
@@ -113,9 +114,9 @@ def _plot_with_helper(
     fig, ax1, ax2 = plot_wrench_and_tipping(
         t=t,
         force_xyz=w_hist[:, :3],
-        torque_primary=w_hist[:, 4],
+        torque_primary=w_hist[:, 3],
         pitch_rad=pitch_rad,
-        torque_label="tau_y",
+        torque_label="tau_x",
         force_labels=("F_x", "F_y", "F_z"),
         y_label="Wrench (N, Nm)",
         contact_time=0.0,
@@ -185,6 +186,7 @@ def plot_multiphase(
     mode: str = "segments",
     compact_max_segment_s: float = 3.0,
     include_move_phases: bool = False,
+    group_interaction_phases: bool = True,
 ) -> None:
     if not npz_path.exists():
         raise FileNotFoundError(f"Input file not found: {npz_path}")
@@ -258,11 +260,61 @@ def plot_multiphase(
     # mode == "segments"
     base_save = Path(save_path) if save_path is not None else None
     figs: list[plt.Figure] = []
-
+    
+    # If grouping, identify SQUASH→PULL_TIP pairs to skip in main loop
+    squash_pull_pairs: set[int] = set()
+    if group_interaction_phases:
+        for i in range(len(runs) - 1):
+            _, _, phase_id = runs[i]
+            _, _, next_phase_id = runs[i + 1]
+            if phase_id == int(Phase.SQUASH) and next_phase_id == int(Phase.PULL_TIP):
+                squash_pull_pairs.add(i)
+    
     shown = 0
     skipped = 0
 
     for run_idx, (start, end, phase_id) in enumerate(runs, start=1):
+        # Skip PULL_TIP if it's part of a grouped SQUASH→PULL_TIP pair
+        if group_interaction_phases and phase_id == int(Phase.PULL_TIP) and (run_idx - 2) in squash_pull_pairs:
+            continue
+        
+        # Handle grouped SQUASH→PULL_TIP pairs
+        if group_interaction_phases and (run_idx - 1) in squash_pull_pairs:
+            start_squash, end_squash, _ = runs[run_idx - 1]
+            start_pull, end_pull, _ = runs[run_idx]
+            
+            # Combine both phases, resetting time at SQUASH start
+            t_combined = t[start_squash:end_pull] - t[start_squash]
+            w_combined = w_hist[start_squash:end_pull, :]
+            pitch_combined_rad = pitch_rad[start_squash:end_pull]
+            
+            seg_transitions = [
+                (0.0, int(Phase.SQUASH)),
+                (t[start_pull] - t[start_squash], int(Phase.PULL_TIP)),
+            ]
+            
+            fig, _ax = _plot_with_helper(
+                t=t_combined,
+                w_hist=w_combined,
+                pitch_rad=pitch_combined_rad,
+                transitions=seg_transitions,
+                title=(
+                    f"Interaction Pair: SQUASH → PULL_TIP "
+                    f"(abs t={t[start_squash]:.2f}s to {t[end_pull - 1]:.2f}s)"
+                ),
+                xlabel="Interaction Time (s)",
+            )
+            figs.append(fig)
+            shown += 1
+            
+            if base_save is not None:
+                stem = base_save.stem
+                suffix = base_save.suffix if base_save.suffix else ".png"
+                out = base_save.parent / f"{stem}_squash_pull_tip_{shown}{suffix}"
+                _save_figure(fig, out)
+            
+            continue
+        
         t_seg = t[start:end] - t[start]
         w_seg = w_hist[start:end, :]
         pitch_seg_rad = pitch_rad[start:end]
@@ -353,6 +405,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="In segments mode, include move-only phases (IDLE, SCAN, APPROACH_PUSH).",
     )
+    parser.add_argument(
+        "--no-group-interaction",
+        action="store_true",
+        help="In segments mode, do not group SQUASH and PULL_TIP into single plots.",
+    )
     return parser.parse_args()
 
 
@@ -365,6 +422,7 @@ def main() -> None:
         mode=args.mode,
         compact_max_segment_s=args.compact_max_segment_s,
         include_move_phases=args.include_move_phases,
+        group_interaction_phases=not args.no_group_interaction,
     )
 
 

@@ -112,7 +112,7 @@ class controller:
         print(f"Force offset: {self.ft_bias_val}")
         return self.ft_bias_val.copy()
 
-    def ft_get_reading(self, grav_comp=True, apply_bias=True):
+    def ft_get_reading(self, grav_comp=True, apply_bias=True, flip_sign=True):
         """Return the compensated wrench in sensor frame {S}.
 
         MuJoCo reports force/torque directly in the site's local frame, so no rotation needed 
@@ -147,7 +147,7 @@ class controller:
 
         # ********************** CRITICAL IMPORTANCE *************************
         # mujoco stupidly reports reaction force... very unintuitive. Negate to get real-world behavior like ATI
-        w *= 1 #-1
+        w *= -1 if flip_sign else 1
 
         return w - self.ft_bias_val if apply_bias else w
 

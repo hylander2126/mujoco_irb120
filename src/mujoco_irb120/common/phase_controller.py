@@ -80,7 +80,7 @@ class PhaseController:
     TIP_DETECT_DEG      = 2.0       # deg — tip detected during push
     CONTACT_FORCE_THRESH= 0.5       # N — force magnitude for contact onset
     APPROACH_TOL        = 0.005     # m — position tolerance to advance phase
-    PREPUSH_GAP        = 0.005     # m — initial gap to object before pushing (no pre-load)
+    PREPUSH_GAP         = 0.01      # 0.005 m — initial gap to object before pushing (no pre-load)
     PRE_PUSH_DWELL      = 1.0       # s — pause at standoff before starting push
 
     # Retreat / top
@@ -92,26 +92,26 @@ class PhaseController:
     DESCEND_CONTACT_F   = 0.5       # N — contact force for descent stop
 
     # Squash / force control
-    F_SQUASH_INIT       = 3.0       # N initial squash force target
-    F_SQUASH_MAX        = 12.0      # N cap on retried squash force
+    F_SQUASH_INIT       = 15.0      # 6.0 N initial squash force target
+    F_SQUASH_MAX        = 20.0      # 16 N cap on retried squash force
     F_SQUASH_KP         = 0.0001    # m/N proportional gain
-    SQUASH_HOLD_TIME    = 0.5       # s — hold at target before transitioning
+    SQUASH_HOLD_TIME    = 0.1       # 0.5 s — hold at target before transitioning
 
     # Pull-tip
-    PULL_SPEED          = 0.02      # m/s lateral pull speed
+    PULL_SPEED          = 0.01      # 0.02 m/s lateral pull speed
     TIP_SUCCESS_DEG     = 5.0       # deg pitch to declare tipping started
     TIP_DONE_DEG        = 35.0      # deg pitch to stop pulling
     SLIP_WINDOW         = 0.5       # s sliding window for slip detection
     SLIP_EE_THRESH      = 0.002     # m EE lateral movement within window to flag slip
     SLIP_PITCH_THRESH   = 0.5       # deg pitch change below which slip declared
-    SLIP_MIN_TRAVEL     = 0.010     # m minimum total lateral travel before slip can be declared
+    SLIP_MIN_TRAVEL     = 0.03      # 0.01 m minimum total lateral travel before slip can be declared
     MAX_SLIP_RETRIES    = 3
 
     # Speed limits for quasi-static motion
     MOVE_SPEED          = 0.08      # m/s — max Cartesian speed for approach / retreat moves
     PUSH_SPEED_CTRL     = 0.03      # m/s — push speed
     DESCEND_SPEED_CTRL  = 0.01      # m/s — descend speed (slow to avoid overshoot on contact)
-    SQUASH_SPEED_MAX    = 0.005     # m/s — max speed during squash force control
+    SQUASH_SPEED_MAX    = 0.008     # 0.005 m/s — max speed during squash force control
     ORI_KP              = 2.0       # rad/s per rad of orientation error — restores EE orientation
 
     def __init__(self, irb, model: mujoco.MjModel, data: mujoco.MjData, object_id: int = 0):
@@ -120,15 +120,15 @@ class PhaseController:
         self.data   = data
         self.object_id = object_id
 
+        # Logging (must be initialized before _load_params which calls _log)
+        self._log_file = None
+        self._log_path = None
+
         # Load ground-truth params
         self._load_params(object_id)
 
         # Current phase
         self.phase = Phase.IDLE
-
-        # Logging
-        self._log_file = None
-        self._log_path = None
 
         # Phase timing
         self._phase_start_time: dict[Phase, float] = {}
@@ -144,6 +144,7 @@ class PhaseController:
         self.obj_front_x      = None   # world-x of front face (toward robot)
         self.obj_half_x       = None   # half-extent in x
         self.obj_center_x     = None   # world-x of object center
+        self.obj_squash_x     = None   # world-x target for squash: front edge + ball_radius
 
         # Targets
         self._pos_target: np.ndarray = None    # (3,) current ball-site Cartesian target
@@ -164,6 +165,7 @@ class PhaseController:
 
         # Slip detection window: stores (sim_time, ee_x, pitch_deg)
         self._slip_window_buf: deque = deque()
+        self._slip_lift: bool = False   # when True, RETREAT lifts straight up instead of retracting in x
 
         # Statistics for summary
         self.tip_achieved = False
@@ -223,7 +225,7 @@ class PhaseController:
     def record(self):
         """Append current-timestep data to histories. Call AFTER mj_step()."""
         self._t_hist.append(self.data.time)
-        self._w_hist.append(self.irb.ft_get_reading())
+        self._w_hist.append(self.irb.ft_get_reading(flip_sign=False))
         self._quat_hist.append(self.irb.get_payload_pose(out='quat'))
         self._ball_pose_hist.append(self.irb.get_site_pose("ball"))
         self._sens_pose_hist.append(self.irb.get_site_pose("sensor"))
@@ -386,7 +388,7 @@ class PhaseController:
             return
 
         ee_pos = self.irb.get_site_pose("ball")[:3, 3]
-        ft     = self.irb.ft_get_reading()
+        ft     = self.irb.ft_get_reading(flip_sign=False)
         f_mag  = np.linalg.norm(ft[:3])
 
         # Detect contact onset
@@ -423,19 +425,36 @@ class PhaseController:
 
     def _run_retreat(self):
         """
-        Three-waypoint retreat using ball-site positions:
+        Retreat using ball-site positions.
+
+        Normal (post-push) path — 3 waypoints:
           1. Pull back in -x to clear the object
           2. Rise +z above the object top
           3. Advance +x to be directly above the object center
-        Re-observes object position at waypoint init so post-push displacement is accounted for.
+
+        Slip-recovery path — 2 waypoints (lift only, no x-retract):
+          1. Rise straight up to above the object top (same x)
+          2. Advance +x to be directly above the object center
+
+        Re-observes object position at waypoint init.
         """
         if self._pos_target is None:
             ball_pos = self.irb.get_site_pose("ball")[:3, 3]
-            self._update_obj_geometry()   # re-read object position after push
-            self._retreat_waypoints = self._compute_retreat_waypoints(ball_pos)
+            self._update_obj_geometry()   # re-read object position after push/slip
+            above_z = self.obj_top_z + self.TOP_CLEARANCE + self.irb.ball_radius
+            if self._slip_lift:
+                # Lift straight up from current x — avoid dragging finger across object
+                self._retreat_waypoints = [
+                    np.array([ball_pos[0],         0.0, above_z]),            # rise in place
+                    np.array([self.obj_squash_x,   0.0, above_z]),            # move over front edge
+                ]
+                self._slip_lift = False   # consume the flag
+                self._log(f"[RETREAT] Slip-recovery lift: rise to z={above_z:.3f}, then over squash_x={self.obj_squash_x:.3f}")
+            else:
+                self._retreat_waypoints = self._compute_retreat_waypoints(ball_pos)
+                self._log(f"[RETREAT] Object re-observed: top_z={self.obj_top_z:.3f}, center_x={self.obj_center_x:.3f}")
             self._retreat_wp_idx = 0
             self._pos_target = self._retreat_waypoints[0]
-            self._log(f"[RETREAT] Object re-observed: top_z={self.obj_top_z:.3f}, center_x={self.obj_center_x:.3f}")
 
         self._move_toward_pos(self._pos_target, self.MOVE_SPEED)
 
@@ -536,15 +555,15 @@ class PhaseController:
         self._q_des = self._q_des + q_dot * dt
         self._q_des = np.clip(self._q_des, self.irb.q_min, self.irb.q_max)
 
-        # --- Z floor: never let joints go shallower than squash depth ---
-        # If force drops, clamp each joint back to its squash value (deepest position).
-        # This prevents kinematic coupling from lifting the finger off the object.
-        if f_z < self._squash_force_target * 0.5 and self._q_squash is not None:
-            # Re-apply squash depth by taking the element-wise value that keeps
-            # the robot deeper. For joints that move the EE down when increased,
-            # the squash value is the one that produced contact — just restore it.
-            self._log(f"[PULL_TIP] Force dropped to {f_z:.2f} N — restoring squash depth.")
-            self._q_des = self._q_squash.copy()
+        # # --- Z floor: never let joints go shallower than squash depth ---
+        # # If force drops, clamp each joint back to its squash value (deepest position).
+        # # This prevents kinematic coupling from lifting the finger off the object.
+        # if f_z < self._squash_force_target * 0.5 and self._q_squash is not None:
+        #     # Re-apply squash depth by taking the element-wise value that keeps
+        #     # the robot deeper. For joints that move the EE down when increased,
+        #     # the squash value is the one that produced contact — just restore it.
+        #     self._log(f"[PULL_TIP] Force dropped to {f_z:.2f} N — restoring squash depth.")
+        #     self._q_des = self._q_squash.copy()
 
         self.irb.set_pos_ctrl(self._q_des, check_ellipsoid=False)
 
@@ -561,11 +580,14 @@ class PhaseController:
         ee_pos = self.irb.get_site_pose("ball")[:3, 3]
         now    = self.data.time
 
-        # Record pull start position on first active (non-stabilising) step
+        # Record pull start position and pitch on first active (non-stabilising) step
         if self._pull_start_x is None:
             self._pull_start_x = ee_pos[0]
+        if self._pull_start_pitch is None:
+            self._pull_start_pitch = pitch_deg
 
-        total_travel = abs(ee_pos[0] - self._pull_start_x)
+        total_travel       = abs(ee_pos[0] - self._pull_start_x)
+        cumulative_pitch   = abs(pitch_deg - self._pull_start_pitch)
 
         self._slip_window_buf.append((now, ee_pos[0], pitch_deg))
 
@@ -573,16 +595,21 @@ class PhaseController:
         while self._slip_window_buf and (now - self._slip_window_buf[0][0]) > self.SLIP_WINDOW:
             self._slip_window_buf.popleft()
 
+        # Once the object has started responding (cumulative pitch > 0.1° from pull start),
+        # disable slip detection — we're in tipping mode, not slip mode.
+        tipping_started = cumulative_pitch > 0.1
+
         # Only evaluate slip after minimum lateral travel — avoids false positives
         # during the stabilisation window and initial contact transients.
-        if total_travel >= self.SLIP_MIN_TRAVEL and len(self._slip_window_buf) >= 2:
+        if not tipping_started and total_travel >= self.SLIP_MIN_TRAVEL and len(self._slip_window_buf) >= 2:
             t_old, x_old, p_old = self._slip_window_buf[0]
             delta_x_ee  = abs(ee_pos[0] - x_old)
             delta_pitch = abs(pitch_deg - p_old)
 
             if delta_x_ee > self.SLIP_EE_THRESH and delta_pitch < self.SLIP_PITCH_THRESH:
                 self._log(f"[PULL_TIP] Slip detected! total_travel={total_travel*1000:.1f} mm, "
-                      f"Δx_ee={delta_x_ee*1000:.1f} mm, Δpitch={delta_pitch:.2f}°")
+                      f"Δx_ee={delta_x_ee*1000:.1f} mm, Δpitch={delta_pitch:.2f}°, "
+                      f"cumulative_pitch={cumulative_pitch:.3f}°")
                 self._handle_slip()
 
     def _handle_slip(self):
@@ -600,6 +627,7 @@ class PhaseController:
         self._squash_hold_start   = None
         self._pos_target          = None
         self._q_target            = None
+        self._slip_lift           = True   # signal RETREAT to lift straight up, skip x-retract
         self._enter_phase(Phase.RETREAT)
 
     # ------------------------------------------------------------------
@@ -678,25 +706,29 @@ class PhaseController:
         self.obj_front_x    = float(aabb_min[0])   # min x = face closest to robot (robot is at -x)
         self.obj_center_x   = float((aabb_min[0] + aabb_max[0]) / 2.0)
         self.obj_half_x     = float((aabb_max[0] - aabb_min[0]) / 2.0)
+        # Squash x: front edge inset by one and a half ball radii so the ball lands just inside the edge.
+        # This maximises tipping leverage compared to squashing at the centroid.
+        self.obj_squash_x   = float(aabb_min[0]) + 1.5 * self.irb.ball_radius
 
         if verbose:
             self._log(f"[SCAN] Object geometry: "
                   f"top_z={self.obj_top_z:.3f}, centroid_z={self.obj_centroid_z:.3f}, "
-                  f"front_x={self.obj_front_x:.3f}, center_x={self.obj_center_x:.3f}")
+                  f"front_x={self.obj_front_x:.3f}, center_x={self.obj_center_x:.3f}, "
+                  f"squash_x={self.obj_squash_x:.3f}")
 
     def _compute_retreat_waypoints(self, ee_pos: np.ndarray) -> list:
         """
         Return a list of (3,) positions describing the retreat path:
           1. Pull back in -x to clear the front face
           2. Rise to above the object top
-          3. Move forward to be above the object center
+          3. Advance to above the squash target (front edge) for maximum tipping leverage
         """
-        clearance_x    = self.obj_front_x - self.RETREAT_CLEARANCE
-        above_z        = self.obj_top_z + self.TOP_CLEARANCE + self.irb.ball_radius
+        clearance_x = self.obj_front_x - self.RETREAT_CLEARANCE
+        above_z     = self.obj_top_z + self.TOP_CLEARANCE + self.irb.ball_radius
 
-        wp1 = np.array([clearance_x,     0.0, ee_pos[2]])      # pull back at same height
-        wp2 = np.array([clearance_x,     0.0, above_z])         # rise up
-        wp3 = np.array([self.obj_center_x, 0.0, above_z])       # move over object center
+        wp1 = np.array([clearance_x,        0.0, ee_pos[2]])   # pull back at same height
+        wp2 = np.array([clearance_x,        0.0, above_z])      # rise up
+        wp3 = np.array([self.obj_squash_x,  0.0, above_z])      # move over front edge
 
         return [wp1, wp2, wp3]
 
@@ -713,7 +745,7 @@ class PhaseController:
         so ft_world[2] is always the vertical (world-z) component regardless of
         wrist orientation.
         """
-        ft_sensor = self.irb.ft_get_reading()
+        ft_sensor = self.irb.ft_get_reading(flip_sign=False)
         R_sensor  = self.data.site_xmat[self.irb.ft_site].reshape(3, 3)
         f_world   = R_sensor @ ft_sensor[:3]
         t_world   = R_sensor @ ft_sensor[3:]
@@ -808,7 +840,8 @@ class PhaseController:
         if new_phase == Phase.PULL_TIP:
             self._pull_stable_until = t_now + 0.3  # hold z-only for 300 ms before lateral pull
             self._q_squash = self._q_des.copy() if self._q_des is not None else None
-            self._pull_start_x = None   # will be set on first active pull step
+            self._pull_start_x = None     # will be set on first active pull step
+            self._pull_start_pitch = None # pitch at pull start, for cumulative change gate
         self._log("")
         self._log(f"[PhaseController] {self.phase.name} → {new_phase.name}  (t={t_now:.3f} s)")
         self.phase = new_phase

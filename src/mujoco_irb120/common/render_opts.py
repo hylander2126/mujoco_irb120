@@ -1,15 +1,16 @@
 import mujoco
 import numpy as np
 import contextlib
+from pathlib import Path
 from pynput import keyboard as pynput_keyboard
 
 
 ### Camera parameters for BOTH viewer and offscreen renderer ###
 
-CAM_DISTANCE   = 1.5 # Zoom level
-CAM_ELEVATION  = -30 # Camera elevation angle
-CAM_AZIMUTH    = 90 # Camera azimuth angle
-CAM_LOOKAT     = np.array([0.75, 0, 0.25]) # structure: (x, y, z)
+CAM_DISTANCE   = 0.739 # 1.5 # Zoom level
+CAM_ELEVATION  = -27.5 # 30 # Camera elevation angle
+CAM_AZIMUTH    = 80.8 # 90 # Camera azimuth angle
+CAM_LOOKAT     = np.array([0.563, -0.028, 0.208])# np.array([0.75, 0, 0.25]) # structure: (x, y, z)
 
 
 
@@ -92,6 +93,24 @@ class RendererViewerOpts:
         if len(self.frames) < data_obj.time * self.framerate:     # Add frame to the video recording
             self.renderer.update_scene(data_obj, camera=self.cam_obj, scene_option=self.opt_obj)  # Update the renderer with the current scene
             self.frames.append(self.renderer.render())        # Capture the current frame for video recording
+
+    def save_video(self, path: str):
+        """Write captured frames to an mp4 file using mediapy (pip install mediapy).
+
+        No-ops gracefully if no frames were captured or mediapy is not installed.
+        """
+        if not self.frames:
+            print("[RendererViewerOpts] No frames captured — skipping video save.")
+            return
+        try:
+            import mediapy
+        except ImportError:
+            print("[RendererViewerOpts] mediapy not installed — cannot save video. "
+                  "Run: pip install mediapy")
+            return
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        mediapy.write_video(path, self.frames, fps=self.framerate)
+        print(f"[RendererViewerOpts] Video saved to {path}  ({len(self.frames)} frames @ {self.framerate} fps)")
 
     def _on_key_press(self, key):
         if key in self.key_state:

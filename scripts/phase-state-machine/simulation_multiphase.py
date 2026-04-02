@@ -9,8 +9,9 @@ Run from the repo root or scripts/ directory:
     python simulation_multiphase.py
 
 Outputs:
-  - simulation_data_multiphase.npz   (sensor + pose data + phase labels)
-  - phase_controller_<timestamp>.log (human-readable state machine log)
+  - simulation_data_multiphase.npz          (sensor + pose data + phase labels)
+  - phase_controller_<timestamp>.log        (human-readable state machine log)
+  - simulation_<timestamp>.mp4  (optional)  (video, if RECORD_VIDEO=True)
 """
 
 import mujoco
@@ -36,7 +37,8 @@ np.set_printoptions(precision=3, suppress=True, linewidth=100)
 # ===========================================================================
 
 OBJECT          = 0        # 0=box_exp, 10=heart, 11=L_shape, 14=flashlight
-VIZ             = True     # Open the MuJoCo viewer
+VIZ             = False     # Open the MuJoCo viewer (set False for headless / faster runs)
+RECORD_VIDEO    = True     # Save an mp4 of the offscreen render (requires: pip install mediapy)
 MU_TABLE        = 0.2      # Sliding friction coefficient for table geom
 MAX_SIM_TIME    = 120.0    # Hard sim-time timeout (seconds)
 OUTPUT_FILE     = "simulation_data_multiphase.npz"
@@ -44,7 +46,7 @@ OUTPUT_FILE     = "simulation_data_multiphase.npz"
 # Set to a Phase to skip earlier phases and start there directly.
 # The robot must already be in a sensible pose for the chosen phase.
 # Options: None (full run), Phase.RETREAT, Phase.DESCEND, Phase.SQUASH, Phase.PULL_TIP
-START_PHASE     = Phase.RETREAT
+START_PHASE     = None #Phase.RETREAT
 
 
 # ===========================================================================
@@ -74,7 +76,7 @@ pc = PhaseController(irb, model, data, object_id=OBJECT)
 
 # --- Log file ---
 _log_dir  = Path(__file__).parent
-_log_name = f"phase_controller_{time.strftime('%Y%m%d_%H%M%S')}.log"
+_log_name = f"phase_controller.log"
 _log_path = str(_log_dir / _log_name)
 pc.set_log_file(_log_path)
 print(f"Logging to: {_log_path}")
@@ -101,7 +103,9 @@ with RendererViewerOpts(model, data, vis=VIZ, show_left_UI=False) as rv:
         mujoco.mj_step(model, data)
         pc.record()
         rv.sync()
-        rv.capture_frame_if_due(data)
+        if RECORD_VIDEO:
+            rv.capture_frame_if_due(data)
+
 
 
 # ===========================================================================
@@ -114,4 +118,9 @@ pc.print_summary()
 _out_path = str(_log_dir / OUTPUT_FILE)
 pc.save(_out_path)
 print(f"Log written to: {_log_path}")
+
+if RECORD_VIDEO:
+    _vid_name = f"simulation_{time.strftime('%Y%m%d_%H%M%S')}.mp4"
+    rv.save_video(str(_log_dir / _vid_name))
+
 print("Done.")
