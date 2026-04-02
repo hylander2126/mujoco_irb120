@@ -19,15 +19,14 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.spatial.transform import Rotation as R
 
 
 # Make package importable when run as a script from scripts/
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-from mujoco_irb120.common.phase_controller import PHASE_NAMES, Phase
-from mujoco_irb120.common.plotting_helper import plot_wrench_and_tipping
+from mujoco_irb120.controllers.phase_controller import PHASE_NAMES, Phase
+from mujoco_irb120.util.plotting_helper import plot_4vec_vs_angle, plot_wrench_and_tipping
 
 
 DEFAULT_SKIP_PHASES = {
@@ -39,6 +38,7 @@ DEFAULT_SKIP_PHASES = {
 ALWAYS_SKIP_PHASES = {
     int(Phase.RETREAT),
     int(Phase.DESCEND),
+    int(Phase.DONE),
 }
 
 
@@ -114,9 +114,9 @@ def _plot_with_helper(
     fig, ax1, ax2 = plot_wrench_and_tipping(
         t=t,
         force_xyz=w_hist[:, :3],
-        torque_primary=w_hist[:, 3],
+        torque_primary=w_hist[:, 4],
         pitch_rad=pitch_rad,
-        torque_label="tau_x",
+        torque_label="tau_y",
         force_labels=("F_x", "F_y", "F_z"),
         y_label="Wrench (N, Nm)",
         contact_time=0.0,
@@ -149,12 +149,44 @@ def _plot_with_helper(
     return fig, ax1
 
 
+def _signed_tipping_from_quat(quat_hist: np.ndarray) -> np.ndarray:
+    """Compute signed tipping angle (rad) from quaternion y component.
+
+    Assumes tipping is predominantly about world Y:
+    theta_y ~= 2*asin(q_y), with quaternion format [x, y, z, w].
+    """
+    q = np.asarray(quat_hist, dtype=float)
+    if q.ndim != 2 or q.shape[1] != 4:
+        raise ValueError(f"quat_hist must have shape (N, 4); got {q.shape}")
+    qy = np.clip(q[:, 1], -1.0, 1.0)
+    return 2.0 * np.arcsin(qy)
+
+
 def _save_figure(fig: plt.Figure, save_path: Path | None) -> None:
     if save_path is None:
         return
     save_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     print(f"Saved plot to: {save_path}")
+
+
+def _plot_4vec_format(
+    w_hist: np.ndarray,
+    pitch_rad: np.ndarray,
+    title: str,
+) -> tuple[plt.Figure, plt.Axes]:
+    vec4 = np.column_stack((w_hist[:, 0], w_hist[:, 1], w_hist[:, 2], w_hist[:, 4]))
+    fig, ax = plot_4vec_vs_angle(
+        vec_xyzw=vec4,
+        pitch_rad=pitch_rad,
+        vec_labels=("f_x", "f_y", "f_z", "tau_y"),
+        x_label="Tipping angle (deg)",
+        y_label="Force (N)",
+        torque_y_label="Torque (Nm)",
+        title=title,
+        show=False,
+    )
+    return fig, ax
 
 
 def _segment_has_interaction(
@@ -193,29 +225,43 @@ def plot_multiphase(
 
     data = np.load(npz_path)
 
-    required = ["t_hist", "w_hist", "quat_hist", "phase_hist"]
+    required = ["t_hist", "w_sensor_hist", "w_world_hist", "quat_hist", "phase_hist"]
     missing = [k for k in required if k not in data]
     if missing:
         raise KeyError(f"Missing required fields in npz: {missing}")
 
     t_hist = np.asarray(data["t_hist"], dtype=float).reshape(-1)
-    w_hist = np.asarray(data["w_hist"], dtype=float).reshape(-1, 6)
+    w_sensor_hist = np.asarray(data["w_sensor_hist"], dtype=float).reshape(-1, 6)
+    w_world_hist = np.asarray(data["w_world_hist"], dtype=float).reshape(-1, 6)
     quat_hist = np.asarray(data["quat_hist"], dtype=float)
     phase_hist = np.asarray(data["phase_hist"], dtype=int).reshape(-1)
 
-    if not (len(t_hist) == len(w_hist) == len(quat_hist) == len(phase_hist)):
+    if not (len(t_hist) == len(w_sensor_hist) == len(w_world_hist) == len(quat_hist) == len(phase_hist)):
         raise ValueError(
-            "Length mismatch among t_hist, w_hist, quat_hist, phase_hist: "
-            f"{len(t_hist)}, {len(w_hist)}, {len(quat_hist)}, {len(phase_hist)}"
+            "Length mismatch among t_hist, w_sensor_hist, w_world_hist, quat_hist, phase_hist: "
+            f"{len(t_hist)}, {len(w_sensor_hist)}, {len(w_world_hist)}, {len(quat_hist)}, {len(phase_hist)}"
         )
 
     # Convert to relative time for readability.
     t = t_hist - t_hist[0]
 
-    # quat is expected in scipy format [x, y, z, w].
-    rpy_rad = R.from_quat(quat_hist).as_euler("xyz", degrees=False)
-    pitch_rad = rpy_rad[:, 1]
+    pitch_rad = _signed_tipping_from_quat(quat_hist)
     pitch_deg = np.rad2deg(pitch_rad)
+
+    extra_figs: list[plt.Figure] = []
+
+    def _emit_4vec_plot(tag: str) -> None:
+        fig4, _ax4 = _plot_4vec_format(
+            w_hist=w_world_hist,
+            pitch_rad=pitch_rad,
+            title=f"4-Vec wrench vs tipping angle ({tag})",
+        )
+        extra_figs.append(fig4)
+        if save_path is not None:
+            base = Path(save_path)
+            suffix = base.suffix if base.suffix else ".png"
+            out = base.parent / f"{base.stem}_4vec{suffix}"
+            _save_figure(fig4, out)
 
     transitions = _find_phase_transitions(t, phase_hist)
     runs = _phase_runs(phase_hist)
@@ -223,17 +269,20 @@ def plot_multiphase(
     if mode == "overview":
         fig, _ax = _plot_with_helper(
             t=t,
-            w_hist=w_hist,
+            w_hist=w_world_hist,
             pitch_rad=pitch_rad,
             transitions=transitions,
             title="Measured Wrench + Pitch with Phase Transitions",
             xlabel="Time (s)",
         )
+        _emit_4vec_plot("overview")
         _save_figure(fig, save_path)
         if show:
             plt.show()
         else:
             plt.close(fig)
+            for fig4 in extra_figs:
+                plt.close(fig4)
         return
 
     if mode == "compact":
@@ -241,7 +290,7 @@ def plot_multiphase(
         transitions_compact = _find_phase_transitions(t_compact, phase_hist)
         fig, _ax = _plot_with_helper(
             t=t_compact,
-            w_hist=w_hist,
+            w_hist=w_world_hist,
             pitch_rad=pitch_rad,
             transitions=transitions_compact,
             title=(
@@ -250,11 +299,14 @@ def plot_multiphase(
             ),
             xlabel="Compressed Time (s)",
         )
+        _emit_4vec_plot("compact")
         _save_figure(fig, save_path)
         if show:
             plt.show()
         else:
             plt.close(fig)
+            for fig4 in extra_figs:
+                plt.close(fig4)
         return
 
     # mode == "segments"
@@ -285,26 +337,34 @@ def plot_multiphase(
             
             # Combine both phases, resetting time at SQUASH start
             t_combined = t[start_squash:end_pull] - t[start_squash]
-            w_combined = w_hist[start_squash:end_pull, :]
+            w_combined = w_world_hist[start_squash:end_pull, :]
             pitch_combined_rad = pitch_rad[start_squash:end_pull]
             
             seg_transitions = [
                 (0.0, int(Phase.SQUASH)),
                 (t[start_pull] - t[start_squash], int(Phase.PULL_TIP)),
             ]
+            pair_title = (
+                f"Interaction Pair: SQUASH → PULL_TIP "
+                f"(abs t={t[start_squash]:.2f}s to {t[end_pull - 1]:.2f}s)"
+            )
             
             fig, _ax = _plot_with_helper(
                 t=t_combined,
                 w_hist=w_combined,
                 pitch_rad=pitch_combined_rad,
                 transitions=seg_transitions,
-                title=(
-                    f"Interaction Pair: SQUASH → PULL_TIP "
-                    f"(abs t={t[start_squash]:.2f}s to {t[end_pull - 1]:.2f}s)"
-                ),
+                title=pair_title,
                 xlabel="Interaction Time (s)",
             )
             figs.append(fig)
+
+            fig4, _ax4 = _plot_4vec_format(
+                w_hist=w_combined,
+                pitch_rad=pitch_combined_rad,
+                title=f"{pair_title} [4vec]",
+            )
+            extra_figs.append(fig4)
             shown += 1
             
             if base_save is not None:
@@ -312,11 +372,13 @@ def plot_multiphase(
                 suffix = base_save.suffix if base_save.suffix else ".png"
                 out = base_save.parent / f"{stem}_squash_pull_tip_{shown}{suffix}"
                 _save_figure(fig, out)
+                out4 = base_save.parent / f"{stem}_squash_pull_tip_{shown}_4vec{suffix}"
+                _save_figure(fig4, out4)
             
             continue
         
         t_seg = t[start:end] - t[start]
-        w_seg = w_hist[start:end, :]
+        w_seg = w_world_hist[start:end, :]
         pitch_seg_rad = pitch_rad[start:end]
         pitch_seg = pitch_deg[start:end]
 
@@ -331,18 +393,26 @@ def plot_multiphase(
 
         # In segment view, we always show transition at local t=0.
         seg_transitions = [(0.0, phase_id)]
+        seg_title = (
+            f"Phase Segment {run_idx}: {_phase_name(phase_id)} "
+            f"(abs t={t[start]:.2f}s to {t[end - 1]:.2f}s, dur={t_seg[-1] if len(t_seg) else 0.0:.2f}s)"
+        )
         fig, _ax = _plot_with_helper(
             t=t_seg,
             w_hist=w_seg,
             pitch_rad=pitch_seg_rad,
             transitions=seg_transitions,
-            title=(
-                f"Phase Segment {run_idx}: {_phase_name(phase_id)} "
-                f"(abs t={t[start]:.2f}s to {t[end - 1]:.2f}s, dur={t_seg[-1] if len(t_seg) else 0.0:.2f}s)"
-            ),
+            title=seg_title,
             xlabel="Phase-Local Time (s)",
         )
         figs.append(fig)
+
+        fig4, _ax4 = _plot_4vec_format(
+            w_hist=w_seg,
+            pitch_rad=pitch_seg_rad,
+            title=f"{seg_title} [4vec]",
+        )
+        extra_figs.append(fig4)
         shown += 1
 
         if base_save is not None:
@@ -351,6 +421,8 @@ def plot_multiphase(
             suffix = base_save.suffix if base_save.suffix else ".png"
             out = base_save.parent / f"{stem}_{run_idx:02d}_{phase_tag}{suffix}"
             _save_figure(fig, out)
+            out4 = base_save.parent / f"{stem}_{run_idx:02d}_{phase_tag}_4vec{suffix}"
+            _save_figure(fig4, out4)
 
     if not include_move_phases:
         print(f"Segments shown: {shown} | move-only segments skipped: {skipped}")
@@ -360,6 +432,8 @@ def plot_multiphase(
     else:
         for fig in figs:
             plt.close(fig)
+        for fig4 in extra_figs:
+            plt.close(fig4)
 
 
 def _parse_args() -> argparse.Namespace:

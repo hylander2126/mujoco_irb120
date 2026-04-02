@@ -37,7 +37,7 @@ np.set_printoptions(precision=3, suppress=True, linewidth=100)
 # ===========================================================================
 
 OBJECT          = 0        # 0=box_exp, 10=heart, 11=L_shape, 14=flashlight
-VIZ             = True     # Open the MuJoCo viewer (set False for headless / faster runs)
+VIZ             = 0     # Open the MuJoCo viewer (set False for headless / faster runs)
 RECORD_VIDEO    = not VIZ  # Save an mp4 of the offscreen render (requires: pip install mediapy)
 MU_TABLE        = 0.2      # Sliding friction coefficient for table geom
 MAX_SIM_TIME    = 120.0    # Hard sim-time timeout (seconds)
@@ -57,7 +57,7 @@ print(f"Loading environment for object {OBJECT}...")
 model, data = load_environment(num=OBJECT, launch_viewer=False)
 assert model is not None, "Failed to load environment."
 
-model.geom_friction[model.geom("table").id, 0] = MU_TABLE
+# model.geom_friction[model.geom("table").id, 0] = MU_TABLE
 
 irb = robot_controller.controller(model, data)
 

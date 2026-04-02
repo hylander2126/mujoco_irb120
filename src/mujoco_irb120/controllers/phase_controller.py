@@ -71,7 +71,7 @@ class PhaseController:
     # Tunable constants
     # ------------------------------------------------------------------
     # Approach / push
-    PUSH_SPEED          = 0.03      # m/s forward push speed
+    # PUSH_SPEED          = 0.03      # m/s forward push speed
     PUSH_DIST_AFTER_CONTACT = 0.04  # how far to push after contact (m)
     PUSH_FORCE_LIMIT    = 20.0      # N — abort push if exceeded
     SAFETY_FORCE_LIMIT  = 30.0      # N — emergency retreat
@@ -87,18 +87,20 @@ class PhaseController:
     TOP_CLEARANCE       = 0.03      # m — how far above object top to hover
 
     # Descend
-    DESCEND_SPEED       = 0.02      # 0.01 m/s
+    # DESCEND_SPEED       = 0.02      # 0.01 m/s
     DESCEND_CONTACT_F   = 0.5       # N — contact force for descent stop
 
     # Squash / force control
-    F_SQUASH_INIT       = 15.0      # 6.0 N initial squash force target
-    F_SQUASH_MAX        = 20.0      # 16 N cap on retried squash force
-    F_SQUASH_KP         = 0.0001    # m/N proportional gain
+    F_SQUASH_INIT       = 8.0      # 15.0 6.0 N initial squash force target
+    F_SQUASH_MAX        = 12.0      # 20.0 16 N cap on retried squash force
+    # F_SQUASH_KP         = 0.0001    # m/N proportional gain
     SQUASH_HOLD_TIME    = 0.1       # 0.5 s — hold at target before transitioning
 
     # Pull-tip
     PULL_SPEED          = 0.01      # 0.02 m/s lateral pull speed
-    TIP_SUCCESS_DEG     = 5.0       # deg pitch to declare tipping started
+    PULL_FZ_KP          = 0.003     # m/s per N — z velocity gain for force regulation during pull
+    PULL_Z_VEL_MAX      = 0.004     # m/s cap for z correction while pulling
+    # TIP_SUCCESS_DEG     = 5.0       # deg pitch to declare tipping started
     TIP_DONE_DEG        = 35.0      # deg pitch to stop pulling
     SLIP_WINDOW         = 0.5       # s sliding window for slip detection
     SLIP_EE_THRESH      = 0.002     # m EE lateral movement within window to flag slip
@@ -174,7 +176,8 @@ class PhaseController:
         # Data histories (appended each call to record())
         # ------------------------------------------------------------------
         self._t_hist        = []
-        self._w_hist        = []
+        self._w_sensor_hist = []
+        self._w_world_hist  = []
         self._quat_hist     = []
         self._ball_pose_hist= []
         self._sens_pose_hist= []
@@ -224,7 +227,8 @@ class PhaseController:
     def record(self):
         """Append current-timestep data to histories. Call AFTER mj_step()."""
         self._t_hist.append(self.data.time)
-        self._w_hist.append(self.irb.ft_get_reading(flip_sign=False))
+        self._w_sensor_hist.append(self.irb.ft_get_reading(flip_sign=True))
+        self._w_world_hist.append(self._get_ft_world())
         self._quat_hist.append(self.irb.get_payload_pose(out='quat'))
         self._ball_pose_hist.append(self.irb.get_site_pose("ball"))
         self._sens_pose_hist.append(self.irb.get_site_pose("sensor"))
@@ -238,7 +242,8 @@ class PhaseController:
     def save(self, path: str = "simulation_data_multiphase.npz"):
         """Convert history lists to numpy arrays and save to .npz."""
         t           = np.asarray(self._t_hist,         dtype=float)
-        w           = np.asarray(self._w_hist,         dtype=float).reshape(-1, 6)
+        w_sensor    = np.asarray(self._w_sensor_hist,         dtype=float).reshape(-1, 6)
+        w_world     = np.asarray(self._w_world_hist,          dtype=float).reshape(-1, 6)
         quat        = np.asarray(self._quat_hist,      dtype=float)
         ball_pose   = np.asarray(self._ball_pose_hist, dtype=float).reshape(-1, 4, 4)
         sens_pose   = np.asarray(self._sens_pose_hist, dtype=float).reshape(-1, 4, 4)
@@ -249,7 +254,8 @@ class PhaseController:
         np.savez(
             path,
             t_hist          = t,
-            w_hist          = w,
+            w_sensor_hist   = w_sensor,
+            w_world_hist    = w_world,
             quat_hist       = quat,
             ball_pose_hist  = ball_pose,
             sens_pose_hist  = sens_pose,
@@ -390,7 +396,7 @@ class PhaseController:
             return
 
         ee_pos = self.irb.get_site_pose("ball")[:3, 3]
-        ft     = self.irb.ft_get_reading(flip_sign=False)
+        ft     = self.irb.ft_get_reading(flip_sign=True)
         f_mag  = np.linalg.norm(ft[:3])
 
         # Detect contact onset
@@ -545,29 +551,22 @@ class PhaseController:
             self.irb.set_pos_ctrl(self._q_des, check_ellipsoid=False)
             return
 
-        # --- Lateral pull only ---
-        # Accumulate only the lateral (+x) velocity into _q_des.
-        # Z is handled separately below to avoid kinematic coupling lifting the EE.
+        # --- Lateral pull + z force regulation ---
+        # Keep pulling in x while adjusting z to maintain squash force.
+        # v_cmd ordering is [wx wy wz vx vy vz].
+        fz_err = self._squash_force_target - f_z
+        vz_cmd = -self.PULL_FZ_KP * fz_err
+        vz_cmd = float(np.clip(vz_cmd, -self.PULL_Z_VEL_MAX, self.PULL_Z_VEL_MAX))
+
         v_cmd = np.zeros(6)
         v_cmd[3] = -self.PULL_SPEED   # vx only
+        v_cmd[5] = vz_cmd             # regulate vertical force
 
         self.irb.get_jacobian(set_pinv=True)
         q_dot = self.irb.J_pinv @ v_cmd
         q_dot = np.clip(q_dot, -self.irb.v_max, self.irb.v_max)
         self._q_des = self._q_des + q_dot * dt
         self._q_des = np.clip(self._q_des, self.irb.q_min, self.irb.q_max)
-
-        ## USER NOTE: This below is a poor implemntation, let's switch to a basic force-control loop
-
-        # # --- Z floor: never let joints go shallower than squash depth ---
-        # # If force drops, clamp each joint back to its squash value (deepest position).
-        # # This prevents kinematic coupling from lifting the finger off the object.
-        # if f_z < self._squash_force_target * 0.5 and self._q_squash is not None:
-        #     # Re-apply squash depth by taking the element-wise value that keeps
-        #     # the robot deeper. For joints that move the EE down when increased,
-        #     # the squash value is the one that produced contact — just restore it.
-        #     self._log(f"[PULL_TIP] Force dropped to {f_z:.2f} N — restoring squash depth.")
-        #     self._q_des = self._q_squash.copy()
 
         self.irb.set_pos_ctrl(self._q_des, check_ellipsoid=False)
 
@@ -737,9 +736,16 @@ class PhaseController:
         return [wp1, wp2, wp3]
 
     def _get_obj_pitch_deg(self) -> float:
-        """Return the object's pitch angle about the Y-axis in degrees."""
-        rpy = self.irb.get_payload_pose(out='rpy', degrees=True)
-        return float(rpy[1])   # pitch = rotation about Y
+        """Return signed pitch (deg) from quaternion y component.
+
+        Assumes tipping is predominantly about world Y, so
+        theta_y ~= 2*asin(q_y) with quaternion in [x, y, z, w].
+        """
+        q = np.asarray(self.irb.get_payload_pose(out='quat'), dtype=float).reshape(4)
+        pitch_B     = R.from_quat(q).as_euler('xyz', degrees=True)[1]
+        # qy = float(np.clip(q[1], -1.0, 1.0))
+        # return float(np.degrees(2.0 * np.arcsin(qy)))
+        return pitch_B
 
     def _get_ft_world(self) -> np.ndarray:
         """Return the F/T reading rotated into the world frame.
@@ -749,7 +755,7 @@ class PhaseController:
         so ft_world[2] is always the vertical (world-z) component regardless of
         wrist orientation.
         """
-        ft_sensor = self.irb.ft_get_reading(flip_sign=False)
+        ft_sensor = self.irb.ft_get_reading(flip_sign=True)
         R_sensor  = self.data.site_xmat[self.irb.ft_site].reshape(3, 3)
         f_world   = R_sensor @ ft_sensor[:3]
         t_world   = R_sensor @ ft_sensor[3:]

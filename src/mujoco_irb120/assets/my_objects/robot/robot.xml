@@ -54,12 +54,21 @@
                                             - sphere center z = 0.110 - 0.01325 = 0.09675 m
                                             - friction (was) 1.5, 0.02, 0.001 but have to increase for testing as high as possible
                                         -->
-                                        <geom name="push_ball_col" type="sphere" pos="0.09675 0 0" size="0.01325"
-                                              friction="1.5 0.02 0.001" condim="4" mass="0.0"/>
+                                        <!-- <geom name="push_ball_col" type="sphere" pos="0.09675 0 0" size="0.01325"
+                                              friction="1.5 0.02 0.001" condim="4" mass="0.0"/> -->
+
+                                        <!-- Try a box instead and set contact solver params -->
+                                        <!-- <geom name="push_ball_col" type="box" pos="0.09675 0 0" size="0.01325 0.01325 0.01325" mass="0.0"
+                                              friction="1.5 0.02 0.001" condim="4" solref="0.01 1" solimp="0.9 0.95 0.001"/> -->
+                                        
+                                        <!-- Try a capsule instead -->
+                                        <geom name="push_ball_col" type="capsule" pos="0.09675 0 0" euler="1.5708 0 0" size="0.01325 0.01325" mass="0.0"
+                                              friction="1.5 0.02 0.001" condim="4" solref="0.01 1" solimp="0.9 0.95 0.001"/>
+
                                         <!-- Ball center site -->
                                         <site name="site:ball_center" pos="0.09675 0 0" euler="0 0 0" size="0.01" rgba="1 1 1 1"/>
                                         <!-- Pusher contact site -->
-                                        <site name="site:fingertip" pos="0.11 0 0" euler="0 0 0" size="0.01" rgba="1 1 1 1"/>
+                                        <site name="site:fingertip" pos="0.11 0 0" euler="0 0 0" size="0.01" rgba="1 1 1 0"/>
                                     </body>
                                 </body>
                             </body>

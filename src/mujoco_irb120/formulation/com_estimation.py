@@ -1,5 +1,5 @@
 import numpy as np
-from .helper_fns import axisangle2rot, rotvec_to_rot, Adjoint, TransInv
+from mujoco_irb120.util.helper_fns import axisangle2rot, rotvec_to_rot, Adjoint, TransInv
 
 # def get_AdT_sensor_O(T_B_sensor: np.ndarray, T_B_obj: np.ndarray) -> np.ndarray:
 #     """
