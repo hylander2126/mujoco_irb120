@@ -147,7 +147,7 @@ class controller:
 
         # ********************** CRITICAL IMPORTANCE *************************
         # mujoco stupidly reports reaction force... very unintuitive. Negate to get real-world behavior like ATI
-        w *= -1
+        w *= 1 #-1
 
         return w - self.ft_bias_val if apply_bias else w
 
