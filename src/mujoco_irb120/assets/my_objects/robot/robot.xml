@@ -52,6 +52,7 @@
                                             - zmin = 0.000 m, zmax = 0.110 m
                                             - ball diameter = 26.5 mm  => radius = 13.25 mm
                                             - sphere center z = 0.110 - 0.01325 = 0.09675 m
+                                            - friction (was) 1.5, 0.02, 0.001 but have to increase for testing as high as possible
                                         -->
                                         <geom name="push_ball_col" type="sphere" pos="0.09675 0 0" size="0.01325"
                                               friction="1.5 0.02 0.001" condim="4" mass="0.0"/>
