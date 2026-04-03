@@ -64,7 +64,7 @@
 		
         <include file="my_objects/robot/robot.xml"> </include>
 
-        <include file="my_objects/box/box_exp.xml"/>
+        <include file="my_objects/heart/heart_exp.xml"/>
         
 		<!-- ^ Object body will inject here ^ -->
 
