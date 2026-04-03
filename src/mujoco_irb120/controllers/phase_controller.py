@@ -4,7 +4,7 @@ phase_controller.py
 Autonomous multi-phase interaction controller for the ABB IRB120 robot in MuJoCo.
 
 State machine:
-    IDLE → SCAN → APPROACH_PUSH → PUSH → RETREAT_TO_TOP → DESCEND → SQUASH → PULL_TIP → DONE
+    IDLE → SCAN → APPROACH_PUSH → PUSH → RETREAT_TO_TOP → DESCEND → SQUASH → PULL_TIP → RETURN_PRE_SQUASH → DONE
 
 Usage (from sim loop):
     pc = PhaseController(irb, model, data, object_id=0)
@@ -17,6 +17,7 @@ Usage (from sim loop):
 
 import json
 import time
+from datetime import date
 from collections import deque
 from enum import IntEnum
 from pathlib import Path
@@ -38,7 +39,8 @@ class Phase(IntEnum):
     DESCEND       = 5
     SQUASH        = 6
     PULL_TIP      = 7
-    DONE          = 8
+    RETURN_PRE_SQUASH = 8
+    DONE          = 9
 
 
 PHASE_NAMES = {p: p.name for p in Phase}
@@ -97,11 +99,10 @@ class PhaseController:
     SQUASH_HOLD_TIME    = 0.1       # 0.5 s — hold at target before transitioning
 
     # Pull-tip
-    PULL_SPEED          = 0.01      # 0.02 m/s lateral pull speed
     PULL_FZ_KP          = 0.003     # m/s per N — z velocity gain for force regulation during pull
     PULL_Z_VEL_MAX      = 0.004     # m/s cap for z correction while pulling
     # TIP_SUCCESS_DEG     = 5.0       # deg pitch to declare tipping started
-    TIP_DONE_DEG        = 35.0      # deg pitch to stop pulling
+    TIP_DONE_DEG        = 10.0      # deg pitch to stop pulling
     SLIP_WINDOW         = 0.5       # s sliding window for slip detection
     SLIP_EE_THRESH      = 0.002     # m EE lateral movement within window to flag slip
     SLIP_PITCH_THRESH   = 0.5       # deg pitch change below which slip declared
@@ -111,8 +112,24 @@ class PhaseController:
     # Speed limits for quasi-static motion
     MOVE_SPEED          = 0.08      # m/s — max Cartesian speed for approach / retreat moves
     PUSH_SPEED_CTRL     = 0.03      # m/s — push speed
-    DESCEND_SPEED_CTRL  = 0.01      # m/s — descend speed (slow to avoid overshoot on contact)
-    SQUASH_SPEED_MAX    = 0.008     # 0.005 m/s — max speed during squash force control
+    DESCEND_SPEED_CTRL  = 0.02      # m/s — descend speed (slow to avoid overshoot on contact)
+    SQUASH_SPEED_MAX    = 0.01     # 0.008 m/s — max speed during squash force control
+    PULL_SPEED          = 0.04      # 0.02 m/s lateral pull speed
+    RETURN_Q_SPEED      = 0.20      # rad/s per-joint cap for gentle post-pull return
+    RETURN_Q_TOL        = 0.02      # rad joint-space tolerance for return completion
+    RETURN_PATH_SPEED   = 0.015     # m/s waypoint tracking speed for pull-path replay
+    RETURN_WP_TOL       = 0.003     # m waypoint reach tolerance during return
+    RETURN_PATH_STRIDE  = 10        # decimation stride for recorded pull path samples
+    RETURN_ARC_Z        = 0.012     # m max upward arc offset while returning
+    RETURN_FZ_TARGET    = 1.5       # N final normal-force target near return completion
+    RETURN_FZ_START     = 4.0       # N initial normal-force target at return start
+    RETURN_FZ_KP        = 0.002     # m/s per N, upward force-relief gain in return
+    RETURN_FZ_VMAX      = 0.006     # m/s cap on upward relief velocity
+    RETURN_FZ_DOWN_VMAX = 0.0015    # m/s cap on downward correction (keep gentle on unstable object)
+    RETURN_FORCE_RECOVER_THRESH = 0.6  # below this ratio of target force, slow lateral replay
+    RETURN_FORCE_SLOW_RATIO = 0.35  # lateral speed scale when contact force is weak
+    RETURN_USE_REVERSE_PULL = True   # if True, return by inverting pull direction with same force loop
+    RETURN_X_TOL = 0.002             # m tolerance to stop reverse-pull at pull anchor x
     ORI_KP              = 2.0       # rad/s per rad of orientation error — restores EE orientation
 
     def __init__(self, irb, model: mujoco.MjModel, data: mujoco.MjData, object_id: int = 0):
@@ -124,6 +141,7 @@ class PhaseController:
         # Logging (must be initialized before _load_params which calls _log)
         self._log_file = None
         self._log_path = None
+        self._log_date = None
 
         # Load ground-truth params
         self._load_params(object_id)
@@ -138,6 +156,12 @@ class PhaseController:
         self._pull_stable_until: float = 0.0   # PULL_TIP: hold z before lateral motion
         self._pull_start_x: float = None       # ball x at start of lateral pull (for min-travel gate)
         self._q_squash: np.ndarray = None      # joint target captured at squash completion (z floor)
+        self._q_pre_squash: np.ndarray = None  # joint target captured at SQUASH entry (pre-load state)
+        self._pull_anchor_pos: np.ndarray = None   # ball position at PULL_TIP entry (start of pull)
+        self._pull_path_pos: list[np.ndarray] = [] # sampled ball positions during pull, for replay return
+        self._return_path: list[np.ndarray] = []   # reverse pull waypoints with arc lift
+        self._return_wp_idx: int = 0
+        self._return_fz_start: float = None        # measured Fz at return entry for target ramp
 
         # Geometry info (filled during SCAN)
         self.obj_centroid_z   = None   # world-z of object centroid
@@ -218,6 +242,9 @@ class PhaseController:
         elif self.phase == Phase.PULL_TIP:
             self._run_pull_tip()
 
+        elif self.phase == Phase.RETURN_PRE_SQUASH:
+            self._run_return_pre_squash()
+
         elif self.phase == Phase.DONE:
             pass  # hold still
 
@@ -289,14 +316,21 @@ class PhaseController:
     def set_log_file(self, path: str):
         """Redirect all PhaseController print() output to `path` (and stdout).
 
-        Must be called before the sim loop starts.  The log file is written in
-        append mode so successive runs in the same session accumulate.
+        Must be called before the sim loop starts. A date-stamped log file is
+        created per day, and repeated runs on the same date append to that file.
         """
-        self._log_file = open(path, "a", buffering=1)   # line-buffered
-        self._log_path = path
+        log_date = date.today().isoformat()
+        log_path = Path(path)
+        dated_name = f"{log_path.stem}_{log_date}{log_path.suffix or '.log'}"
+        dated_path = log_path.with_name(dated_name)
+
+        self._log_file = open(dated_path, "a", buffering=1)   # line-buffered
+        self._log_path = str(dated_path)
+        self._log_date = log_date
         self._log("=" * 60)
         self._log(f"PhaseController log  —  object {self.object_id}  —  {time.strftime('%Y-%m-%d %H:%M:%S')}")
         self._log("=" * 60)
+        return self._log_path
 
     def _log(self, msg: str):
         """Print to stdout and, if a log file is open, also write there."""
@@ -525,8 +559,8 @@ class PhaseController:
             if self._q_des is not None:
                 self.irb.set_pos_ctrl(self._q_des, check_ellipsoid=False)
 
-        # Track hold time once force is close enough (within 20%)
-        if f_z >= self._squash_force_target * 0.8:
+        # Track hold time once force is close enough (within 10% to skip the slow speed at end)
+        if f_z >= self._squash_force_target * 0.9:
             if self._squash_hold_start is None:
                 self._squash_hold_start = self.data.time
                 self._log(f"[SQUASH] Force target reached ({f_z:.2f}/{self._squash_force_target:.2f} N). Holding...")
@@ -574,13 +608,15 @@ class PhaseController:
         pitch_deg = self._get_obj_pitch_deg()
 
         if abs(pitch_deg) > self.TIP_DONE_DEG:
-            self._log(f"[PULL_TIP] Tipping complete (pitch={pitch_deg:.1f}°). Done.")
+            self._log(f"[PULL_TIP] Tipping complete (pitch={pitch_deg:.1f}°). Returning to pre-squash pose.")
             self.tip_achieved = True
-            self._enter_phase(Phase.DONE)
+            self._enter_phase(Phase.RETURN_PRE_SQUASH)
             return
 
         # --- Slip detection ---
         ee_pos = self.irb.get_site_pose("ball")[:3, 3]
+        if not self._pull_path_pos or np.linalg.norm(ee_pos - self._pull_path_pos[-1]) > 5e-4:
+            self._pull_path_pos.append(ee_pos.copy())
         now    = self.data.time
 
         # Record pull start position and pitch on first active (non-stabilising) step
@@ -615,12 +651,128 @@ class PhaseController:
                       f"cumulative_pitch={cumulative_pitch:.3f}°")
                 self._handle_slip()
 
+    def _run_return_pre_squash(self):
+        # Preferred return mode: invert pull-tip controller (same squash force loop,
+        # same speed magnitude, opposite x direction) until we reach pull start.
+        # The arc/path-replay implementation below is intentionally kept for future use.
+        if self.RETURN_USE_REVERSE_PULL:
+            self._run_return_pre_squash_reverse_pull()
+            return
+
+        """Replay pull path in reverse with arc lift and reduced normal force."""
+        if not self._return_path:
+            raw_path = self._pull_path_pos if self._pull_path_pos else [self.irb.get_site_pose("ball")[:3, 3].copy()]
+            rev = list(reversed(raw_path[::max(1, int(self.RETURN_PATH_STRIDE))]))
+            if raw_path:
+                last = raw_path[0].copy()
+                if np.linalg.norm(rev[-1] - last) > 1e-6:
+                    rev.append(last)
+            if self._pull_anchor_pos is not None:
+                if np.linalg.norm(rev[-1] - self._pull_anchor_pos) > 1e-6:
+                    rev.append(self._pull_anchor_pos.copy())
+
+            n = len(rev)
+            path = []
+            for i, p in enumerate(rev):
+                alpha = i / max(1, n - 1)
+                lift = self.RETURN_ARC_Z * np.sin(np.pi * alpha)
+                wp = p.copy()
+                wp[2] += lift
+                path.append(wp)
+
+            self._return_path = path
+            self._return_wp_idx = 0
+            self._log(f"[RETURN_PRE_SQUASH] Replaying {len(self._return_path)} pull-path waypoints with arc lift.")
+
+        if self._q_des is None:
+            self._q_des = self.data.qpos[self.irb.joint_idx].copy().astype(float)
+        if self._R_des is None:
+            self._R_des = self.irb.FK()[:3, :3].copy()
+
+        wp = self._return_path[self._return_wp_idx]
+        ball_pos = self.irb.get_site_pose("ball")[:3, 3]
+        diff = wp - ball_pos
+        dist = np.linalg.norm(diff)
+        v_lin = (diff / dist) * self.RETURN_PATH_SPEED if dist > 1e-6 else np.zeros(3)
+
+        # Force-aware return: ramp normal-force target down along the replay,
+        # with asymmetric z control (fast unload, gentle reload).
+        alpha = self._return_wp_idx / max(1, len(self._return_path) - 1)
+        f_z = abs(self._get_ft_world()[2])
+        fz_start = self._return_fz_start if self._return_fz_start is not None else self.RETURN_FZ_START
+        fz_target = (1.0 - alpha) * fz_start + alpha * self.RETURN_FZ_TARGET
+        fz_err = fz_target - f_z
+        vz_force = -self.RETURN_FZ_KP * fz_err
+        if vz_force >= 0.0:
+            vz_force = min(vz_force, self.RETURN_FZ_VMAX)
+        else:
+            vz_force = max(vz_force, -self.RETURN_FZ_DOWN_VMAX)
+        v_lin[2] += vz_force
+
+        # If contact weakens, slow lateral replay to recover grip before continuing.
+        if f_z < self.RETURN_FORCE_RECOVER_THRESH * max(fz_target, 1e-6):
+            v_lin[0] *= self.RETURN_FORCE_SLOW_RATIO
+            v_lin[1] *= self.RETURN_FORCE_SLOW_RATIO
+
+        R_curr = self.irb.FK()[:3, :3]
+        R_err = self._R_des @ R_curr.T
+        rotvec = R.from_matrix(R_err).as_rotvec()
+        w_ori = self.ORI_KP * rotvec
+
+        v_cmd = np.zeros(6)
+        v_cmd[:3] = w_ori
+        v_cmd[3:] = v_lin
+
+        dt = float(self.model.opt.timestep)
+        self.irb.get_jacobian(set_pinv=True)
+        q_dot = self.irb.J_pinv @ v_cmd
+        q_dot = np.clip(q_dot, -self.irb.v_max, self.irb.v_max)
+        self._q_des = self._q_des + q_dot * dt
+        self._q_des = np.clip(self._q_des, self.irb.q_min, self.irb.q_max)
+        self.irb.set_pos_ctrl(self._q_des, check_ellipsoid=False)
+
+        if np.linalg.norm(ball_pos - wp) < self.RETURN_WP_TOL:
+            self._return_wp_idx += 1
+            if self._return_wp_idx >= len(self._return_path):
+                self._log("[RETURN_PRE_SQUASH] Arc return complete. Done.")
+                self._enter_phase(Phase.DONE)
+
+    def _run_return_pre_squash_reverse_pull(self):
+        """Return by inverting pull direction while maintaining squash force."""
+        if self._q_des is None:
+            self._q_des = self.data.qpos[self.irb.joint_idx].copy().astype(float)
+
+        ee_pos = self.irb.get_site_pose("ball")[:3, 3]
+        if self._pull_anchor_pos is not None and ee_pos[0] >= (self._pull_anchor_pos[0] - self.RETURN_X_TOL):
+            self._log("[RETURN_PRE_SQUASH] Reverse-pull return reached pre-pull x. Done.")
+            self._enter_phase(Phase.DONE)
+            return
+
+        ft = self._get_ft_world()
+        f_z = abs(ft[2])
+        dt = float(self.model.opt.timestep)
+
+        fz_err = self._squash_force_target - f_z
+        vz_cmd = -self.PULL_FZ_KP * fz_err
+        vz_cmd = float(np.clip(vz_cmd, -self.PULL_Z_VEL_MAX, self.PULL_Z_VEL_MAX))
+
+        v_cmd = np.zeros(6)
+        v_cmd[3] = +self.PULL_SPEED   # reverse of pull phase
+        v_cmd[5] = vz_cmd             # same squash-force regulation as pull
+
+        self.irb.get_jacobian(set_pinv=True)
+        q_dot = self.irb.J_pinv @ v_cmd
+        q_dot = np.clip(q_dot, -self.irb.v_max, self.irb.v_max)
+        self._q_des = self._q_des + q_dot * dt
+        self._q_des = np.clip(self._q_des, self.irb.q_min, self.irb.q_max)
+        self.irb.set_pos_ctrl(self._q_des, check_ellipsoid=False)
+
     def _handle_slip(self):
         """Increment squash force and retry from RETREAT, or give up."""
         self._slip_retries += 1
         if self._slip_retries > self.MAX_SLIP_RETRIES:
-            self._log(f"[PULL_TIP] Max slip retries ({self.MAX_SLIP_RETRIES}) reached. Stopping.")
-            self._enter_phase(Phase.DONE)
+            self._log(f"[PULL_TIP] Max slip retries ({self.MAX_SLIP_RETRIES}) reached. Returning to pre-squash pose.")
+            self._enter_phase(Phase.RETURN_PRE_SQUASH)
             return
 
         new_f = min(self._squash_force_target * 1.5, self.F_SQUASH_MAX)
@@ -711,7 +863,7 @@ class PhaseController:
         self.obj_half_x     = float((aabb_max[0] - aabb_min[0]) / 2.0)
         # Squash x: front edge inset by one and a half ball radii so the ball lands just inside the edge.
         # This maximises tipping leverage compared to squashing at the centroid.
-        self.obj_squash_x   = float(aabb_min[0]) + 1.5 * self.irb.ball_radius
+        self.obj_squash_x   = float(aabb_min[0]) + 1.1 * self.irb.ball_radius # small inset for slip allowance
 
         if verbose:
             self._log(f"[SCAN] Object geometry: "
@@ -847,11 +999,22 @@ class PhaseController:
             self._phase_end_time[self.phase] = t_now
         self._phase_start_time[new_phase] = t_now
         self._phase_settle_until = t_now + 0.1   # ignore force safety for 100 ms after transition
+        if new_phase == Phase.SQUASH:
+            if self._q_des is not None:
+                self._q_pre_squash = self._q_des.copy()
+            else:
+                self._q_pre_squash = self.data.qpos[self.irb.joint_idx].copy().astype(float)
         if new_phase == Phase.PULL_TIP:
             self._pull_stable_until = t_now + 0.3  # hold z-only for 300 ms before lateral pull
             self._q_squash = self._q_des.copy() if self._q_des is not None else None
             self._pull_start_x = None     # will be set on first active pull step
             self._pull_start_pitch = None # pitch at pull start, for cumulative change gate
+            self._pull_anchor_pos = self.irb.get_site_pose("ball")[:3, 3].copy()
+            self._pull_path_pos = [self._pull_anchor_pos.copy()]
+            self._return_path = []
+            self._return_wp_idx = 0
+        if new_phase == Phase.RETURN_PRE_SQUASH:
+            self._return_fz_start = abs(self._get_ft_world()[2])
         self._log("")
         self._log(f"[PhaseController] {self.phase.name} → {new_phase.name}  (t={t_now:.3f} s)")
         self.phase = new_phase
@@ -863,8 +1026,9 @@ class PhaseController:
         # Keep accumulated joint target across smooth motion chains:
         #   APPROACH_PUSH → PUSH  (continue forward)
         #   SQUASH → PULL_TIP     (preserve squash depth so force is not released)
+        #   PULL_TIP → RETURN_PRE_SQUASH (smoothly interpolate back to pre-squash state)
         # All other transitions reset so the new phase starts from actual robot state.
-        if new_phase not in (Phase.PUSH, Phase.PULL_TIP):
+        if new_phase not in (Phase.PUSH, Phase.PULL_TIP, Phase.RETURN_PRE_SQUASH):
             self._q_des  = None
             self._R_des  = None  # capture fresh orientation reference at next move call
 

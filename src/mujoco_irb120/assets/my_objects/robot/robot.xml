@@ -39,14 +39,14 @@
 
                                 <!-- Force sensor adapter, body, etc. -->
                                 <body name="ft_and_adapter_link" pos="0.041125 0 0" gravcomp="1">
-                                    <geom type="cylinder" size="0.0375 0.041125" euler="0 1.5708 0" rgba="0.5 0.5 0.5 1" mass="0.0"/>
+                                    <geom name="robot0:ft" type="cylinder" size="0.0375 0.041125" euler="0 1.5708 0" rgba="0.5 0.5 0.5 1" mass="0.0"/>
                                     <!-- Force Sensor Site : Real robot has +y up, +x into screen, +z right (aka sensor-axial)-->
                                     <site name="site:sensor" pos="0.041125 0 0" euler="0 1.5708 1.5708" size="0.01" rgba="1 1 1 1"/>
                                     
                                     <!-- Pusher link -->
                                     <body name="pusher_link" pos="0.041125 0 0" euler="0 0 0" gravcomp="1">
                                         <!-- Visual mesh only; collision handled by explicit primitives. -->
-                                        <geom name="push_rod" type="mesh" mass="0.064" euler="0 1.5708 0" mesh="pusher_link" material="robot0:gripper_mat" contype="0" conaffinity="0"/>
+                                        <geom name="robot0:push_rod" type="mesh" mass="0.064" euler="0 1.5708 0" mesh="pusher_link" material="robot0:gripper_mat" contype="0" conaffinity="0"/>
                                         <!-- Tip sphere collision model aligned to STL local frame.
                                             Measured mesh bounds for pusher_link.stl:
                                             - zmin = 0.000 m, zmax = 0.110 m
@@ -54,16 +54,16 @@
                                             - sphere center z = 0.110 - 0.01325 = 0.09675 m
                                             - friction (was) 1.5, 0.02, 0.001 but have to increase for testing as high as possible
                                         -->
-                                        <!-- <geom name="push_ball_col" type="sphere" pos="0.09675 0 0" size="0.01325"
-                                              friction="1.5 0.02 0.001" condim="4" mass="0.0"/> -->
+                                        <geom name="robot0:push_ball_col" type="sphere" pos="0.09675 0 0" size="0.01325" mass="0.0"
+                                              friction="1.5 0.0005 0.0001" solref="0.01 1" solimp="0.9 0.95 0.001"/>
 
                                         <!-- Try a box instead and set contact solver params -->
-                                        <!-- <geom name="push_ball_col" type="box" pos="0.09675 0 0" size="0.01325 0.01325 0.01325" mass="0.0"
-                                              friction="1.5 0.02 0.001" condim="4" solref="0.01 1" solimp="0.9 0.95 0.001"/> -->
+                                        <!-- <geom name="robot0:push_ball_col" type="box" pos="0.09675 0 0" size="0.01325 0.01325 0.01325" mass="0.0"
+                                              friction="1.5 0.0005 0.0001" solref="0.01 1" solimp="0.9 0.95 0.001"/> -->
                                         
                                         <!-- Try a capsule instead -->
-                                        <geom name="push_ball_col" type="capsule" pos="0.09675 0 0" euler="1.5708 0 0" size="0.01325 0.01325" mass="0.0"
-                                              friction="1.5 0.02 0.001" condim="4" solref="0.01 1" solimp="0.9 0.95 0.001"/>
+                                        <!-- <geom name="robot0:push_ball_col" type="capsule" pos="0.09675 0 0" euler="1.5708 0 0" size="0.01325 0.01325" mass="0.0"
+                                              friction="1.5 0.005 0.0001" solref="0.01 1" solimp="0.9 0.95 0.001"/> -->
 
                                         <!-- Ball center site -->
                                         <site name="site:ball_center" pos="0.09675 0 0" euler="0 0 0" size="0.01" rgba="1 1 1 1"/>

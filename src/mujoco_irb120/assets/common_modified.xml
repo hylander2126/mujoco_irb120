@@ -10,6 +10,7 @@
         <texture type="skybox" builtin="gradient" rgb1="0.45 0.6 0.807" rgb2="0.46 0.87 0.58" width="32" height="32"></texture>
         <!-- <texture name="texture_block" file="block.png" gridsize="3 4" gridlayout=".U..LFRB.D.."></texture> -->
         <texture name="grid" type="2d" builtin="checker" rgb1=".1 .2 .3" rgb2=".2 .3 .4" width="300" height="300"/>
+        <texture name="checkers" type="2d" builtin="checker" rgb1="0.5 0.75 0.8" rgb2="0.9 0.55 0.86" width="300" height="300"/>
 
         <material name="floor_mat" specular="0" shininess="0.5" reflectance="0" rgba="0.2 0.2 0.2 1"></material>
         <material name="table_mat" specular="0" shininess="0.5" reflectance="0" rgba="0.57 0.75 0.83 0.8"></material>
@@ -18,7 +19,8 @@
         <material name="robot0:gripper_finger_mat" shininess="0.03" specular="0.4" reflectance="0"></material>
         <material name="robot0:gripper_mat" shininess="0.03" specular="0.4" reflectance="0"></material>
         <material name="robot0:base_mat" shininess="0.03" specular="0.4" reflectance="0"></material>
-        <material name="grid_mat" texture="grid" texrepeat="8 8" reflectance="0.2"/>
+        <material name="grid_mat" texture="grid" texrepeat="8 8" reflectance="0.2"></material>
+        <material name="checkers_mat" texture="checkers" texrepeat="8 8" reflectance="0"></material>
 
 		<mesh name="base_link"   file="my_objects/robot/base_link.stl" />
         <mesh name="link_1"      file="my_objects/robot/link_1.stl" />

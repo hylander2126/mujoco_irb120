@@ -10,7 +10,15 @@
 	
 	<visual>
 		<global offwidth="1280" offheight="720"/>
+		<scale contactwidth="0.01" contactheight="0.2" framewidth="0.025" framelength="0.75"/>
 	</visual>
+
+	<!-- <contact>
+		<pair geom1="push_ball_col" geom2="payload_col"
+			  condim="4"
+			  friction="0.9 0.02 0.001"
+			  />
+	</contact> -->
 
 	<!-- v ROBOT actuators will inject here v -->
 	{actuator_block}
@@ -32,7 +40,7 @@
 		
 		<!-- Table Surface === Recall geom SIZE is half-dims so table surface is z=0.1 (fric was 1, 0.005. 0.0001)-->
 		<body pos="0.75 0 0" name="table0">
-			<geom size="1 0.5 0.05" type="box" name="table" mass="2000" material="table_mat" friction="0 0 0"></geom>
+			<geom size="1 0.5 0.05" type="box" name="table" mass="2000" material="checkers_mat" friction="0 0 0"></geom>
 			<site name="site:table" pos="0 0 0" size = "0.02 0.02 0.02" type="box" rgba="1 1 0 0"></site>
 		</body>
 

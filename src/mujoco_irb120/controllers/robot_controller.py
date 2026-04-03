@@ -1,7 +1,6 @@
 import mujoco
 from scipy.spatial.transform import Rotation as Robj
 import numpy as np
-import matplotlib.pyplot as plt
 from mujoco_irb120.util.helper_fns import *
 
 class controller:
@@ -47,7 +46,7 @@ class controller:
         # self.o_obj          = self.data.site_xpos[self.obj_frame_site]  # (3,) object frame origin in world frame
         self.payload_body_id = int(self.model.site_bodyid[self.obj_frame_site])
         self.pusher_body_id = int(model.body('pusher_link').id)
-        self.ball_geom_id   = model.geom('push_ball_col').id
+        self.ball_geom_id   = model.geom('robot0:push_ball_col').id
 
         # --- Force Sensor Calculations ---
         self.f_adr          = int(self.model.sensor_adr[model.sensor('force_sensor').id]) 

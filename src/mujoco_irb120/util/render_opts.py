@@ -15,7 +15,9 @@ CAM_LOOKAT     = np.array([0.563, -0.028, 0.208])# np.array([0.75, 0, 0.25]) # s
 
 
 class RendererViewerOpts:
-    def __init__(self, model_obj, data_obj, vis=True, width=1280, height=720, framerate=60, show_left_UI=False):
+    def __init__(self, model_obj, data_obj, 
+                 vis=True, show_left_UI=False,
+                 width=1280, height=720, framerate=60):
 
         self.model_obj  = model_obj
         self.data_obj   = data_obj
@@ -156,10 +158,11 @@ class RendererViewerOpts:
     @staticmethod
     def _apply_viewer_opts(v_ctx):
         """ Set visualization options for the passive viewer context """
-        # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
-        v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Gross... Contact 'translucent' force 'disc'
-       # Just use keyboard shortcut ('v') to toggle visualization of frames as needed; too cluttered otherwise.
-        # v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_COM]              = True # Center of mass spheres TOO BIG, don't use...
+        v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT]    = True # Contact arrows
+        v_ctx.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Contact 'translucent' force 'disc'
+        # Just use keyboard shortcut ('v') to toggle visualization of frames as needed; too cluttered otherwise.
+        
+        v_ctx.opt.label = mujoco.mjtLabel.mjLABEL_CONTACTFORCE # Show contact force magnitudes as text labels
 
         v_ctx.cam.distance                                       = CAM_DISTANCE
         v_ctx.cam.elevation                                      = CAM_ELEVATION
@@ -168,12 +171,14 @@ class RendererViewerOpts:
 
     @staticmethod
     def _apply_model_vis(model_obj):
-        model_obj.vis.scale.contactwidth    = 0.004  # Contact arrow width
-        model_obj.vis.scale.contactheight   = 0.02   # Contact arrow height
-        # model_obj.vis.scale.forcewidth      = 0.05 # Gross... force 'disc' size
-        # model_obj.vis.map.force             = 0.3  # Gross... force 'disc' scale
-        model_obj.vis.scale.framewidth      = 0.025  # Frame axis width
-        model_obj.vis.scale.framelength     = 0.75   # Frame axis length
+        null=1
+        # UPDATE: THESE DO NOTHING... INSTEAD, SET THESE IN XML MODEL FILE
+        # model_obj.vis.scale.contactwidth    = 0.004  # Contact arrow width
+        # model_obj.vis.scale.contactheight   = 0.02   # Contact arrow height
+        # model_obj.vis.scale.forcewidth      = 0.05   # force 'disc' size
+        # model_obj.vis.map.force             = 0.3    # 'disc' scale
+        # model_obj.vis.scale.framewidth      = 0.025  # Frame axis width
+        # model_obj.vis.scale.framelength     = 0.75   # Frame axis length
 
     @staticmethod
     def _apply_offscreen_opts(cam_obj, opt_obj):

@@ -46,7 +46,7 @@ OUTPUT_FILE     = "simulation_data_multiphase.npz"
 # Set to a Phase to skip earlier phases and start there directly.
 # The robot must already be in a sensible pose for the chosen phase.
 # Options: None (full run), Phase.RETREAT, Phase.DESCEND, Phase.SQUASH, Phase.PULL_TIP
-START_PHASE     = Phase.RETREAT
+START_PHASE     = None #Phase.RETREAT
 
 
 # ===========================================================================
@@ -78,7 +78,7 @@ pc = PhaseController(irb, model, data, object_id=OBJECT)
 _log_dir  = Path(__file__).parent
 _log_name = f"phase_controller.log"
 _log_path = str(_log_dir / _log_name)
-pc.set_log_file(_log_path)
+_log_path = pc.set_log_file(_log_path)
 print(f"Logging to: {_log_path}")
 
 # --- Start phase ---
@@ -105,7 +105,6 @@ with RendererViewerOpts(model, data, vis=VIZ, show_left_UI=False) as rv:
         rv.sync()
         if RECORD_VIDEO:
             rv.capture_frame_if_due(data)
-
 
 
 # ===========================================================================

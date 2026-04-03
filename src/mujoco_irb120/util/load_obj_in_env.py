@@ -57,8 +57,8 @@ GEN_DIR = ASSETS_DIR / "_generated"
 # -----------------------------------------------------------------
 def create_scene_xml(
         object_id, 
-        template_path = str(ASSETS_DIR / "table_push.xml"),
-        out           = str(ASSETS_DIR / "generated_scene.xml")
+        template_path = str(ASSETS_DIR / "main.xml"),
+        out           = str(ASSETS_DIR / "gen_main.xml")
     ):
     
     if object_id in [0, 10, 11, 12, 13, 14]:
@@ -162,7 +162,7 @@ def load_environment(num=1, launch_viewer=False):
 
 def create_photoshoot_xml(
         nums            =[0, 10, 11, 12, 13, 5],
-        template_path   = str(ASSETS_DIR / "table_push.xml"),
+        template_path   = str(ASSETS_DIR / "main.xml"),
         out             = str(ASSETS_DIR / "photoshoot_scene.xml")
     ):
     # asset_path = OBJ_DIR / name / "assets.xml"
