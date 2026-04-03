@@ -23,14 +23,14 @@
 	<!-- v ROBOT actuators will inject here v -->
 	
 <actuator>
-    <!-- Position Control -->
-    <!-- kp, kv: (200,100) first 3, (100,50) last 3 -->
-    <position joint="joint_1" name="joint_1" kp="200" kv="100" ctrlrange="-2.87979 2.87979" forcerange="-20 20"/>
-    <position joint="joint_2" name="joint_2" kp="200" kv="100" ctrlrange="-1.91986 1.91986" forcerange="-20 20"/>
-    <position joint="joint_3" name="joint_3" kp="200" kv="100" ctrlrange="-1.22173 1.91986" forcerange="-20 20"/>
-    <position joint="joint_4" name="joint_4" kp="100" kv="50" ctrlrange="-2.79252 2.79252" forcerange="-10 10"/>
-    <position joint="joint_5" name="joint_5" kp="100" kv="50" ctrlrange="-2.09440 2.90440" forcerange="-10 10"/>
-    <position joint="joint_6" name="joint_6" kp="100" kv="50" ctrlrange="-3.14200 3.14200" forcerange="-10 10"/>
+    <!-- Velocity Control -->
+    <!-- kv values kept aligned with the current joint grouping -->
+    <velocity joint="joint_1" name="joint_1" kv="100" ctrlrange="-1.5 1.5" forcerange="-20 20"/>
+    <velocity joint="joint_2" name="joint_2" kv="100" ctrlrange="-1.5 1.5" forcerange="-20 20"/>
+    <velocity joint="joint_3" name="joint_3" kv="100" ctrlrange="-1.5 1.5" forcerange="-20 20"/>
+    <velocity joint="joint_4" name="joint_4" kv="50" ctrlrange="-1.5 1.5" forcerange="-10 10"/>
+    <velocity joint="joint_5" name="joint_5" kv="50" ctrlrange="-1.5 1.5" forcerange="-10 10"/>
+    <velocity joint="joint_6" name="joint_6" kv="50" ctrlrange="-1.5 1.5" forcerange="-10 10"/>
 </actuator>
 
 <sensor>
@@ -64,7 +64,7 @@
 		
         <include file="my_objects/robot/robot.xml"> </include>
 
-        <include file="my_objects/heart/heart_exp.xml"/>
+        <include file="my_objects/box/box_exp.xml"/>
         
 		<!-- ^ Object body will inject here ^ -->
 

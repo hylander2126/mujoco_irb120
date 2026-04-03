@@ -28,7 +28,7 @@ OBJECT_CONFIGS = {
     14: {"name": "flashlight",  "pos": "1.0 0.0 0.225", "euler": "0 0 0",   "rgba": "0.9 0.1 0.1 1", 'scale': "1.0"},
 }
 
-ACTUATOR_BLOCK = f"""
+POSITION_ACTUATOR_BLOCK = f"""
 <actuator>
     <!-- Position Control -->
     <!-- kp, kv: (200,100) first 3, (100,50) last 3 -->
@@ -46,6 +46,37 @@ ACTUATOR_BLOCK = f"""
 </sensor>
 """
 
+VELOCITY_ACTUATOR_BLOCK = f"""
+<actuator>
+    <!-- Velocity Control -->
+    <!-- kv values kept aligned with the current joint grouping -->
+    <velocity joint="joint_1" name="joint_1" kv="100" ctrlrange="-1.5 1.5" forcerange="-20 20"/>
+    <velocity joint="joint_2" name="joint_2" kv="100" ctrlrange="-1.5 1.5" forcerange="-20 20"/>
+    <velocity joint="joint_3" name="joint_3" kv="100" ctrlrange="-1.5 1.5" forcerange="-20 20"/>
+    <velocity joint="joint_4" name="joint_4" kv="50" ctrlrange="-1.5 1.5" forcerange="-10 10"/>
+    <velocity joint="joint_5" name="joint_5" kv="50" ctrlrange="-1.5 1.5" forcerange="-10 10"/>
+    <velocity joint="joint_6" name="joint_6" kv="50" ctrlrange="-1.5 1.5" forcerange="-10 10"/>
+</actuator>
+
+<sensor>
+    <force name="force_sensor" site="site:sensor"/>
+    <torque name="torque_sensor" site="site:sensor"/>
+</sensor>
+"""
+
+ACTUATOR_BLOCKS = {
+    "position": POSITION_ACTUATOR_BLOCK,
+    "velocity": VELOCITY_ACTUATOR_BLOCK,
+}
+
+
+def build_actuator_block(controller_type: str = "position") -> str:
+    controller_key = controller_type.strip().lower()
+    if controller_key not in ACTUATOR_BLOCKS:
+        valid = ", ".join(sorted(ACTUATOR_BLOCKS))
+        raise ValueError(f"controller_type must be one of: {valid}")
+    return ACTUATOR_BLOCKS[controller_key]
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ASSETS_DIR = REPO_ROOT / "assets"
@@ -57,6 +88,7 @@ GEN_DIR = ASSETS_DIR / "_generated"
 # -----------------------------------------------------------------
 def create_scene_xml(
         object_id, 
+    controller_type = "position",
         template_path = str(ASSETS_DIR / "main.xml"),
         out           = str(ASSETS_DIR / "gen_main.xml")
     ):
@@ -104,7 +136,7 @@ def create_scene_xml(
     with open(template_path, "r") as f:
         tpl = f.read()
     with open(out, "w") as f:
-        f.write(tpl.format(actuator_block=ACTUATOR_BLOCK, asset_block=asset_block, object_block=object_block))
+        f.write(tpl.format(actuator_block=build_actuator_block(controller_type), asset_block=asset_block, object_block=object_block))
     return out
 
 
@@ -132,8 +164,8 @@ def write_scaled_assets_copy(vendor_asset_path: Path, out_path: Path, scale: flo
 # 3. RUN EXPERIMENT
 # -----------------------------------------------------------------
 
-def load_environment(num=1, launch_viewer=False):
-    xml_path = create_scene_xml(num)
+def load_environment(num=1, launch_viewer=False, controller_type="position"):
+    xml_path = create_scene_xml(num, controller_type=controller_type)
     if xml_path:
         try:
             m = mujoco.MjModel.from_xml_path(xml_path)

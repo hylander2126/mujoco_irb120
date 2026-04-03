@@ -25,8 +25,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from mujoco_irb120.util.load_obj_in_env import load_environment
-import mujoco_irb120.controllers.robot_controller as robot_controller
-from mujoco_irb120.controllers.phase_controller import PhaseController, Phase
+from mujoco_irb120.controllers.controllers import PositionController, VelocityController
 from mujoco_irb120.util.render_opts import RendererViewerOpts
 
 np.set_printoptions(precision=3, suppress=True, linewidth=100)
@@ -36,17 +35,23 @@ np.set_printoptions(precision=3, suppress=True, linewidth=100)
 # Configuration
 # ===========================================================================
 
-OBJECT          = 10        # 0=box_exp, 10=heart, 11=L_shape, 14=flashlight
-VIZ             = 1     # Open the MuJoCo viewer (set False for headless / faster runs)
+OBJECT          = 0        # 0=box_exp, 10=heart, 11=L_shape, 14=flashlight
+VIZ             = 0     # Open the MuJoCo viewer (set False for headless / faster runs)
 RECORD_VIDEO    = not VIZ  # Save an mp4 of the offscreen render (requires: pip install mediapy)
 MU_TABLE        = 0.2      # Sliding friction coefficient for table geom
-MAX_SIM_TIME    = 120.0    # Hard sim-time timeout (seconds)
-OUTPUT_FILE     = "simulation_data_multiphase.npz"
+MAX_SIM_TIME    = 30.0    # Hard sim-time timeout (seconds)
+CONTROLLER_TYPE = "velocity"  # "position" or "velocity" actuator block in load_obj_in_env.py
 
-# Set to a Phase to skip earlier phases and start there directly.
-# The robot must already be in a sensible pose for the chosen phase.
-# Options: None (full run), Phase.RETREAT, Phase.DESCEND, Phase.SQUASH, Phase.PULL_TIP
-START_PHASE     = None #Phase.RETREAT
+from mujoco_irb120.controllers.phase_controllers import PositionPhaseController, VelocityPhaseController
+from mujoco_irb120.controllers.state_machine import Phase
+
+if CONTROLLER_TYPE == "velocity":
+    PhaseController = VelocityPhaseController
+else:
+    PhaseController = PositionPhaseController
+
+# Set to a Phase to skip earlier phases and start there directly (must be in sensible pose for phase)
+START_PHASE     = Phase.RETREAT # None is full run
 
 
 # ===========================================================================
@@ -54,12 +59,14 @@ START_PHASE     = None #Phase.RETREAT
 # ===========================================================================
 
 print(f"Loading environment for object {OBJECT}...")
-model, data = load_environment(num=OBJECT, launch_viewer=False)
+model, data = load_environment(num=OBJECT, launch_viewer=False, controller_type=CONTROLLER_TYPE)
 assert model is not None, "Failed to load environment."
 
-# model.geom_friction[model.geom("table").id, 0] = MU_TABLE
 
-irb = robot_controller.controller(model, data)
+if CONTROLLER_TYPE == "velocity":
+    irb = VelocityController(model, data)
+else:
+    irb = PositionController(model, data)
 
 _params  = _json.load(open(_REPO_ROOT / "src" / "mujoco_irb120" / "assets" / "object_params.json"))["objects"][str(OBJECT)]
 init_xyz = np.array(_params["init_xyz"])
@@ -76,8 +83,10 @@ pc = PhaseController(irb, model, data, object_id=OBJECT)
 
 # --- Log file ---
 _log_dir  = Path(__file__).parent
-_log_name = f"phase_controller.log"
-_log_path = str(_log_dir / _log_name)
+_results_dir = _log_dir / "results"
+_results_dir.mkdir(parents=True, exist_ok=True)
+_log_name = "phase_controller.log"
+_log_path = str(_results_dir / _log_name)
 _log_path = pc.set_log_file(_log_path)
 print(f"Logging to: {_log_path}")
 
@@ -90,7 +99,8 @@ else:
     start_label = "IDLE (full run)"
 
 print(f"\nStarting from: {start_label}  (max {MAX_SIM_TIME} s sim time)")
-print("Phases: IDLE→SCAN→APPROACH_PUSH→PUSH→RETREAT→DESCEND→SQUASH→PULL_TIP→DONE\n")
+print("Phases: IDLE → SCAN → APPROACH_PUSH → PUSH → RETREAT ↩ \n")
+print("        → DESCEND → SQUASH → PULL_TIP → RETURN → DONE\n")
 
 
 # ===========================================================================
@@ -114,12 +124,12 @@ with RendererViewerOpts(model, data, vis=VIZ, show_left_UI=False) as rv:
 print(f"\nSimulation ended at t = {data.time:.2f} s.")
 pc.print_summary()
 
-_out_path = str(_log_dir / OUTPUT_FILE)
+_out_path = str(_results_dir / "simulation_data_multiphase.npz")
 pc.save(_out_path)
 print(f"Log written to: {_log_path}")
 
 if RECORD_VIDEO:
-    _vid_name = f"simulation_video.mp4"
-    rv.save_video(str(_log_dir / _vid_name))
+    _vid_name = "simulation_video.mp4"
+    rv.save_video(str(_results_dir / _vid_name))
 
 print("Done.")

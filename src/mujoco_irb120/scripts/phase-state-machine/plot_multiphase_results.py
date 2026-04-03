@@ -25,7 +25,9 @@ import numpy as np
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-from mujoco_irb120.controllers.phase_controller import PHASE_NAMES, Phase
+_RESULTS_DIR = Path(__file__).resolve().parent / "results"
+
+from mujoco_irb120.controllers.state_machine import PHASE_NAMES, Phase
 from mujoco_irb120.util.plotting_helper import plot_4vec_vs_angle, plot_wrench_and_tipping
 
 
@@ -441,7 +443,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path(__file__).resolve().parent / "simulation_data_multiphase.npz",
+        default=_RESULTS_DIR / "simulation_data_multiphase.npz",
         help="Path to simulation_data_multiphase.npz",
     )
     parser.add_argument(

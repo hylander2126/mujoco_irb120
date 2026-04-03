@@ -187,7 +187,7 @@ class RendererViewerOpts:
         opt_obj.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE]    = True # Contact 'translucent' force 'disc'
         # opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_BODY # Visualize BODY frames only
         # opt_obj.frame                                          = mujoco.mjtFrame.mjFRAME_SITE # Visualize SITE frames only NOT WORKING TODO
-
+        opt_obj.label = mujoco.mjtLabel.mjLABEL_CONTACTFORCE # Show contact force magnitudes as text labels
         cam_obj.distance                                       = CAM_DISTANCE
         cam_obj.elevation                                      = CAM_ELEVATION
         cam_obj.azimuth                                        = CAM_AZIMUTH
