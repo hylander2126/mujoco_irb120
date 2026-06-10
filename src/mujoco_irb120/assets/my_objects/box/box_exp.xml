@@ -11,6 +11,6 @@
             solref="0.0001 1.0" rgba="1 0 0 1"/>
         
         <site name="site:payload" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 1 0"></site>
-        <site name="site:obj_frame" pos="-0.05 0.0 -0.15" size="0.02 0.02 0.02" type="box" rgba="1 1 1 1"></site>
+        <site name="site:obj_frame" pos="-0.05 0.0 -0.15" size="0.02 0.02 0.02" type="box" rgba="1 1 1 0"></site>
     </body>
 </mujoco>

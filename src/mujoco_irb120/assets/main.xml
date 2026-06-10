@@ -34,6 +34,8 @@
 
 	<worldbody>
 		<geom name="floor" size="5 5 5" type="plane" material="grid_mat"/>
+		<!-- Fixed perception camera for RGB-D/depth rendering -->
+		<camera name="depth_cam" mode="fixed" pos="0.2 -0.4 0.25" euler="1.57079 -0.78539 0" fovy="55"/>
 		
 		<!-- <camera name="closeup" pos="0 -100 .07" xyaxes="1 0 0 0 1 2"/> -->
 		<!-- <include file="my_objects/robot/robot.xml"></include> -->

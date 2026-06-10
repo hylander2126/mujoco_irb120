@@ -36,7 +36,7 @@ np.set_printoptions(precision=3, suppress=True, linewidth=100)
 # ===========================================================================
 
 OBJECT          = 0        # 0=box_exp, 10=heart, 11=L_shape, 14=flashlight
-VIZ             = 0     # Open the MuJoCo viewer (set False for headless / faster runs)
+VIZ             = 1     # Open the MuJoCo viewer (set False for headless / faster runs)
 RECORD_VIDEO    = not VIZ  # Save an mp4 of the offscreen render (requires: pip install mediapy)
 MU_TABLE        = 0.2      # Sliding friction coefficient for table geom
 MAX_SIM_TIME    = 30.0    # Hard sim-time timeout (seconds)
