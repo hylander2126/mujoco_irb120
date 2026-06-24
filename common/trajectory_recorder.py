@@ -6,7 +6,7 @@ Supports multiple recording types (joint angles, end-effector poses, cartesian p
 flexible playback strategies.
 
 Usage:
-    from mujoco_irb120.common.trajectory_recorder import TrajectoryRecorder
+    from common.trajectory_recorder import TrajectoryRecorder
     
     recorder = TrajectoryRecorder(robot_controller)
     recorder.start_recording()

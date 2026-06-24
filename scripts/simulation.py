@@ -5,13 +5,20 @@ print('Setting environment variable to use GPU rendering:')
 import mujoco
 
 # Other imports and helper functions
+import sys
+from pathlib import Path
+
 import numpy as np
 
-from mujoco_irb120.common.load_obj_in_env import load_environment, load_photoshoot
-from mujoco_irb120.common.trajectory_recorder import TrajectoryRecorder
-import mujoco_irb120.common.robot_controller as robot_controller
-from mujoco_irb120.common.helper_fns import *
-from mujoco_irb120.common.render_opts import RendererViewerOpts
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from common.load_obj_in_env import load_environment, load_photoshoot
+from common.trajectory_recorder import TrajectoryRecorder
+import common.robot_controller as robot_controller
+from common.helper_fns import *
+from common.render_opts import RendererViewerOpts
 
 # Graphics and plotting.
 import mediapy as media

@@ -16,7 +16,7 @@ import mujoco
 import mujoco.viewer
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ASSETS_DIR = REPO_ROOT / "src" / "mujoco_irb120" / "assets"
+ASSETS_DIR = REPO_ROOT / "assets"
 COMMON_XML = (ASSETS_DIR / "common_modified.xml").as_posix()
 ROBOT_XML = (ASSETS_DIR / "my_objects" / "robot" / "robot.xml").as_posix()
 

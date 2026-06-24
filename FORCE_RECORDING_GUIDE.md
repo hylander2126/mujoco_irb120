@@ -125,7 +125,7 @@ After the simulation runs, `simulation_data.npz` is automatically saved with all
 
 ## Files Modified
 
-1. **`src/mujoco_irb120/common/trajectory_recorder.py`**
+1. **`common/trajectory_recorder.py`**
    - Added `record_forces` parameter
    - Added `forces` list to store wrench data
    - Updated save/load methods to handle force data

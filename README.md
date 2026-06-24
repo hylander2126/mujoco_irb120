@@ -39,27 +39,34 @@ Estimating an object's center of mass from robot interactions is a fundamental c
 
 ```
 mujoco_irb120/
-├── analyze_experiment.py          # Main analysis pipeline for experiment CSV data
-├── scripts/
-│   ├── main.ipynb                 # Simulation notebook (robot control + data collection)
+├── common/
 │   ├── load_obj_in_env.py         # Procedurally generates MuJoCo XML scenes
-│   ├── test_ik.py                 # Standalone IK solver validation
+│   ├── robot_controller.py        # IK/FK, force sensing, gravity compensation
+│   ├── com_estimation.py          # Physics models (τ, F) and curve fitting
+│   ├── helper_fns.py              # Rotation utilities (quaternions, axis-angle, SO3)
+│   ├── trajectory_recorder.py     # Waypoint recording/playback (see TRAJECTORY_RECORDER_GUIDE.md)
+│   ├── render_opts.py             # Viewer/renderer + keyboard control options
+│   └── plotting_helper.py         # Shared plotting utilities
+├── scripts/
+│   ├── main.ipynb                 # CoM-estimation notebook (model fitting on recorded data)
+│   ├── simulation.ipynb           # Simulation notebook (robot control + data collection)
+│   ├── simulation.py               # Script version of the simulation notebook
 │   ├── photoshoot.py              # Multi-object visualization scenes
-│   └── utils/
-│       ├── robot_controller.py    # IK/FK, force sensing, gravity compensation
-│       ├── com_estimation.py      # Physics models (τ, F) and curve fitting
-│       └── helper_fns.py          # Rotation utilities (quaternions, axis-angle, SO3)
+│   └── visualize_robot.py         # Minimal robot-only frame viewer
+├── push_selection/                 # Push/tip point selection pipeline for tipping experiments
+├── formulation/
+│   └── pulling_tipping.ipynb      # Derivation + validation of the tipping torque-balance model
 ├── assets/
 │   ├── my_objects/                # Custom test object meshes + IRB120 robot URDF/XML
 │   │   └── robot/                 # ABB IRB120 MuJoCo model
-│   ├── object_sim/                # External object library (git submodule)
+│   ├── object_sim/                # External object mesh library
 │   ├── _generated/                # Auto-generated scaled asset copies
 │   ├── table_push.xml             # Base MuJoCo scene (table + robot)
 │   └── common_modified.xml        # Shared rendering/material settings
-├── experiments/                   # CSV data from physical robot trials (500 Hz)
-├── figures/                       # Output plots and visualizations
-└── requirements.txt
+└── figures/                        # Output plots and visualizations
 ```
+
+There is no installable package — `common/`, `scripts/`, `push_selection/`, etc. are plain top-level directories. Run scripts and notebooks from the repo root (or from their own directory; each entry point adds the repo root to `sys.path` itself).
 
 ---
 
@@ -69,21 +76,14 @@ mujoco_irb120/
 
 - Python 3.10+
 - MuJoCo (installed automatically via the `mujoco` Python package)
-- Git (for submodule initialization)
 
 ### Installation
 
-**1. Clone with submodules** (required for object assets):
+**1. Clone the repo:**
 
 ```bash
-git clone --recurse-submodules https://github.com/<your-username>/mujoco_irb120.git
+git clone https://github.com/<your-username>/mujoco_irb120.git
 cd mujoco_irb120
-```
-
-If you already cloned without `--recurse-submodules`, initialize the submodule manually:
-
-```bash
-git submodule update --init --recursive
 ```
 
 **2. Create a virtual environment** (recommended):
@@ -96,36 +96,12 @@ source .venv/bin/activate
 **3. Install dependencies**:
 
 ```bash
-pip install mujoco numpy scipy matplotlib mediapy
+pip install mujoco numpy scipy matplotlib mediapy trimesh pynput
 ```
-
-**4. Install this repo as an editable package** (recommended for shared imports across scripts and notebooks):
-
-```bash
-pip install -e .
-```
-
-> **Note:** A `requirements.txt` is provided if available. You can also install directly:
-> `pip install -r requirements.txt`
 
 ---
 
 ## Usage
-
-### Analyze Experimental Data
-
-Run the full analysis pipeline on the recorded CSV experiments:
-
-```bash
-python analyze_experiment.py
-```
-
-This will:
-- Load experiment CSVs from `experiments/` for all test objects (box, heart, flashlight, monitor, soda)
-- Apply a Butterworth + median + Savitzky-Golay filter cascade to the raw force signals
-- Fit the torque-balance model to estimate mass *m* and CoM height *z_c*
-- Compute tipping angle θ* and compare against ground-truth CAD values
-- Save analysis plots to `figures/`
 
 ### Run the Simulation
 
@@ -133,30 +109,25 @@ Open the Jupyter notebook to simulate the robot performing the tipping maneuver:
 
 ```bash
 cd scripts
-jupyter notebook main.ipynb
+jupyter notebook simulation.ipynb
 ```
 
-The notebook covers:
+The notebook (and its script counterpart, `scripts/simulation.py`) covers:
 - Loading an object into the MuJoCo scene
 - Executing the robot push trajectory via damped-least-squares IK
 - Recording force/torque, EE pose, and object angle data
-- Running the CoM estimation pipeline on simulated data
+- Saving the resulting `simulation_data.npz` for later analysis
 
-### Test the IK Solver
+### Fit the CoM Model
 
-```bash
-cd scripts
-python test_ik.py
-```
-
-Validates the damped-least-squares IK solver against known target poses and prints convergence statistics.
+`scripts/main.ipynb` loads recorded force/torque + angle data, fits the torque-balance model, and plots the predicted vs. ground-truth tipping behavior — see `formulation/pulling_tipping.ipynb` for the underlying derivation.
 
 ### Load Custom Objects
 
 To generate a MuJoCo scene with a specific object:
 
 ```python
-from load_obj_in_env import load_environment
+from common.load_obj_in_env import load_environment
 
 model, data = load_environment(num=0)   # 0=box, 10=heart, 11=L-shape,
                                         # 12=monitor, 13=soda, 14=flashlight
