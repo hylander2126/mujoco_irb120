@@ -8,15 +8,15 @@ A physics-based framework for estimating the 3D center-of-mass (CoM) of unknown 
 
 | Simulation & Experiment Results |
 |:---:|
-| ![Simulation and Experiment Comparison](figures/sim_and_exp_topple.png) |
+| ![Simulation and Experiment Comparison](outputs/figures/sim_and_exp_topple.png) |
 
 | Object Lineup | Force/Torque Signals (Sim) | Force/Torque Signals (Exp) |
 |:---:|:---:|:---:|
-| ![Objects](figures/sim_objects.png) | ![Sim XYZ](figures/sim_topple_xyz.png) | ![Exp XYZ](figures/exp_topple_xyz.png) |
+| ![Objects](outputs/figures/sim_objects.png) | ![Sim XYZ](outputs/figures/sim_topple_xyz.png) | ![Exp XYZ](outputs/figures/exp_topple_xyz.png) |
 
 | Model Fit — Simulation | Model Fit — Experiment |
 |:---:|:---:|
-| ![Sim Fit](figures/sim_topple_fit25.png) | ![Exp Fit](figures/exp_topple_fit25.png) |
+| ![Sim Fit](outputs/figures/sim_topple_fit25.png) | ![Exp Fit](outputs/figures/exp_topple_fit25.png) |
 
 ---
 
@@ -39,34 +39,43 @@ Estimating an object's center of mass from robot interactions is a fundamental c
 
 ```
 mujoco_irb120/
-├── common/
-│   ├── load_obj_in_env.py         # Procedurally generates MuJoCo XML scenes
-│   ├── robot_controller.py        # IK/FK, force sensing, gravity compensation
-│   ├── com_estimation.py          # Physics models (τ, F) and curve fitting
+├── environment/
+│   ├── scene.py                   # Procedurally generates MuJoCo XML scenes
+│   ├── env.py                     # Lightweight environment loader alias
+│   └── object_params.json         # Per-object ground-truth parameters
+├── robot/
+│   ├── assets/
+│   │   ├── robot/                 # ABB IRB120 MuJoCo model + meshes
+│   │   ├── objects/               # Custom objects + external object_sim meshes
+│   │   ├── generated/             # Auto-generated scaled asset copies
+│   │   ├── scene_template.xml     # Base MuJoCo scene (table + robot)
+│   │   └── generated_scene.xml    # Latest generated scene, including photoshoot scenes
+│   └── controllers/
+│       └── robot.py               # IK/FK, force sensing, gravity compensation
+├── util/
+│   ├── com_estimation.py          # Physics models (tau, F) and curve fitting
 │   ├── helper_fns.py              # Rotation utilities (quaternions, axis-angle, SO3)
-│   ├── trajectory_recorder.py     # Waypoint recording/playback (see TRAJECTORY_RECORDER_GUIDE.md)
+│   ├── trajectory_recorder.py     # Waypoint recording/playback
 │   ├── render_opts.py             # Viewer/renderer + keyboard control options
-│   └── plotting_helper.py         # Shared plotting utilities
+│   ├── plotting_helper.py         # Shared plotting utilities
+│   └── visualize_robot.py         # Minimal robot-only frame viewer
+├── common/                        # Compatibility wrappers for older notebooks/imports
 ├── scripts/
 │   ├── main.ipynb                 # CoM-estimation notebook (model fitting on recorded data)
 │   ├── simulation.ipynb           # Simulation notebook (robot control + data collection)
 │   ├── simulation.py               # Script version of the simulation notebook
+│   ├── shove_simulation.py        # Constant-velocity shove simulation
 │   ├── photoshoot.py              # Multi-object visualization scenes
-│   └── visualize_robot.py         # Minimal robot-only frame viewer
+│   └── visualize_robot.py         # Compatibility entry point for util.visualize_robot
 ├── push_selection/                 # Push/tip point selection pipeline for tipping experiments
 ├── formulation/
 │   └── pulling_tipping.ipynb      # Derivation + validation of the tipping torque-balance model
-├── assets/
-│   ├── my_objects/                # Custom test object meshes + IRB120 robot URDF/XML
-│   │   └── robot/                 # ABB IRB120 MuJoCo model
-│   ├── object_sim/                # External object mesh library
-│   ├── _generated/                # Auto-generated scaled asset copies
-│   ├── table_push.xml             # Base MuJoCo scene (table + robot)
-│   └── common_modified.xml        # Shared rendering/material settings
-└── figures/                        # Output plots and visualizations
+└── outputs/
+    ├── figures/                   # Output plots and visualizations
+    └── rollouts/                  # Saved simulation rollouts
 ```
 
-There is no installable package — `common/`, `scripts/`, `push_selection/`, etc. are plain top-level directories. Run scripts and notebooks from the repo root (or from their own directory; each entry point adds the repo root to `sys.path` itself).
+There is no installable package. Run scripts and notebooks from the repo root; compatibility modules in `common/` preserve the old import paths while new code can import from `environment/`, `robot/`, and `util/`.
 
 ---
 
@@ -96,7 +105,7 @@ source .venv/bin/activate
 **3. Install dependencies**:
 
 ```bash
-pip install mujoco numpy scipy matplotlib mediapy trimesh pynput
+pip install -r requirements.txt
 ```
 
 ---
@@ -116,7 +125,7 @@ The notebook (and its script counterpart, `scripts/simulation.py`) covers:
 - Loading an object into the MuJoCo scene
 - Executing the robot push trajectory via damped-least-squares IK
 - Recording force/torque, EE pose, and object angle data
-- Saving the resulting `simulation_data.npz` for later analysis
+- Saving the resulting `outputs/rollouts/simulation_data.npz` for later analysis
 
 ### Fit the CoM Model
 
@@ -127,7 +136,7 @@ The notebook (and its script counterpart, `scripts/simulation.py`) covers:
 To generate a MuJoCo scene with a specific object:
 
 ```python
-from common.load_obj_in_env import load_environment
+from environment.scene import load_environment
 
 model, data = load_environment(num=0)   # 0=box, 10=heart, 11=L-shape,
                                         # 12=monitor, 13=soda, 14=flashlight

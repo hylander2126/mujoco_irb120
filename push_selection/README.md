@@ -109,7 +109,7 @@ Supported flags:
 ```bash
 python run_push_selection.py --loa-epsilon 0.02
 python run_push_selection.py --top-k 3
-python run_push_selection.py --output-dir ../figures/push_selection
+python run_push_selection.py --output-dir ../outputs/figures/push_selection
 ```
 
 Notes:

@@ -1286,7 +1286,7 @@ if __name__ == "__main__":
 
         _default_stl = (
             Path(__file__).resolve().parents[1]
-            / "assets" / "my_objects" / "box" / "box_exp.stl"
+            / "robot" / "assets" / "objects" / "box" / "box_exp.stl"
         )
 
         parser = argparse.ArgumentParser(

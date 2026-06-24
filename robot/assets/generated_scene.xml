@@ -2,7 +2,6 @@
 
 <mujoco>
 	<compiler angle="radian" />
-	 <!-- texturedir="textures/" /> meshdir="meshes/" -->
 	
 	<option timestep="0.001" tolerance="1e-9" integrator="implicitfast" iterations="100" ls_iterations="100">
 		<flag warmstart="enable" multiccd="enable"/>
@@ -33,11 +32,52 @@
 	<!-- v ROBOT actuators will inject here v -->
 
 	<size njmax="500" nconmax="100" />
-    
+
+	<asset>
+		<material name="MatObject" specular="0.75" shininess="0.1" reflectance="0.5" rgba="0.9 0.7 0.5 1" />
+
+		<texture type="skybox" builtin="gradient" rgb1="0.45 0.6 0.807" rgb2="0.46 0.87 0.58" width="32" height="32"/>
+		<texture name="grid" type="2d" builtin="checker" rgb1=".1 .2 .3" rgb2=".2 .3 .4" width="300" height="300"/>
+
+		<material name="floor_mat" specular="0" shininess="0.5" reflectance="0" rgba="0.2 0.2 0.2 1"/>
+		<material name="table_mat" specular="0" shininess="0.5" reflectance="0" rgba="0.57 0.75 0.83 0.8"/>
+		<material name="block_mat" specular="0" shininess="0.5" reflectance="0" rgba="1 0.2 0.2 1"/>
+		<material name="robot0:geomMat" shininess="0.03" specular="0.4"/>
+		<material name="robot0:gripper_finger_mat" shininess="0.03" specular="0.4" reflectance="0"/>
+		<material name="robot0:gripper_mat" shininess="0.03" specular="0.4" reflectance="0"/>
+		<material name="robot0:base_mat" shininess="0.03" specular="0.4" reflectance="0"/>
+		<material name="grid_mat" texture="grid" texrepeat="8 8" reflectance="0.2"/>
+
+		<mesh name="base_link" file="robot/base_link.stl"/>
+		<mesh name="link_1" file="robot/link_1.stl"/>
+		<mesh name="link_2" file="robot/link_2.stl"/>
+		<mesh name="link_3" file="robot/link_3.stl"/>
+		<mesh name="link_4" file="robot/link_4.stl"/>
+		<mesh name="link_5" file="robot/link_5.stl"/>
+		<mesh name="link_6" file="robot/link_6.stl"/>
+		<mesh name="pusher_link" file="robot/pusher_link.stl"/>
+
+		<mesh name="flashlight_exp" file="objects/flashlight/flashlight_exp.stl"/>
+		<mesh name="heart_exp" file="objects/heart/heart_exp.stl"/>
+		<mesh name="L_exp" file="objects/L/L_exp.stl"/>
+		<mesh name="monitor_exp" file="objects/monitor/monitor_exp.stl"/>
+		<mesh name="soda_exp" file="objects/soda/soda_exp.stl"/>
+	</asset>
+
+	<default>
+		<default class="grab">
+			<joint limited="false" margin="0.01" armature="0.001" damping="0" frictionloss="0.001" />
+			<geom type="mesh" rgba=".93 .99 .97 1.0"/>
+			<site size="0.005 0 0" rgba="0.4 0.9 0.4 1" />
+			<default class="object_col">
+				<geom type="mesh" density="1250" contype="1" conaffinity="1" friction="1 0.5 0.01" margin="0.0005" condim="4" rgba=".3 .4 .5 1" group="3"/>
+			</default>
+		</default>
+	</default>
 
 
 	<!-- v Per-object assets (meshes, mats) will inject here v -->
-	<include file="/home/hylander2126/Documents/github/mujoco_irb120/src/mujoco_irb120/assets/common_modified.xml"/>
+	
 	<!-- ^ Per-object assets (meshes, mats) will inject here ^ -->
 
 	<worldbody>
@@ -54,9 +94,9 @@
 
 		<!-- v Object body will inject here v -->
 		
-        <include file="my_objects/robot/robot.xml"> </include>
+        <include file="robot/robot.xml"> </include>
 
-        <include file="my_objects/box/box_exp.xml"/>
+        <include file="objects/box/box_exp.xml"/>
         
 		<!-- ^ Object body will inject here ^ -->
 

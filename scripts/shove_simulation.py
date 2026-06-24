@@ -1,13 +1,17 @@
 # Set up GPU rendering.
 # Configure MuJoCo to use the EGL rendering backend (requires GPU)
-print('Setting environment variable to use GPU rendering:')
+import argparse
+import os
+import sys
+from pathlib import Path
+
+_DEFAULT_MUJOCO_GL = "glfw" if "--show-viewer" in sys.argv else "egl"
+os.environ.setdefault("MUJOCO_GL", _DEFAULT_MUJOCO_GL)
+print(f"MuJoCo GL backend: {os.environ['MUJOCO_GL']}")
 
 import mujoco
 
 # Other imports and helper functions
-import sys
-from pathlib import Path
-
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -15,7 +19,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from environment.scene import load_environment, load_photoshoot
-from util.trajectory_recorder import TrajectoryRecorder
 from robot.controllers import robot as robot_controller
 from util.helper_fns import *
 from util.render_opts import RendererViewerOpts
@@ -30,36 +33,55 @@ np.set_printoptions(precision=3, suppress=True, linewidth=100)
 # Set matplotlib font size
 fonts = {'size' : 20}
 plt.rc('font', **fonts)
-# %matplotlib notebook
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run the IRB120 shove simulation and record rollout/video frames."
+    )
+    viewer_group = parser.add_mutually_exclusive_group()
+    viewer_group.add_argument(
+        "--show-viewer",
+        dest="show_viewer",
+        action="store_true",
+        help="Open the live MuJoCo viewer while the simulation runs.",
+    )
+    viewer_group.add_argument(
+        "--no-viewer",
+        dest="show_viewer",
+        action="store_false",
+        help="Run headless/offscreen and save the recorded video after the run.",
+    )
+    parser.add_argument(
+        "--video-path",
+        type=Path,
+        default=None,
+        help="Path for the rendered video file. Defaults to outputs/rollouts/shove_simulation.mp4.",
+    )
+    parser.add_argument(
+        "--show-video",
+        action="store_true",
+        help="Also create an inline mediapy display object after saving the video.",
+    )
+    parser.set_defaults(show_viewer=False)
+    return parser.parse_args()
 
 
-
-# Enable/disable keyboard control toggle
-KEYBOARD_CONTROL = True   # Set to False to disable keyboard control
-print(f"Keyboard control: {'ENABLED' if KEYBOARD_CONTROL else 'DISABLED'}")
-if KEYBOARD_CONTROL:
-    print("  Controls: Arrow keys to move in X and Z directions")
-    print("  Make sure viewer window has focus for keyboard input")
-
-
-
+ARGS = parse_args()
 
 
 # ======================== Toggle visualization here =========================
-VIZ = True   # set to False to record video without showing the viewer
-MOTION_MODE = None   # Set to 'RECORD' to record keyboard motion, 'PLAYBACK' to replay from recorded_motion.npz
-RECORD_FORCES = True   # Set to True to also record F/T sensor data during manual control
+VIZ = ARGS.show_viewer
 # ============================================================================
+print(f"Live viewer: {'ENABLED' if VIZ else 'DISABLED'}")
 
 ## Let's recall the model to reset the simulation
 # 0: box_exp, 10: heart, 11: L_shape, 12: monitor, 13: soda, 14: flashlight
 OBJECT = 0
 ROLLOUT_DIR = REPO_ROOT / "outputs" / "rollouts"
 OBJECT_PARAMS_PATH = REPO_ROOT / "environment" / "object_params.json"
-RECORDED_MOTION_PATH = ROLLOUT_DIR / "recorded_motion.npz"
-SIMULATION_DATA_PATH = ROLLOUT_DIR / "simulation_data.npz"
+SHOVE_DATA_PATH = ROLLOUT_DIR / "shove_simulation_data.npz"
+SHOVE_VIDEO_PATH = ARGS.video_path or (ROLLOUT_DIR / "shove_simulation.mp4")
 
 model, data = load_environment(num=OBJECT, launch_viewer=False)
 
@@ -91,24 +113,35 @@ irb = robot_controller.controller(model, data)
 T_home = irb.FK()
 print('Initial end-effector pose:\n', T_home)
 
+## =================== SHOVE TEST PARAMETERS ===================
+# Table top is at z=0.05 and the box spans z=0.05-0.35 (see robot/assets/objects/box/box_exp.xml),
+# so the finger height must sit inside that range to make a clean planar push (not dig into the table).
+FINGER_HEIGHT   = 0.18   # hardcoded finger (fingertip) height above table, in meters
+SHOVE_VELOCITY  = 0.30   # m/s, adjustable shove speed in +x direction
+SHOVE_DURATION  = 0.5    # seconds to hold the shove velocity before stopping
+## ===============================================================
+
 ## Set robot just in front of payload (same orientation as home position (facing +x))
+## at a fixed, hardcoded finger height rather than the payload's resting height.
 T_init = T_home.copy()
 T_init[:3, 3] = init_xyz.copy()
+T_init[2, 3] = FINGER_HEIGHT
 
 q_init = irb.IK(T_init, method=2, damping=0.5, max_iters=1000) # DLS method
 irb.set_pose(q=q_init)
-
-## The end pose we want to reach FOR POSITION CONTROL (format: 4x4 matrix)
-T_end = T_init.copy()
-T_end[0, 3] += 0.10  # Move EE forward by 15 cm in x direction
-
-target_q = irb.IK(T_end, method=2, damping=0.5, max_iters=1000)  # DLS method
 
 ## TARE / Bias sensor
 irb.ft_bias(n_samples=200)
 
 ## FOR VELOCITY CONTROL (format: [wx wy wz vx vy vz])
-# target_vel  = np.array([0.0, 0.0, 0.0, 0.14, 0.0, 0.0])  # Move EE forward at 4 cm/s in x direction
+## NOTE: the robot's actuators are position-controlled, so the Cartesian velocity command
+## must be integrated into a joint-position target (apply_cartesian_keyboard_ctrl does this)
+## rather than sent directly via set_vel_ctrl, which would feed raw velocities into the
+## position actuators as if they were joint-angle targets.
+
+# shove_vel = np.array([0.0, 0.0, 0.0, SHOVE_VELOCITY, 0.0, 0.0])
+
+shove_vel = np.zeros(6)
 
 ## Initialize time, force and tilt history for plotting
 t_hist          = []
@@ -119,25 +152,7 @@ sens_pose_hist  = []  # (4,4) pose of FT sensor site in world frame
 con_bool_hist   = []  # contact flag
 obj_pose_hist   = []  # (4,4) object pose in world frame (mj internal)
 
-traj_duration = 6.0 # seconds
-run_duration = traj_duration + 50.0 # 4.0  # seconds
-
-# Initialize trajectory recorder for recording or load trajectory for playback
-recorder = None
-loaded_trajectory = None
-
-if MOTION_MODE == 'RECORD':
-    recorder = TrajectoryRecorder(irb)
-    recorder.start_recording(verbose=False, record_forces=RECORD_FORCES)
-elif MOTION_MODE == 'PLAYBACK':
-    recorder = TrajectoryRecorder(irb)
-    try:
-        loaded_trajectory = recorder.load_trajectory(RECORDED_MOTION_PATH)
-        recorder.start_playback(trajectory=loaded_trajectory)
-        print("Loaded and ready for playback.")
-    except FileNotFoundError:
-        print(f"ERROR: {RECORDED_MOTION_PATH} not found. Skipping playback.")
-        MOTION_MODE = None
+run_duration = SHOVE_DURATION + 4.0  # seconds, includes settling time after the shove
 
 ## Additions for video recording
 rv = RendererViewerOpts(model, data, vis=VIZ, show_left_UI=True)
@@ -146,23 +161,11 @@ with rv: # enters viewer if vis=True, sets viewer opts, and readies offscreen re
     while rv.viewer_is_running() and not irb.stop and data.time < run_duration:
         irb.check_topple()                          # Check for payload topple condition
 
-        # Apply control: either keyboard-based or trajectory-based position control
-        if KEYBOARD_CONTROL and VIZ:
-            v_cmd = rv.get_keyboard_input()
-            irb.apply_cartesian_keyboard_ctrl(v_cmd, maintain_orientation=True, verbose=False)
+        # Shove at constant velocity for SHOVE_DURATION, then hold the last commanded pose.
+        if data.time < SHOVE_DURATION:
+            irb.apply_cartesian_keyboard_ctrl(shove_vel, maintain_orientation=True, verbose=False)
         else:
-            if data.time < traj_duration:
-                alpha = data.time / traj_duration
-                interp_q = (1 - alpha) * q_init + alpha * target_q
-            else:
-                interp_q = target_q.copy()
-            irb.set_pos_ctrl(interp_q, check_ellipsoid=False)
-
-        # Record or playback waypoint if enabled
-        if MOTION_MODE == 'RECORD' and recorder:
-            recorder.record_waypoint(record_type='joints')
-        elif MOTION_MODE == 'PLAYBACK' and recorder:
-            recorder.playback_step(playback_type='joints', interpolate=True)
+            irb.apply_cartesian_keyboard_ctrl(np.zeros(6), maintain_orientation=True, verbose=False)
 
         mujoco.mj_step(model, data)                 # Step the simulation
 
@@ -189,26 +192,11 @@ ball_pos_hist = ball_pose_hist[:, :3, 3]
 sens_pos_hist = sens_pose_hist[:, :3, 3]
 obj_pos_hist  = obj_pose_hist[:,  :3, 3]
 
-# Save trajectory if recording was enabled (skip if playback mode)
-if MOTION_MODE == 'RECORD' and recorder:
-    recorder.stop_recording(verbose=False)
-    ROLLOUT_DIR.mkdir(parents=True, exist_ok=True)
-    recorder.save_trajectory(RECORDED_MOTION_PATH, format='numpy')
-elif MOTION_MODE == 'PLAYBACK' and recorder:
-    recorder.stop_playback()
-
 print(f'\nSimulation ended in t = {data.time:.2f} seconds.')
-
-
-
-
-# # ====== OPTIONAL: Save all simulation variables to numpy file ======
-# # This captures all the data collected during the simulation loop
-# # Useful when you want to preserve force/pose history even if not using trajectory recorder
 
 ROLLOUT_DIR.mkdir(parents=True, exist_ok=True)
 np.savez(
-    SIMULATION_DATA_PATH,
+    SHOVE_DATA_PATH,
     t_hist=t_hist,
     w_hist=w_hist,                    # Force/torque at each step (N, Nm)
     quat_hist=quat_hist,              # Object quaternion at each step
@@ -220,8 +208,14 @@ np.savez(
     sens_pos_hist=sens_pos_hist,      # Sensor position trajectory
     obj_pos_hist=obj_pos_hist         # Object position trajectory
 )
-print(f"Saved all simulation data to {SIMULATION_DATA_PATH}")
+print(f"Saved all simulation data to {SHOVE_DATA_PATH}")
 
+if not rv.frames:
+    raise RuntimeError("No video frames were captured; cannot write shove simulation video.")
 
-media.show_video(rv.frames, fps=rv.framerate)
+SHOVE_VIDEO_PATH.parent.mkdir(parents=True, exist_ok=True)
+media.write_video(SHOVE_VIDEO_PATH, rv.frames, fps=rv.framerate)
+print(f"Saved shove simulation video to {SHOVE_VIDEO_PATH}")
 
+if ARGS.show_video:
+    media.show_video(rv.frames, fps=rv.framerate)

@@ -6,7 +6,7 @@ Run push/tip selection on the four experiment meshes and save one PNG each.
 Usage
 -----
     python run_push_selection.py
-    python run_push_selection.py --output-dir figures/push_selection
+    python run_push_selection.py --output-dir outputs/figures/push_selection
     python run_push_selection.py --loa-epsilon 0.02
     python run_push_selection.py --top-k 3
 """
@@ -39,22 +39,23 @@ except ModuleNotFoundError:
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+CUSTOM_OBJECT_DIR = REPO_ROOT / "robot" / "assets" / "objects"
 
 OBJECTS = {
     "box": {
-        "stl":    REPO_ROOT / "assets" / "my_objects" / "box"         / "box_exp.stl",
+        "stl":    CUSTOM_OBJECT_DIR / "box" / "box_exp.stl",
         "loa_epsilon": 0.05,
     },
     "heart": {
-        "stl":    REPO_ROOT / "assets" / "my_objects" / "heart"       / "heart_exp.stl",
+        "stl":    CUSTOM_OBJECT_DIR / "heart" / "heart_exp.stl",
         "loa_epsilon": 0.02,
     },
     "flashlight": {
-        "stl":    REPO_ROOT / "assets" / "my_objects" / "flashlight"  / "flashlight_exp.stl",
+        "stl":    CUSTOM_OBJECT_DIR / "flashlight" / "flashlight_exp.stl",
         "loa_epsilon": 0.02,
     },
     "monitor": {
-        "stl":    REPO_ROOT / "assets" / "my_objects" / "monitor"     / "monitor_exp.stl",
+        "stl":    CUSTOM_OBJECT_DIR / "monitor" / "monitor_exp.stl",
         "loa_epsilon": 0.02,
     },
 }

@@ -64,7 +64,7 @@ Added a new cell that saves **all** collected simulation data to a numpy file:
 
 ```python
 np.savez(
-    "simulation_data.npz",
+    "outputs/rollouts/simulation_data.npz",
     t_hist=t_hist,                  # Time array
     w_hist=w_hist,                  # Force/torque history (N, Nm)
     quat_hist=quat_hist,            # Object quaternion 
@@ -88,7 +88,7 @@ np.savez(
 ### Loading Saved Data
 
 ```python
-data = np.load("simulation_data.npz")
+data = np.load("outputs/rollouts/simulation_data.npz")
 w_history = data['w_hist']           # Force/torque at each step
 time = data['t_hist']
 obj_poses = data['obj_pose_hist']
@@ -119,7 +119,7 @@ MOTION_MODE = 'PLAYBACK'
 
 ### Accessing All Experimental Data
 
-After the simulation runs, `simulation_data.npz` is automatically saved with all captured variables.
+After the simulation runs, `outputs/rollouts/simulation_data.npz` is automatically saved with all captured variables.
 
 ---
 
@@ -134,7 +134,7 @@ After the simulation runs, `simulation_data.npz` is automatically saved with all
 2. **`scripts/main.ipynb`**
    - Added `RECORD_FORCES` flag (line 80)
    - Updated recorder initialization to pass `record_forces=RECORD_FORCES`
-   - Added new cell to save `simulation_data.npz` after each run
+   - Added new cell to save `outputs/rollouts/simulation_data.npz` after each run
 
 ---
 
@@ -151,5 +151,4 @@ After the simulation runs, `simulation_data.npz` is automatically saved with all
 
 **Q: Large file sizes**
 - Force data increases file size significantly (~6x for wrench vs position-only)
-- Use `simulation_data.npz` for analysis, `recorded_motion.npz` for playback
-
+- Use `outputs/rollouts/simulation_data.npz` for analysis, `outputs/rollouts/recorded_motion.npz` for playback
