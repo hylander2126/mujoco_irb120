@@ -118,7 +118,7 @@ print('Initial end-effector pose:\n', T_home)
 # so the finger height must sit inside that range to make a clean planar push (not dig into the table).
 FINGER_HEIGHT   = 0.18   # hardcoded finger (fingertip) height above table, in meters
 SHOVE_VELOCITY  = 0.30   # m/s, adjustable shove speed in +x direction
-SHOVE_DURATION  = 0.5    # seconds to hold the shove velocity before stopping
+SHOVE_DURATION  = 1.0    # seconds to hold the shove velocity before stopping
 ## ===============================================================
 
 ## Set robot just in front of payload (same orientation as home position (facing +x))
@@ -139,9 +139,9 @@ irb.ft_bias(n_samples=200)
 ## rather than sent directly via set_vel_ctrl, which would feed raw velocities into the
 ## position actuators as if they were joint-angle targets.
 
-# shove_vel = np.array([0.0, 0.0, 0.0, SHOVE_VELOCITY, 0.0, 0.0])
+shove_vel = np.array([0.0, 0.0, 0.0, 0.0, SHOVE_VELOCITY, 0.0])
 
-shove_vel = np.zeros(6)
+# shove_vel = np.zeros(6)
 
 ## Initialize time, force and tilt history for plotting
 t_hist          = []

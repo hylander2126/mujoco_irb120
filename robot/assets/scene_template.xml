@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<mujoco>
-	<compiler angle="radian" />
+<mujoco model="irb120_scene">
+	<compiler angle="radian" meshdir="."/>
 	
 	<option timestep="0.001" tolerance="1e-9" integrator="implicitfast" iterations="100" ls_iterations="100">
 		<flag warmstart="enable" multiccd="enable"/>
@@ -32,14 +32,14 @@
 		<material name="robot0:base_mat" shininess="0.03" specular="0.4" reflectance="0"/>
 		<material name="grid_mat" texture="grid" texrepeat="8 8" reflectance="0.2"/>
 
-		<mesh name="base_link" file="robot/base_link.stl"/>
-		<mesh name="link_1" file="robot/link_1.stl"/>
-		<mesh name="link_2" file="robot/link_2.stl"/>
-		<mesh name="link_3" file="robot/link_3.stl"/>
-		<mesh name="link_4" file="robot/link_4.stl"/>
-		<mesh name="link_5" file="robot/link_5.stl"/>
-		<mesh name="link_6" file="robot/link_6.stl"/>
-		<mesh name="pusher_link" file="robot/pusher_link.stl"/>
+		<mesh name="base_link" file="visual/base_link.stl"/>
+		<mesh name="link_1" file="visual/link_1.stl"/>
+		<mesh name="link_2" file="visual/link_2.stl"/>
+		<mesh name="link_3" file="visual/link_3.stl"/>
+		<mesh name="link_4" file="visual/link_4.stl"/>
+		<mesh name="link_5" file="visual/link_5.stl"/>
+		<mesh name="link_6" file="visual/link_6.stl"/>
+		<mesh name="pusher_link" file="visual/pusher_link.stl"/>
 
 		<mesh name="flashlight_exp" file="objects/flashlight/flashlight_exp.stl"/>
 		<mesh name="heart_exp" file="objects/heart/heart_exp.stl"/>

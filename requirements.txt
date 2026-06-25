@@ -1,7 +1,8 @@
 mujoco
 numpy
 scipy
-matplotlib
+matplotlib>=3.9
 mediapy
 trimesh
 pynput
+genesis-world

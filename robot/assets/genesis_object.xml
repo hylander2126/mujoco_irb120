@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco model="object_genesis">
+    <worldbody>
+        <!-- NOTE: geom size is the HALF-SIZE of the box in meters -->
+        <!-- So the box's dimensions are: (w:x, l:y, h:z) = (0.1, 0.1, 0.3) -->
+        <!-- And the box starts at z = 0.2 - 0.15 = 0.05 -->
+        <body name="payload" pos="0.58 0.08 0.2"> <!-- was 0.62 0 0.2 -->
+            <joint type="free" damping="0.01"></joint>
+
+            <inertial mass="0.663" pos="0 0 -0.01219" diaginertia="0.006083536 0.006083536 0.00185977"/>
+
+            <geom name="payload" type="box" size="0.05 0.05 0.15" friction="0.1 0.1 0.0001" 
+                solref="0.0001 1.0" rgba="1 0 0 1"/>
+            
+            <site name="site:payload" pos="0 0 0" size="0.02 0.02 0.02" type="box" rgba="1 1 1 0"></site>
+            <site name="site:obj_frame" pos="-0.05 0.0 -0.15" size="0.02 0.02 0.02" type="box" rgba="1 1 1 1"></site>
+        </body>
+    </worldbody>
+</mujoco>
