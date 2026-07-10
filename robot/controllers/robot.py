@@ -1,7 +1,7 @@
 import mujoco
 from scipy.spatial.transform import Rotation as Robj
 import numpy as np
-from util.helper_fns import *
+from mujoco_irb120.util.helper_fns import *
 
 class controller:
     def __init__(self, model: mujoco.MjModel, data: mujoco.MjData):

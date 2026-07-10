@@ -24,7 +24,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(REPO_ROOT))
 
 import genesis as gs
-from robot.controllers.genesis_robot import GenesisRobotController
+from parameter_estimation.genesis_robot import GenesisRobotController
 
 def str_to_bool(value):
     if isinstance(value, bool):
