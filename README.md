@@ -1,37 +1,6 @@
-# MuJoCo IRB120 — 3D Center-of-Mass Estimation via Robotic Tipping
+# mujoco_irb120
 
-A physics-based framework for estimating the 3D center-of-mass (CoM) of unknown objects using an ABB IRB120 6-DOF manipulator. The robot pushes objects to the edge of a table, and a torque-balance model is fit to the observed tipping dynamics to recover object mass and CoM height. Both MuJoCo simulation and real-world experiments on a physical robot are supported.
-
----
-
-## Demo
-
-| Simulation & Experiment Results |
-|:---:|
-| ![Simulation and Experiment Comparison](outputs/figures/sim_and_exp_topple.png) |
-
-| Object Lineup | Force/Torque Signals (Sim) | Force/Torque Signals (Exp) |
-|:---:|:---:|:---:|
-| ![Objects](outputs/figures/sim_objects.png) | ![Sim XYZ](outputs/figures/sim_topple_xyz.png) | ![Exp XYZ](outputs/figures/exp_topple_xyz.png) |
-
-| Model Fit — Simulation | Model Fit — Experiment |
-|:---:|:---:|
-| ![Sim Fit](outputs/figures/sim_topple_fit25.png) | ![Exp Fit](outputs/figures/exp_topple_fit25.png) |
-
----
-
-## Overview
-
-### Problem Statement
-
-Estimating an object's center of mass from robot interactions is a fundamental capability for manipulation tasks such as grasping, transportation, and placement. This project addresses **CoM estimation without prior knowledge of object geometry**, using only the measured contact forces and object rotation during a controlled tipping maneuver.
-
-### Approach
-
-1. **Tipping Maneuver**: The robot pushes an object horizontally until it begins to tip over the table edge. A 6-axis force/torque sensor on the end-effector records contact forces throughout the motion.
-2. **Orientation Tracking**: An AR tag on the object provides rotation angle θ via quaternion estimates (physical experiments), or the MuJoCo joint state is used directly (simulation).
-3. **Torque-Balance Model**: At each timestep, the applied torque τ_app = r_f × F is matched against the gravity torque τ_grav = −r_c × R(−θ) · W using nonlinear least squares. The free parameters are mass m and CoM height z_c.
-4. **Tipping Angle Prediction**: The estimated CoM is used to compute the critical tipping angle θ* = arctan(d_xy / z_c), which is the angle at which the object becomes unstable.
+MuJoCo/Genesis model and controllers for the ABB IRB120 6-DOF manipulator. This repo is meant to be used as a submodule: it holds the robot's MJCF model, meshes, a handful of hand-made test objects, and the generic controller code used to drive it — no experiment- or research-specific logic.
 
 ---
 
@@ -39,112 +8,47 @@ Estimating an object's center of mass from robot interactions is a fundamental c
 
 ```
 mujoco_irb120/
-├── environment/
-│   ├── scene.py                   # Procedurally generates MuJoCo XML scenes
-│   ├── env.py                     # Lightweight environment loader alias
-│   └── object_params.json         # Per-object ground-truth parameters
 ├── robot/
 │   ├── assets/
-│   │   ├── robot/                 # ABB IRB120 MuJoCo model + meshes
-│   │   ├── objects/               # Custom objects + external object_sim meshes
-│   │   ├── generated/             # Auto-generated scaled asset copies
-│   │   ├── scene_template.xml     # Base MuJoCo scene (table + robot)
-│   │   └── generated_scene.xml    # Latest generated scene, including photoshoot scenes
-│   └── controllers/
-│       └── robot.py               # IK/FK, force sensing, gravity compensation
+│   │   ├── robot/                 # IRB120 MuJoCo model + visual meshes
+│   │   ├── objects/                # Hand-made test objects (box, heart, flashlight, L, monitor, soda)
+│   │   └── genesis_object.xml      # Standalone object MJCF used by the Genesis demo
+│   ├── controllers/
+│   │   ├── robot.py                # MuJoCo controller: IK/FK, Jacobians, force/torque sensing, gravity compensation
+│   │   └── genesis_robot.py        # Genesis controller: guarded Cartesian velocity shove, workspace/manipulability fade-out
+│   └── __init__.py
 ├── util/
-│   ├── com_estimation.py          # Physics models (tau, F) and curve fitting
-│   ├── helper_fns.py              # Rotation utilities (quaternions, axis-angle, SO3)
-│   ├── trajectory_recorder.py     # Waypoint recording/playback
-│   ├── render_opts.py             # Viewer/renderer + keyboard control options
-│   ├── plotting_helper.py         # Shared plotting utilities
-│   └── visualize_robot.py         # Minimal robot-only frame viewer
-├── common/                        # Compatibility wrappers for older notebooks/imports
-├── scripts/
-│   ├── main.ipynb                 # CoM-estimation notebook (model fitting on recorded data)
-│   ├── simulation.ipynb           # Simulation notebook (robot control + data collection)
-│   ├── simulation.py               # Script version of the simulation notebook
-│   ├── shove_simulation.py        # Constant-velocity shove simulation
-│   ├── photoshoot.py              # Multi-object visualization scenes
-│   └── visualize_robot.py         # Compatibility entry point for util.visualize_robot
-├── push_selection/                 # Push/tip point selection pipeline for tipping experiments
-├── formulation/
-│   └── pulling_tipping.ipynb      # Derivation + validation of the tipping torque-balance model
-└── outputs/
-    ├── figures/                   # Output plots and visualizations
-    └── rollouts/                  # Saved simulation rollouts
+│   └── helper_fns.py               # Rotation/screw-theory math (SO3/SE3, quaternions, Jacobians) used by robot.py
+└── scripts/
+    └── genesis_test.py             # Smoke test: loads the IRB120 + a box into Genesis and runs a scripted shove
 ```
-
-There is no installable package. Run scripts and notebooks from the repo root; compatibility modules in `common/` preserve the old import paths while new code can import from `environment/`, `robot/`, and `util/`.
-
----
 
 ## Setup
-
-### Prerequisites
-
-- Python 3.10+
-- MuJoCo (installed automatically via the `mujoco` Python package)
-
-### Installation
-
-**1. Clone the repo:**
-
-```bash
-git clone https://github.com/<your-username>/mujoco_irb120.git
-cd mujoco_irb120
-```
-
-**2. Create a virtual environment** (recommended):
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-```
-
-**3. Install dependencies**:
-
-```bash
 pip install -r requirements.txt
 ```
 
----
-
 ## Usage
 
-### Run the Simulation
-
-Open the Jupyter notebook to simulate the robot performing the tipping maneuver:
+Run the Genesis smoke test from the repo root:
 
 ```bash
-cd scripts
-jupyter notebook simulation.ipynb
+python scripts/genesis_test.py --show-viewer true
 ```
 
-The notebook (and its script counterpart, `scripts/simulation.py`) covers:
-- Loading an object into the MuJoCo scene
-- Executing the robot push trajectory via damped-least-squares IK
-- Recording force/torque, EE pose, and object angle data
-- Saving the resulting `outputs/rollouts/simulation_data.npz` for later analysis
+or headless (saves a video to `outputs/genesis_test.mp4`):
 
-### Fit the CoM Model
-
-`scripts/main.ipynb` loads recorded force/torque + angle data, fits the torque-balance model, and plots the predicted vs. ground-truth tipping behavior — see `formulation/pulling_tipping.ipynb` for the underlying derivation.
-
-### Load Custom Objects
-
-To generate a MuJoCo scene with a specific object:
-
-```python
-from environment.scene import load_environment
-
-model, data = load_environment(num=0)   # 0=box, 10=heart, 11=L-shape,
-                                        # 12=monitor, 13=soda, 14=flashlight
+```bash
+python scripts/genesis_test.py --show-viewer false
 ```
 
----
+### Controllers
 
-## Technical Details
+- `robot.controllers.robot.controller` — MuJoCo-side controller. Wraps a `mujoco.MjModel`/`mujoco.MjData` pair, exposing `FK`/`IK` (Newton-Raphson, damped least squares, or gradient descent), Jacobian-based velocity control, force/torque sensor readings with gravity compensation, and contact/topple checks against a payload body.
+- `robot.controllers.genesis_robot.GenesisRobotController` — Genesis-side controller. Wraps a Genesis entity + scene, adding a guarded `velocity_shove` primitive (trapezoidal speed profile, workspace ellipsoid fade-out, manipulability fade-out, damped-least-squares joint velocity) on top of Genesis's built-in IK/planning.
 
 ### Robot Model — ABB IRB120
 
@@ -163,80 +67,3 @@ model, data = load_environment(num=0)   # 0=box, 10=heart, 11=L-shape,
 | Pusher finger length | 110 mm |
 
 Control gains: kp = 200 / kv = 100 (joints 1–3); kp = 100 / kv = 50 (joints 4–6)
-
-### Inverse Kinematics
-
-Three solvers are implemented in `robot_controller.py`:
-
-| Method | Description |
-|--------|-------------|
-| Newton-Raphson | Standard Jacobian-based iteration |
-| **Damped Least Squares** (default) | J^T (JJ^T + λ²I)^{-1} — robust near singularities |
-| Gradient Descent | Step-based minimization of pose error |
-
-The damping coefficient λ is adjusted dynamically based on the convergence rate to balance accuracy and singularity avoidance.
-
-### CoM Estimation — Physics Model
-
-The tipping maneuver produces a time series of contact force **F**(t) and object rotation angle θ(t). The model parameters m (mass) and z_c (CoM height) are recovered by minimizing:
-
-```
-min_{m, z_c}  ||τ_app(t) − τ_grav(θ(t), m, z_c)||²
-```
-
-where:
-- **τ_app** = r_f × F — applied torque from finger contact
-- **τ_grav** = −r_c × R(−θ) · W — gravity torque about the tipping edge
-- **r_c** = [d_x, d_y, z_c]ᵀ — CoM position vector from pivot
-- **R(−θ)** — rotation matrix for object angle about the tipping axis
-
-Fitting is performed with `scipy.optimize.curve_fit` (Levenberg-Marquardt).
-
-### Signal Processing
-
-Raw force signals are passed through a three-stage filter cascade:
-
-1. **Butterworth low-pass** — 4th order, 5 Hz cutoff (removes high-frequency vibration)
-2. **Median filter** — kernel size 5 (removes impulse artifacts)
-3. **Savitzky-Golay** — 3rd order polynomial, kernel size 89 (smooths while preserving tipping transient shape)
-
-### Test Objects
-
-| Object | Ground Truth Mass | Ground Truth z_c | Notes |
-|--------|:-----------------:|:----------------:|-------|
-| Box | 664 g | 146 mm | Uniform rectangular prism |
-| Heart | 236 g | 98 mm | Irregular geometry |
-| Flashlight | 387 g | 97 mm | Cylindrical, off-axis mass |
-| L-shape | 106 g | 58 mm | Asymmetric cross-section |
-| Monitor | 5008 g | 252 mm | Large, heavy object |
-| Soda can | 2071 g | 115 mm | Cylindrical, near-uniform |
-
-### Simulation Parameters
-
-| Parameter | Value |
-|-----------|-------|
-| Timestep | 1 ms (1 kHz) |
-| Integrator | Implicit-fast |
-| Gravity | 9.81 m/s² |
-| Table friction | μ = 1.0 |
-| Experiment sample rate | 500 Hz |
-
----
-
-## Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| `mujoco` | Physics simulation and rendering |
-| `numpy` | Numerical arrays and linear algebra |
-| `scipy` | Signal filtering, nonlinear optimization, rotation utilities |
-| `matplotlib` | Plotting and figure generation |
-| `mediapy` | Video recording from MuJoCo renderer |
-
-Object assets: [vikashplus/object_sim](https://github.com/vikashplus/object_sim)
-
----
-
-## License
-
-This project is for research and educational purposes. See [LICENSE](LICENSE) for details.

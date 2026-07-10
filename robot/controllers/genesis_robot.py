@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 
 def as_numpy(value):
@@ -108,6 +109,32 @@ def damped_least_squares_qdot(jac, target_velocity, damping=0.01):
     return jac.T @ np.linalg.solve(lhs, target_velocity)
 
 
+def damped_pseudoinverse(jac, damping=0.01):
+    """
+    Return the damped least-squares pseudo-inverse J#.
+
+    Keeping this separate from damped_least_squares_qdot lets us reuse J# for
+    nullspace projection: qdot = J# v + (I - J#J) qdot_posture.
+    """
+    lhs = jac @ jac.T + (damping ** 2) * np.eye(jac.shape[0])
+    return jac.T @ np.linalg.solve(lhs, np.eye(jac.shape[0]))
+
+
+def limit_joint_velocity(qdot, limit):
+    """
+    Preserve the solved joint-velocity direction while respecting a max speed.
+
+    Per-joint clipping changes the direction of qdot, which can destroy the
+    Cartesian velocity solve. Uniform scaling keeps the same qdot direction and
+    only reduces its magnitude when one joint would exceed the limit.
+    """
+    max_abs = np.max(np.abs(qdot))
+    if max_abs <= limit:
+        return qdot, 1.0
+    scale = limit / max_abs
+    return qdot * scale, scale
+
+
 class GenesisRobotController:
     """
     Small Genesis-side controller wrapper for the IRB120.
@@ -158,11 +185,11 @@ class GenesisRobotController:
     def configure_default_gains(self):
         """Apply the default gains/force ranges used by the Genesis smoke test."""
         self.entity.set_dofs_kp(
-            kp=np.array([4500, 4500, 3500, 3500, 2000, 2000]),
+            kp=np.array([3500, 3500, 2500, 2500, 1000, 1000]),
             dofs_idx_local=self.dofs_idx,
         )
         self.entity.set_dofs_kv(
-            kv=np.array([450, 450, 350, 350, 200, 200]),
+            kv=np.array([350, 350, 250, 250, 100, 100]),
             dofs_idx_local=self.dofs_idx,
         )
         self.entity.set_dofs_force_range(
@@ -170,6 +197,17 @@ class GenesisRobotController:
             upper=np.array([87, 87, 87, 87, 12, 12]),
             dofs_idx_local=self.dofs_idx,
         )
+
+    def step(self, camera=None):
+        """
+        Step the scene and optionally render one camera frame.
+
+        Genesis camera recording stores frames produced by camera.render(), so
+        headless video capture needs an explicit render after each sim step.
+        """
+        self.scene.step()
+        if camera is not None:
+            camera.render()
 
     def link_local_point_world(self, link=None, local_point=None):
         """Convert a point fixed in a link's local frame into world coordinates."""
@@ -193,7 +231,7 @@ class GenesisRobotController:
             )
         )
 
-    def plan_ik_with_constraints(self, pos, quat, t_const=5, link=None):
+    def plan_ik_with_constraints(self, pos, quat, t_const=5, link=None, camera=None):
         """
         Use Genesis IK and RRTConnect planning to reach a Cartesian pose.
 
@@ -222,17 +260,18 @@ class GenesisRobotController:
             return None
 
         for waypoint in path:
-            self.entity.set_dofs_position(waypoint, self.dofs_idx)
-            self.scene.step()
+            # self.entity.set_dofs_position(waypoint, self.dofs_idx)
+            self.entity.control_dofs_position(waypoint, self.dofs_idx)
+            self.step(camera=camera)
 
         return path
 
-    def stop_velocity(self, steps=500):
+    def stop_velocity(self, steps=500, camera=None):
         """Command zero joint velocity for a few steps so the robot settles."""
         zeros = np.zeros(len(self.dofs_idx))
         for _ in range(steps):
             self.entity.control_dofs_velocity(zeros, self.dofs_idx)
-            self.scene.step()
+            self.step(camera=camera)
 
     def velocity_shove(
         self,
@@ -241,10 +280,14 @@ class GenesisRobotController:
         preshove_quat=None,
         push_direction=None,
         obj=None,
-        ramp_up_steps=100,
-        hold_steps=300,
-        ramp_down_steps=100,
-        settle_steps=500,
+        camera=None,
+        ramp_up_steps=25,
+        hold_steps=50,
+        ramp_down_steps=25,
+        settle_steps=100,
+        snap=False,
+        height_kp=4.0,
+        posture_kp=0.75,
     ):
         """
         Execute a guarded Cartesian velocity shove.
@@ -256,25 +299,43 @@ class GenesisRobotController:
             -> damped least-squares joint velocity
             -> joint velocity clamp
         """
-        preshove_pos = np.array([0.30, 0.0, 0.18]) if preshove_pos is None else np.asarray(preshove_pos, dtype=float)
+        # z=0.18 is low, z=0.25 is centroid, z=0.3 is top
+        preshove_pos = np.array([0.30, 0.0, 0.25]) if preshove_pos is None else np.asarray(preshove_pos, dtype=float)
         preshove_quat = np.array([1, 0, 0, 0]) if preshove_quat is None else np.asarray(preshove_quat, dtype=float)
         push_direction = np.array([1.0, 0.0, 0.0]) if push_direction is None else np.asarray(push_direction, dtype=float)
         push_direction = push_direction / np.linalg.norm(push_direction)
 
-        q_preshove_plan = self.plan_ik_with_constraints(
-            pos=preshove_pos,
-            quat=preshove_quat,
-            t_const=5,
-        )
-        if q_preshove_plan is None:
-            return
+        timeout = 25.0
+        start_time = time.time()
 
-        q_preshove = q_preshove_plan[-1]
+        if snap:
+            # Snap to preshove pose, but first convert cartesian to joint angles
+            q_preshove = self.entity.inverse_kinematics(link=self.pusher, pos=preshove_pos, quat=preshove_quat)
+            self.entity.set_dofs_position(q_preshove, self.dofs_idx)
+            
+        else:
+            q_preshove_plan = self.plan_ik_with_constraints(
+                pos=preshove_pos,
+                quat=preshove_quat,
+                t_const=5,
+                camera=camera,
+            )
+            if q_preshove_plan is None:
+                return
+
+            q_preshove = q_preshove_plan[-1]
+
+        q_preshove = as_numpy(q_preshove)
 
         # Briefly hold the preshove pose before making contact.
         for _ in range(100):
             self.entity.control_dofs_position(q_preshove, self.dofs_idx)
-            self.scene.step()
+            self.step(camera=camera)
+
+        # Hold the contact point's vertical position from the start of the
+        # shove. Lateral y motion is left unconstrained on purpose.
+        contact_ref = self.link_local_point_world()
+        prev_contact_pos = contact_ref.copy()
 
         shove_steps = ramp_up_steps + hold_steps + ramp_down_steps
         for step in range(shove_steps):
@@ -315,12 +376,36 @@ class GenesisRobotController:
                 )
                 break
 
+            if (time.time() - start_time) > timeout:
+                print("Shove timeout reached.")
+                break
+
+            # Feedforward shove speed plus feedback to keep y/z near the
+            # preshove contact point. For the default +x shove, this gives a
+            # constant-height Cartesian command without constraining lateral y.
             target_velocity = commanded_speed * push_direction
-            qdot = damped_least_squares_qdot(jac_pos, target_velocity, damping=0.01)
-            qdot = np.clip(qdot, -self.joint_velocity_limit, self.joint_velocity_limit)
+            target_velocity[2] += height_kp * (contact_ref[2] - contact_pos[2])
+
+            jac_pinv = damped_pseudoinverse(jac_pos, damping=0.01)
+            qdot_task = jac_pinv @ target_velocity
+
+            # The translational task only uses 3 constraints for a 6-DOF arm.
+            # This nullspace term asks the unused DOFs to stay near the
+            # preshove posture instead of drifting into odd elbow/wrist poses.
+            q_current = as_numpy(self.entity.get_dofs_position(self.dofs_idx))
+            qdot_posture = posture_kp * (q_preshove - q_current)
+            nullspace = np.eye(len(self.dofs_idx)) - jac_pinv @ jac_pos
+            qdot_unlimited = qdot_task + nullspace @ qdot_posture
+
+            qdot, qdot_scale = limit_joint_velocity(qdot_unlimited, self.joint_velocity_limit)
+            predicted_velocity = jac_pos @ qdot
 
             self.entity.control_dofs_velocity(qdot, self.dofs_idx)
-            self.scene.step()
+            self.step(camera=camera)
+
+            new_contact_pos = self.link_local_point_world()
+            actual_delta = new_contact_pos - prev_contact_pos
+            prev_contact_pos = new_contact_pos
 
             if step % 100 == 0:
                 box_pos = as_numpy(obj.get_pos()) if obj is not None else None
@@ -331,7 +416,11 @@ class GenesisRobotController:
                     f"manip_scale={manip_scale:.3f}",
                     f"box_pos={box_pos}",
                     f"fingertip_pos={contact_pos}",
+                    f"target_v={target_velocity}",
+                    f"predicted_v={predicted_velocity}",
+                    f"actual_delta={actual_delta}",
+                    f"qdot_scale={qdot_scale:.3f}",
                     f"qdot={qdot}",
                 )
 
-        self.stop_velocity(steps=settle_steps)
+        self.stop_velocity(steps=settle_steps, camera=camera)

@@ -1,7 +1,6 @@
 import mujoco
 from scipy.spatial.transform import Rotation as Robj
 import numpy as np
-import matplotlib.pyplot as plt
 from util.helper_fns import *
 
 class controller:

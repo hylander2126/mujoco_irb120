@@ -1,8 +1,4 @@
 mujoco
 numpy
 scipy
-matplotlib>=3.9
-mediapy
-trimesh
-pynput
 genesis-world
