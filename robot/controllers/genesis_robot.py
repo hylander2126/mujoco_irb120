@@ -200,14 +200,14 @@ class GenesisRobotController:
 
     def step(self, camera=None):
         """
-        Step the scene and optionally render one camera frame.
+        Step the scene.
 
-        Genesis camera recording stores frames produced by camera.render(), so
-        headless video capture needs an explicit render after each sim step.
+        Scene recorders invoke their camera data function at the requested
+        sampling rate during ``scene.step()``, so rendering again here would
+        duplicate expensive offscreen work. ``camera`` remains accepted for
+        compatibility with existing controller calls.
         """
         self.scene.step()
-        if camera is not None:
-            camera.render()
 
     def link_local_point_world(self, link=None, local_point=None):
         """Convert a point fixed in a link's local frame into world coordinates."""
