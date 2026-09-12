@@ -337,6 +337,10 @@ class GenesisRobotController:
         contact_ref = self.link_local_point_world()
         prev_contact_pos = contact_ref.copy()
 
+        # TEMP: per-step contact force log for chatter debugging. Read back via
+        # `robot.force_log` after the call; not meant to be a permanent API.
+        self.force_log = []
+
         shove_steps = ramp_up_steps + hold_steps + ramp_down_steps
         for step in range(shove_steps):
             contact_pos = self.link_local_point_world()
@@ -402,6 +406,9 @@ class GenesisRobotController:
 
             self.entity.control_dofs_velocity(qdot, self.dofs_idx)
             self.step(camera=camera)
+
+            if obj is not None:
+                self.force_log.append(as_numpy(obj.get_links_net_contact_force()).sum(axis=0))
 
             new_contact_pos = self.link_local_point_world()
             actual_delta = new_contact_pos - prev_contact_pos
