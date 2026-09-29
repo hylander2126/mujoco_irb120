@@ -266,12 +266,17 @@ class GenesisRobotController:
 
         return path
 
-    def stop_velocity(self, steps=500, camera=None):
+    def stop_velocity(self, steps=500, camera=None, obj=None):
         """Command zero joint velocity for a few steps so the robot settles."""
         zeros = np.zeros(len(self.dofs_idx))
         for _ in range(steps):
             self.entity.control_dofs_velocity(zeros, self.dofs_idx)
             self.step(camera=camera)
+            # TEMP: keep logging through the settle phase -- this is where the
+            # box actually finishes rocking/sliding after the commanded push ends.
+            if obj is not None and hasattr(self, "force_log"):
+                self.force_log.append(as_numpy(obj.get_links_net_contact_force()).sum(axis=0))
+                self.ang_log.append(as_numpy(obj.get_ang()))
 
     def velocity_shove(
         self,
@@ -337,9 +342,13 @@ class GenesisRobotController:
         contact_ref = self.link_local_point_world()
         prev_contact_pos = contact_ref.copy()
 
-        # TEMP: per-step contact force log for chatter debugging. Read back via
-        # `robot.force_log` after the call; not meant to be a permanent API.
+        # TEMP: per-step contact force / angular velocity log for chatter
+        # debugging. Read back via `robot.force_log` / `robot.ang_log` after
+        # the call; not meant to be a permanent API. Angular velocity is the
+        # more direct signal for "rocking" -- force chatter is dominated by
+        # contact-solver noise that swamps small differences in push height.
         self.force_log = []
+        self.ang_log = []
 
         shove_steps = ramp_up_steps + hold_steps + ramp_down_steps
         for step in range(shove_steps):
@@ -409,6 +418,7 @@ class GenesisRobotController:
 
             if obj is not None:
                 self.force_log.append(as_numpy(obj.get_links_net_contact_force()).sum(axis=0))
+                self.ang_log.append(as_numpy(obj.get_ang()))
 
             new_contact_pos = self.link_local_point_world()
             actual_delta = new_contact_pos - prev_contact_pos
@@ -430,4 +440,4 @@ class GenesisRobotController:
                     f"qdot={qdot}",
                 )
 
-        self.stop_velocity(steps=settle_steps, camera=camera)
+        self.stop_velocity(steps=settle_steps, camera=camera, obj=obj)
