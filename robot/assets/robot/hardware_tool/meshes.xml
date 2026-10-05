@@ -1,0 +1,8 @@
+<mujoco>
+  <mesh name="hardware_adapter_robot" file="robot/hardware_tool/meshes/adapter_robot.stl" />
+  <mesh name="hardware_adapter_sensor" file="robot/hardware_tool/meshes/adapter_sensor.stl" />
+  <mesh name="hardware_sensor_body" file="robot/hardware_tool/meshes/sensor_body.stl" />
+  <mesh name="hardware_sensor_plate" file="robot/hardware_tool/meshes/sensor_plate.stl" />
+  <mesh name="hardware_ball" file="robot/hardware_tool/meshes/ball.stl" />
+  <mesh name="hardware_pusher_body" file="robot/hardware_tool/meshes/pusher_body.stl" />
+</mujoco>

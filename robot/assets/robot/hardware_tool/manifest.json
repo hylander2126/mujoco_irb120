@@ -1,0 +1,26 @@
+{
+  "source_commit": "83ee38617f9ef30b077074c0072a1c289407aa74",
+  "sha256": {
+    "urdf/sensor_and_adapter_assembly.urdf": "e225a2cc615251dda9c15bf9cf9324c945425a4a8d4658849c27b84ea533da92",
+    "urdf/finger_assembly.urdf": "509517d8b5563121e778fbd97f398c4e0116b65b32e18400b6466f477eb6646b",
+    "urdf/irb120_with_finger.xacro": "9c6bd2f49bdd890c583ab84112e1647c020acddcc751f05ea2ad2584d5bc2c1f",
+    "meshes/sensor_and_adapter_assembly/adapter_robot.gltf": "cf11b75ec0543a1b92243b72da553ba2abbcf7fac57fe61a74305de78639c84f",
+    "meshes/sensor_and_adapter_assembly/adapter_sensor.gltf": "fb9e49c43abdd53f867d0941bb918a62220f94ba68924687440db78b9b6995df",
+    "meshes/sensor_and_adapter_assembly/sensor_body.gltf": "32a2bd98affa9826d881557902fea1f5eb97039e50c8c8d922fa9e1441072ef7",
+    "meshes/sensor_and_adapter_assembly/sensor_plate.gltf": "7282cddf76ca533ebaaaeceddfd71ac6c2f4084d628b43498f48bd34d72d3df2",
+    "meshes/finger_assembly/ball.gltf": "ec5d092fb0ce7bbd678b76427a2057acaee24c173d47df4e6bdbf375ffc5b040",
+    "meshes/finger_assembly/pusher_body.gltf": "7be5feb736eaa2f054883b533b70bb8ad628726652e081e485e534c8cb5eaee6"
+  },
+  "finger_root_in_tool0_m": [
+    0.08582439683145071,
+    -2.277427434723847e-07,
+    -0.0005010324574679748
+  ],
+  "ball_in_tool0_m": [
+    0.17247559682941138,
+    -4.5767948337817743e-07,
+    -0.000501580681837921
+  ],
+  "measured_finger_mass_kg": 0.066,
+  "measured_finger_cog_m": 0.0275
+}

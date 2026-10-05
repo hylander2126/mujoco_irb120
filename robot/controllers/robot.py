@@ -136,11 +136,13 @@ class controller:
             g_S = R_BS.T @ np.asarray(self.model.opt.gravity, dtype=float) # TODO was .T but trying without
             # Pusher weight in sensor frame.
             weight_S = self.grav_mass * g_S
-            f_S -= weight_S
-            # Gravity torque about sensor origin: r_{sensor→fingertip} expressed in {S}.
-            r_B = self.data.site_xpos[self.fingertip_site] - self.data.site_xpos[self.ft_site]
+            # Raw MuJoCo wrench is the parent-on-child reaction (-weight).
+            # Remove gravity before the final sign flip to external wrench.
+            f_S += weight_S
+            # Gravity acts at the measured pusher CoM, not the fingertip.
+            r_B = self.data.xipos[self.pusher_body_id] - self.data.site_xpos[self.ft_site]
             r_S = R_BS.T @ r_B
-            t_S -= np.cross(r_S, weight_S)
+            t_S += np.cross(r_S, weight_S)
 
         w = np.concatenate([f_S, t_S])
 

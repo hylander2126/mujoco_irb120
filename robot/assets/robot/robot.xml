@@ -38,28 +38,21 @@
                                 <site name="site:tool0" pos="0 0 0" euler="0 0 0" size="0.01"/> <!-- rotated to match ft and adapter link -->
 
                                 <!-- Force sensor adapter, body, etc. -->
-                                <body name="ft_and_adapter_link" pos="0.041125 0 0" gravcomp="1">
-                                    <geom type="cylinder" size="0.0375 0.041125" euler="0 1.5708 0" rgba="0.5 0.5 0.5 1" mass="0.0"/>
-                                    <!-- Force Sensor Site : Real robot has +y up, +x into screen, +z right (aka sensor-axial)-->
-                                    <site name="site:sensor" pos="0.041125 0 0" euler="0 1.5708 1.5708" size="0.01" rgba="1 1 1 1"/>
-                                    
-                                    <!-- Pusher link -->
-                                    <body name="pusher_link" pos="0.041125 0 0" euler="0 0 0" gravcomp="1">
-                                        <!-- Visual mesh only; collision handled by explicit primitives. -->
-                                        <geom name="push_rod" type="mesh" mass="0.064" euler="0 1.5708 0" mesh="pusher_link" material="robot0:gripper_mat" contype="0" conaffinity="0"/>
-                                        <!-- Tip sphere collision model aligned to STL local frame.
-                                            Measured mesh bounds for pusher_link.stl:
-                                            - zmin = 0.000 m, zmax = 0.110 m
-                                            - ball diameter = 26.5 mm  => radius = 13.25 mm
-                                            - sphere center z = 0.110 - 0.01325 = 0.09675 m
-                                        -->
-                                        <geom name="push_ball_col" type="sphere" pos="0.09675 0 0" size="0.01325"
-                                              friction="1.5 0.02 0.001" condim="4" mass="0.0"/>
-                                        <!-- Ball center site -->
-                                        <site name="site:ball_center" pos="0.09675 0 0" euler="0 0 0" size="0.01" rgba="1 1 1 1"/>
-                                        <!-- Pusher contact site -->
-                                        <site name="site:fingertip" pos="0.11 0 0" euler="0 0 0" size="0.01" rgba="1 1 1 1"/>
+                                <body name="ft_and_adapter_link" gravcomp="1">
+                                    <geom name="tool_stack_col" type="cylinder" pos="0.0429 0 0" size="0.045 0.0429" euler="0 1.5707963267948966 0" mass="0" rgba="0.5 0.5 0.5 0" group="3" />
+                                    <site name="site:sensor" pos="0.08582439683145071 -2.277427434723847e-07 -0.0005010324574679748" euler="0 1.5707963267948966 1.5707963267948966" size="0.01" />
+                                    <body name="pusher_link" pos="0.08582439683145071 -2.277427434723847e-07 -0.0005010324574679748" gravcomp="1">
+                                        <geom name="hardware_ball" type="mesh" mesh="hardware_ball" mass="0" contype="0" conaffinity="0" rgba="0.615686 0.811765 0.929412 1" />
+                                        <geom name="push_rod" type="mesh" mesh="hardware_pusher_body" mass="0" contype="0" conaffinity="0" rgba="0.615686 0.811765 0.929412 1" />
+                                        <inertial pos="0.027499999999352785 -7.2973719318478e-08 -1.7398685965712252e-07" mass="0.066" fullinertia="1.537250000023675e-05 2.0402399999964577e-05 2.040239999979865e-05 1.334729130150451e-11 3.182314565021262e-11 -8.444564970516236e-17" />
+                                        <geom name="push_ball_col" type="sphere" pos="0.08665119999796066 -2.2993673990579274e-07 -5.482243699462275e-07" size="0.01325" friction="1.5 0.02 0.001" condim="4" mass="0" rgba="0 0 0 0" group="3" />
+                                        <site name="site:ball_center" pos="0.08665119999796066 -2.2993673990579274e-07 -5.482243699462275e-07" size="0.01" />
+                                        <site name="site:fingertip" pos="0.09990119999764882 -2.6509680466833214e-07 -6.320544023264774e-07" size="0.01" />
                                     </body>
+                                    <geom name="hardware_adapter_robot" type="mesh" mesh="hardware_adapter_robot" mass="0" contype="0" conaffinity="0" rgba="0.615686 0.811765 0.929412 1" />
+                                    <geom name="hardware_adapter_sensor" type="mesh" mesh="hardware_adapter_sensor" mass="0" contype="0" conaffinity="0" rgba="0.87451 0.447059 0.317647 1" />
+                                    <geom name="hardware_sensor_body" type="mesh" mesh="hardware_sensor_body" mass="0" contype="0" conaffinity="0" rgba="0.498039 0.498039 0.498039 1" />
+                                    <geom name="hardware_sensor_plate" type="mesh" mesh="hardware_sensor_plate" mass="0" contype="0" conaffinity="0" rgba="0.901961 0.901961 0.901961 1" />
                                 </body>
                             </body>
                         </body>
